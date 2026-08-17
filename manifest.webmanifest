@@ -1,0 +1,19 @@
+{
+  "name": "Lab de oído",
+  "short_name": "Lab oído",
+  "description": "Oído y verbos irregulares para hispanohablantes. A1 a B2.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e8f1ee",
+  "theme_color": "#0b7a72",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

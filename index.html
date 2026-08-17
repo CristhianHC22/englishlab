@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lab de oído</title>
+  <meta name="description" content="Laboratorio de oído y verbos irregulares. A1 a B2. Pulsa para oír." />
+  <meta name="theme-color" id="theme-color" content="#0b7a72" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Lab oído" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#hoy">Saltar al contenido</a>
+  <div id="welcome" class="welcome" hidden>
+    <div class="card welcome-card">
+      <p class="kicker">Cómo funciona</p>
+      <h2>Pulsa, oye, repite</h2>
+      <ol>
+        <li>Elige un nivel: A1 es fácil, B1 es la meta.</li>
+        <li>Los botones con triángulo <strong>suenan</strong> en inglés.</li>
+        <li>Haz los 4 pasos de Hoy (15 min). El resto es para explorar.</li>
+      </ol>
+      <p class="muted">Sirve para chicos desde ~10 años y para adultos. Chrome o Edge. Nada se sube a internet.</p>
+      <p><button type="button" class="btn" id="welcome-go">Empezar</button></p>
+    </div>
+  </div>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <div class="kicker">Laboratorio de oído · de A1 a B2</div>
+        <h1>Lab de oído</h1>
+        <p class="lede" id="level-lede">Pulsa las palabras para oírlas. 15 minutos al día. Empieza en fácil (A1) y sube cuando ya no te trabe.</p>
+        <div class="level-bar" role="group" aria-label="Nivel" id="level-bar"></div>
+        <p class="muted" id="level-blurb"></p>
+        <div class="row rate-row" role="group" aria-label="Velocidad de la voz">
+          <span class="muted">Voz:</span>
+          <button type="button" class="chip" data-rate="slow">Lenta</button>
+          <button type="button" class="chip" data-rate="normal">Normal</button>
+          <span class="muted">Fondo:</span>
+          <button type="button" class="chip" data-theme-set="light">Claro</button>
+          <button type="button" class="chip" data-theme-set="dark">Oscuro</button>
+          <button type="button" class="chip" data-hide-es aria-pressed="false" title="Oculta las traducciones">Reto: sin español</button>
+          <button type="button" class="chip" id="pwa-install" hidden>Instalar app</button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Secciones">
+      <button data-tab="hoy" aria-current="page">Hoy</button>
+      <button data-tab="vocales">Oír</button>
+      <button data-tab="verbos">Verbos</button>
+      <button data-tab="quiz">Juego</button>
+      <button data-tab="hablar">Hablar</button>
+      <button data-tab="ia">Ayuda</button>
+    </nav>
+
+    <section id="hoy" class="panel active">
+      <div class="card" style="margin-bottom:14px">
+        <p class="kicker">Misión del día</p>
+        <h2>15 minutos de oído</h2>
+        <p class="muted" id="home-stats"></p>
+        <p id="day-theme"></p>
+        <p class="muted" id="hoy-hint">La rutina cambia con el nivel.</p>
+        <div id="week-strip" class="week-strip"></div>
+        <div class="session-head">
+          <div>
+            <p class="muted" style="margin:12px 0 6px">Se marca solo: oye, pulsa, habla, termina un juego.</p>
+            <div id="hoy-check"></div>
+          </div>
+          <div class="timer-box">
+            <div id="hoy-clock">15:00</div>
+            <button type="button" class="btn" id="hoy-timer-btn">Empezar 15 min</button>
+          </div>
+        </div>
+        <div class="remind-box">
+          <label class="remind-label">Avisarme a
+            <input id="remind-time" type="time" value="18:00" />
+          </label>
+          <button type="button" class="chip" id="remind-toggle" aria-pressed="false">Activar aviso</button>
+          <p class="muted" id="remind-status">Elige una hora. Chrome avisa en este aparato; no hay servidor. La pestaña (o la app) tiene que seguir abierta.</p>
+        </div>
+        <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> saltan a cada paso.</p>
+        <div id="hoy-misses" class="ear-misses" hidden></div>
+        <details class="fold session-log-box">
+          <summary>Sesiones guardadas</summary>
+          <div id="session-log"></div>
+        </details>
+        <details class="fold session-log-box">
+          <summary>Copia de seguridad (cambiar de PC)</summary>
+          <div class="row" style="margin-top:10px">
+            <button type="button" class="btn ghost sm" id="prog-export">Exportar</button>
+            <button type="button" class="btn ghost sm" id="prog-import">Importar</button>
+            <input id="prog-file" type="file" accept="application/json,.json" hidden />
+          </div>
+          <p class="muted">Se guarda en este navegador, en este aparato. Exportar sirve si cambias de computadora.</p>
+        </details>
+      </div>
+      <div id="daily-tip" class="card lesson" style="margin-bottom:16px" hidden></div>
+
+      <details class="card lesson" style="margin-bottom:16px">
+        <summary>Qué significan débil y fuerte</summary>
+        <p>No hay verbos “débiles” o “fuertes” en la gramática inglesa. <strong>Tú</strong> marcas cómo se te dan:</p>
+        <div class="mini-table">
+          <div>
+            <strong>Débil</strong>
+            <div class="muted">Este verbo <em>se te traba</em> (formas o pronunciación). Lo marcas tú, o el quiz lo marca si fallas. Mañana sale más veces en “Hoy” para que lo practiques.</div>
+          </div>
+          <div>
+            <strong>Fuerte</strong>
+            <div class="muted">Este ya te sale: lo recuerdas y lo dices bien. No es que el verbo sea fácil; es que <em>tú</em> ya lo dominas. El filtro “Sin fuerte” esconde estos para estudiar solo lo que falta.</div>
+          </div>
+          <div>
+            <strong>Mazo del nivel</strong>
+            <div class="muted">Los verbos de tu CEFR: A1 = 15 básicos, A2–B1 = 40 frecuentes, B2 = los 193. No son “los débiles”.</div>
+          </div>
+          <div>
+            <strong>Racha</strong>
+            <div class="muted">Días seguidos que abriste y practicaste (oír, quiz o voz). Si saltas un día, vuelve a 0.</div>
+          </div>
+          <div>
+            <strong>I + pasado vs I have…</strong>
+            <div class="muted"><em>I wrote</em> = ayer, un momento concreto. <em>I have written</em> = experiencia hasta ahora (típico al contar qué sabes hacer).</div>
+          </div>
+          <div>
+            <strong>Ojo: “palabras débiles” en Oído (B1)</strong>
+            <div class="muted">Eso es <em>otra cosa</em>: en inglés las palabritas <em>to, of, can, the</em> se pronuncian flojas. No tiene que ver con el botón <em>Débil</em> de los verbos.</div>
+          </div>
+        </div>
+      </details>
+      <article class="step-card" id="hoy-step-1">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">1</span>
+          <div>
+            <h3>Oye estas parejas</h3>
+            <p class="muted">Pulsa. Son dos palabras que se parecen. El truco está en la diferencia.</p>
+          </div>
+          <button type="button" class="btn ghost sm" id="play-daily-pairs">Oír las 4</button>
+        </div>
+        <div id="daily-pairs" class="grid grid-2"></div>
+      </article>
+      <article class="step-card" id="block-daily-role" data-hoy-step="2">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">2</span>
+          <div>
+            <h3>Palabra camaleón</h3>
+            <p class="muted">Misma escritura, otro trabajo. Oye la frase, no la palabra suelta.</p>
+          </div>
+        </div>
+        <div id="daily-role"></div>
+      </article>
+      <article class="step-card" id="hoy-step-3">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">3</span>
+          <div>
+            <h3>10 verbos del día</h3>
+            <p class="muted">Pulsa Presente, 3 formas o I have…</p>
+          </div>
+        </div>
+        <div id="daily-verbs" class="card"></div>
+      </article>
+      <article class="step-card" id="hoy-step-4">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">4</span>
+          <div>
+            <h3>Di estas frases</h3>
+            <p class="muted">Escucha. Luego ve a Hablar y grábate.</p>
+          </div>
+        </div>
+        <div id="interview-list" class="grid"></div>
+      </article>
+    </section>
+
+    <section id="vocales" class="panel">
+      <div class="card">
+        <h2>Oír: por qué cambia cada vocal</h2>
+        <p>Pulsa para oír. Empieza por las reglas. El mapa y los tips están más abajo. Meta: B1.</p>
+        <p><button type="button" class="btn" id="start-ear-from-oido">Jugar: ¿cap o cape?</button></p>
+        <nav class="oido-toc" id="oido-toc" aria-label="En esta página"></nav>
+      </div>
+      <div id="vowel-intro"></div>
+      <h3 id="oido-decidir">Cómo decidir</h3>
+      <div id="vowel-decide" class="grid"></div>
+      <h3 id="oido-reglas">Las reglas, con audio</h3>
+      <div id="vowel-rules"></div>
+      <h3 id="oido-clave">Clave de la transcripción</h3>
+      <div id="vowel-key" class="card"></div>
+      <h3 id="oido-mapa">Mapa por letra (clic = escuchar)</h3>
+      <div id="vowel-maps" class="grid grid-2"></div>
+      <h3 id="oido-contrastes">Contrastes</h3>
+      <div id="vowel-pairs" class="grid grid-3"></div>
+      <h3 id="oido-trampas">Trampas de hispanohablante</h3>
+      <div id="vowel-traps" class="grid grid-2"></div>
+      <div id="block-roles">
+        <h3 id="oido-roles">Misma palabra: verbo, sustantivo o adjetivo</h3>
+        <p class="muted">Se escribe igual, pero el <em>trabajo</em> en la frase cambia. A veces se mueve el acento (REcord / reCORD), a veces el sonido (live [liv] vs live [laiv]). Oye <strong>la oración</strong>: si pulsas solo la palabra, el sintetizador elige una sola.</p>
+        <div id="roles-list"></div>
+      </div>
+      <div id="block-b1-stress" hidden>
+      <h3 id="oido-acento">Acento tónico de palabra</h3>
+      <div id="stress-list" class="grid grid-2"></div>
+      </div>
+      <div id="block-b1-ough">
+      <h3 id="oido-ough">ough — misma escritura, muchos sonidos</h3>
+      <div id="ough-list" class="row" style="gap:8px;flex-wrap:wrap"></div>
+      </div>
+      <div id="block-a2-extra">
+      <h3 id="oido-mudas">Letras y sílabas que no se dicen</h3>
+      <p class="muted">sometimes no es so-me-ti-mes: son <strong>sám-taimz</strong> (la E no es sílaba). Abajo: E muda, sílabas que se comen, y letras mudas (K, W, L, T…).</p>
+      <div id="silent-list"></div>
+      <h3 id="oido-contra">Contracciones</h3>
+      <div id="contraction-list" class="grid grid-3"></div>
+      </div>
+      <div id="block-endings">
+        <h3 id="oido-endings">Terminaciones, C/G y el golpe</h3>
+        <p class="muted">-tion no es “ción”. En phrasals el golpe va en OFF/UP. C, G y CH cambian según la letra de al lado.</p>
+        <div id="endings-list"></div>
+      </div>
+      <div id="block-rhythm">
+        <h3 id="oido-ritmo">Ritmo y habla conectada</h3>
+        <div id="rhythm-list"></div>
+      </div>
+      <div id="block-b-tips">
+        <h3 id="oido-tips">Tips B1 / B2 — lo que suele faltar</h3>
+        <p class="muted">Vocales y verbos ya están. Esto es lo que más delata a un hispanohablante en conversación. Pulsa para oír. En B1 ves los de B1; en B2 aparecen los demás (flap T, gonna, unir palabras).</p>
+        <div id="tips-list"></div>
+      </div>
+    </section>
+
+    <section id="verbos" class="panel">
+      <div class="card">
+        <h2>Verbos irregulares</h2>
+        <p class="muted">A1: 15 esenciales. A2–B1: 40 frecuentes. B2: los 193. <em>I + pasado</em> = ayer; <em>I have…</em> = experiencia.</p>
+        <input id="verb-search" type="search" placeholder="Busca: go, ir, thought, escribir, I have…" />
+        <div id="verb-filters" class="row" style="margin-top:10px"></div>
+        <p class="muted" id="verb-count"></p>
+        <p class="muted"><strong>Débil</strong> = se te traba (repásalo). <strong>Fuerte</strong> = ya te sale. No son tipos de verbo en inglés; son tu lista personal. En Oído (B1), “palabras débiles” (to, of, can) es otro tema: cómo se aplastan en la frase.</p>
+      </div>
+      <div id="verb-list" class="card" style="margin-top:12px"></div>
+    </section>
+
+    <section id="quiz" class="panel">
+      <div class="card">
+        <h2>Elige un juego</h2>
+        <p class="muted">Al terminar un round se marca en Hoy. En oído: teclas <strong>1</strong> y <strong>2</strong>; <strong>espacio</strong> = oír otra vez. En examen las palabras salen <em>después</em> de oír.</p>
+        <label class="muted"><input type="checkbox" id="quiz-starter" checked> Solo verbos de mi nivel</label>
+        <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego">
+          <button type="button" class="mode-pick on" data-quiz-mode="choice">
+            <strong>Verbos</strong>
+            <span>Elige la forma correcta</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="type">
+            <strong>Escribir</strong>
+            <span>Tú pones el pasado</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="ear">
+            <strong>Oído</strong>
+            <span>¿Qué palabra oíste?</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="exam">
+            <strong>Examen</strong>
+            <span>Oyes primero. Luego ves las dos.</span>
+          </button>
+        </div>
+        <select id="quiz-mode" hidden>
+          <option value="choice">Verbos: opción múltiple</option>
+          <option value="type">Verbos: escribir pasado / participio</option>
+          <option value="ear">Oído: ¿qué palabra oíste?</option>
+          <option value="exam">Examen de oído</option>
+        </select>
+        <div><button class="btn" id="quiz-start">¡Jugar!</button></div>
+      </div>
+      <div id="ear-misses" class="card ear-misses" style="margin-top:12px" hidden></div>
+      <div id="quiz-box" style="margin-top:12px"></div>
+    </section>
+
+    <section id="hablar" class="panel">
+      <div class="card">
+        <h2>Di esto</h2>
+        <p class="muted">Oye el modelo, grábate, escúchate y vuelve a oír. Si el micrófono no abre, oye y habla en voz alta igual.</p>
+        <div class="speak-steps" aria-hidden="true">
+          <span>1 Oye</span>
+          <span>2 Graba</span>
+          <span>3 Escúchate</span>
+          <span>4 Oye otra vez</span>
+        </div>
+        <label class="muted"><input type="checkbox" id="speak-starter" checked> Solo frases de mi nivel</label>
+        <p class="quiz-q" id="speak-target"></p>
+        <p class="muted" id="speak-help"></p>
+        <div class="row">
+          <button class="btn ghost" id="speak-listen">Oír modelo</button>
+          <button type="button" class="btn" id="speak-rec">Grabarme</button>
+          <button class="btn ghost" id="speak-go">¿Me entendió?</button>
+          <button class="btn ghost" id="speak-next">Otra frase</button>
+        </div>
+        <audio id="speak-playback" controls hidden style="width:100%;margin-top:12px"></audio>
+        <p class="status" id="speak-status"></p>
+      </div>
+    </section>
+
+    <section id="ia" class="panel">
+      <div class="card">
+        <h2>Ayuda de una IA (gratis)</h2>
+        <p>Copia un texto y pégalo en ChatGPT, Claude o Gemini. Dile tu nivel. Esta página no cobra nada.</p>
+      </div>
+      <div id="ai-prompts" class="grid" style="margin-top:12px"></div>
+      <div class="card" style="margin-top:16px">
+        <h3>Plan de 21 días (15 min)</h3>
+        <ol id="plan-list"></ol>
+      </div>
+    </section>
+
+    <footer>
+      Lab de oído · pulsa para oír · Chrome o Edge · se guarda aquí.
+    </footer>
+  </div>
+  <script src="data.js"></script>
+  <script src="guide.js"></script>
+  <script src="levels.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
