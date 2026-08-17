@@ -1,4 +1,4 @@
-# Lab de oído
+# English Lab
 
 Página **gratis**, sin servidor. Pulsa las palabras para oírlas. A1 → B2. Meta: B1.
 

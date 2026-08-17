@@ -1,4 +1,4 @@
-/* Lab de oído — datos (inglés americano). Generado: 193 verbos del documento. */
+/* English Lab — datos (inglés americano). Generado: 193 verbos del documento. */
 window.ENLAB = {
   "familyNames": {
     "same": "No cambian",

@@ -1676,7 +1676,7 @@ function fireRemind() {
   localStorage.setItem("enlab-remind-last", todayKey());
   buzz(true);
   try {
-    new Notification("Lab de oído", {
+    new Notification("English Lab", {
       body: "Son 15 minutos. Abre Hoy y pulsa Empezar.",
       icon: "./icon.svg",
       tag: "enlab-daily",

@@ -1,6 +1,6 @@
 {
-  "name": "Lab de oído",
-  "short_name": "Lab oído",
+  "name": "English Lab",
+  "short_name": "English Lab",
   "description": "Oído y verbos irregulares para hispanohablantes. A1 a B2.",
   "start_url": "./index.html",
   "scope": "./",
