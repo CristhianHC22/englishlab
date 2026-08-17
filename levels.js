@@ -4,30 +4,39 @@ ENLAB.verbsA1 = [
   "give", "know", "think", "find", "leave",
 ];
 
+/* A2: los de A1 + vida diaria (comer, oír, pagar…). No raros de diccionario. */
+ENLAB.verbsA2 = [
+  "be", "have", "do", "go", "get", "make", "take", "see", "say", "come",
+  "give", "know", "think", "find", "leave",
+  "eat", "buy", "sleep", "hear", "feel", "sit", "spend", "hurt", "fall", "drink",
+  "drive", "forget", "wear", "let", "sell", "win", "run", "put", "set", "pay",
+  "meet", "read", "write", "speak", "tell",
+];
+
 ENLAB.cefr = {
   a1: {
     num: 1,
     name: "A1",
     title: "Principiante",
     short: "Fácil",
-    goal: "Sonidos que el español no tiene y los 15 verbos más usados. Frases cortas.",
-    next: "Cuando cap/cape y go/went/gone te salgan sin dudar, pasa a A2.",
+    goal: "Sonidos que el español no tiene, 15 verbos + regulares (-ed) y frases para pedir ayuda.",
+    next: "Cuando cap/cape, go/went y “Can you say that again?” te salgan, pasa a A2.",
   },
   a2: {
     num: 2,
     name: "A2",
     title: "Básico",
     short: "Base",
-    goal: "E muda, dos vocales, -ed/-s, contracciones, 40 verbos. I went / I have gone.",
-    next: "Cuando escuches la diferencia ship/sheep y uses I've, pasa a B1.",
+    goal: "E muda, -ed/-s, contracciones, verbos de la vida diaria. I went / I'm going to.",
+    next: "Cuando oigas ship/sheep y uses I've o Did you…?, pasa a B1.",
   },
   b1: {
     num: 3,
     name: "B1",
     title: "Intermedio (meta)",
     short: "Meta",
-    goal: "Schwa, acento de palabra, R, ough, present perfect, ritmo básico. Aquí ya puedes defender una conversación.",
-    next: "Si te entienden siempre pero suenas “español con palabras en inglés”, prueba B2. En Oído abre Tips B1/B2.",
+    goal: "Schwa, TH/V, present perfect, opiniones y 40+ irregulares. Defender una conversación.",
+    next: "Si te entienden siempre pero suenas “español con palabras en inglés”, prueba B2. En Oído: tips y calcos.",
   },
   b2: {
     num: 4,
@@ -39,16 +48,46 @@ ENLAB.cefr = {
   },
 };
 
-ENLAB.vowelRules.forEach((r, i) => { r.min = [1, 1, 2, 3, 3, 3, 2][i]; });
+ENLAB.vowelRules.forEach((r, i) => { r.min = [1, 1, 2, 3, 3, 3, 1][i]; });
 ENLAB.decideSteps.forEach((s, i) => { s.min = [1, 1, 2, 3, 3][i]; });
 
 ENLAB.phrasesA1 = [
-  { en: "I go to work every day.", es: "Voy al trabajo todos los días." },
-  { en: "I have a question.", es: "Tengo una pregunta." },
-  { en: "I did it yesterday.", es: "Lo hice ayer." },
-  { en: "Can you help me?", es: "¿Puedes ayudarme?" },
-  { en: "I don't know.", es: "No sé." },
+  { en: "Hi. How are you?", es: "Hola. ¿Cómo estás?" },
+  { en: "I'm fine, thanks. And you?", es: "Bien, gracias. ¿Y tú?" },
+  { en: "Nice to meet you.", es: "Gusto en conocerte." },
+  { en: "What's your name?", es: "¿Cómo te llamas?" },
+  { en: "My name is Ana.", es: "Me llamo Ana." },
   { en: "See you tomorrow.", es: "Nos vemos mañana." },
+  { en: "Have a good day.", es: "Que tengas buen día." },
+  { en: "Excuse me.", es: "Perdón / con permiso." },
+  { en: "Thank you.", es: "Gracias." },
+  { en: "You're welcome.", es: "De nada." },
+  { en: "I don't know.", es: "No sé." },
+  { en: "I don't understand.", es: "No entiendo." },
+  { en: "Can you help me?", es: "¿Puedes ayudarme?" },
+  { en: "Can you say that again, please?", es: "¿Puedes repetirlo, por favor?" },
+  { en: "Sorry, I didn't catch that.", es: "Perdón, no te oí / no lo pillé." },
+  { en: "Please speak slowly.", es: "Habla despacio, por favor." },
+  { en: "What does this mean?", es: "¿Qué significa esto?" },
+  { en: "I have a question.", es: "Tengo una pregunta." },
+  { en: "I live in Ecuador.", es: "Vivo en Ecuador." },
+  { en: "I go to work every day.", es: "Voy al trabajo todos los días." },
+  { en: "I work in an office.", es: "Trabajo en una oficina." },
+  { en: "I'm hungry.", es: "Tengo hambre. (no: I have hungry)" },
+  { en: "I'm thirsty.", es: "Tengo sed." },
+  { en: "I'm tired.", es: "Estoy cansado/a." },
+  { en: "I like this.", es: "Me gusta esto." },
+  { en: "I need help.", es: "Necesito ayuda." },
+  { en: "What time is it?", es: "¿Qué hora es?" },
+  { en: "How much is this?", es: "¿Cuánto cuesta esto?" },
+  { en: "Where is the bathroom?", es: "¿Dónde está el baño?" },
+  { en: "I did it yesterday.", es: "Lo hice ayer." },
+  { en: "I was at home.", es: "Estaba / estuve en casa." },
+  { en: "I went to work yesterday.", es: "Ayer fui al trabajo." },
+  { en: "I can do it.", es: "Puedo hacerlo." },
+  { en: "Do you speak Spanish?", es: "¿Hablas español?" },
+  { en: "Yes, I do.", es: "Sí." },
+  { en: "No, I don't.", es: "No." },
 ];
 
 ENLAB.rhythm = [
@@ -78,6 +117,41 @@ ENLAB.rhythm = [
   },
 ];
 
+ENLAB.phrasesA2 = [
+  { en: "What did you do yesterday?", es: "¿Qué hiciste ayer? (Did + verbo; no “You did what?”)" },
+  { en: "Where did you go?", es: "¿Adónde fuiste?" },
+  { en: "Did you see it?", es: "¿Lo viste?" },
+  { en: "I didn't get it.", es: "No lo entendí." },
+  { en: "I finished work at six.", es: "Terminé a las seis. finished = [fínisht], no “finisheD-ed”." },
+  { en: "I was tired yesterday.", es: "Ayer estaba cansado. I was (no I were)." },
+  { en: "They were at home.", es: "Ellos estaban en casa. they were." },
+  { en: "I'm going to call you tomorrow.", es: "Te voy a llamar mañana." },
+  { en: "I'll take it.", es: "Me lo llevo. (decisión ahora)" },
+  { en: "I have to go.", es: "Tengo que irme. have to ≈ háfta" },
+  { en: "Could you help me?", es: "¿Me podrías ayudar? (más cortés que Can you)" },
+  { en: "I'd like a coffee, please.", es: "Quisiera un café, por favor." },
+  { en: "How do I get to the station?", es: "¿Cómo llego a la estación?" },
+  { en: "It's bigger than this.", es: "Es más grande que esto. than ≈ [dhən], no then." },
+  { en: "There is a problem.", es: "Hay un problema." },
+  { en: "There are two rooms.", es: "Hay dos habitaciones." },
+  { en: "I'm looking for the bank.", es: "Estoy buscando el banco." },
+  { en: "What's the matter?", es: "¿Qué pasa?" },
+  { en: "Let's go.", es: "Vamos." },
+  { en: "Can I ask you something?", es: "¿Puedo preguntarte algo?" },
+  { en: "I need to think about it.", es: "Necesito pensarlo." },
+  { en: "She likes it. He doesn't like it.", es: "A ella le gusta. A él no. (he/she + -s)" },
+  { en: "I've already done it.", es: "Ya lo he hecho. (puente a B1)" },
+  { en: "Sorry I'm late.", es: "Perdón por la tardanza." },
+  { en: "How much is five fifty?", es: "¿Cuánto es $5.50? Se oye five fifty." },
+  { en: "I was at the store.", es: "Estaba / estuve en la tienda. I was." },
+  { en: "We were busy.", es: "Estábamos ocupados. we were (no we was)." },
+  { en: "Do you have any questions?", es: "¿Tienes alguna pregunta?" },
+  { en: "I usually get up at six.", es: "Normalmente me levanto a las seis." },
+  { en: "I'm looking it up.", es: "Lo estoy buscando (en Google, etc.)." },
+  { en: "Wait a minute, please.", es: "Un momento, por favor." },
+  { en: "That was helpful. Thanks.", es: "Eso ayudó. Gracias." },
+];
+
 ENLAB.phrasesB1 = [
   { en: "I went there yesterday.", es: "Fui ayer. (momento concreto → pasado simple)" },
   { en: "I have already done it.", es: "Ya lo he hecho. (experiencia / resultado ahora)" },
@@ -87,10 +161,30 @@ ENLAB.phrasesB1 = [
   { en: "Can I ask you something?", es: "¿Puedo preguntarte algo? can átono ≈ [kən]" },
   { en: "I've never tried that.", es: "Nunca lo he probado." },
   { en: "That sounds good.", es: "Suena bien." },
-  { en: "It depends.", es: "Depende." },
+  { en: "It depends.", es: "Depende. (luego: It depends on you)" },
   { en: "I'm not sure yet.", es: "Aún no estoy seguro." },
   { en: "See what I mean?", es: "¿Me entiendes?" },
   { en: "I didn't get it.", es: "No lo entendí / no lo conseguí." },
+  { en: "I've never been there.", es: "Nunca he estado ahí." },
+  { en: "How long have you worked here?", es: "¿Cuánto tiempo llevas trabajando aquí?" },
+  { en: "I've lived here for two years.", es: "Llevo dos años viviendo aquí. for = duración" },
+  { en: "I've lived here since 2020.", es: "Vivo aquí desde 2020. since = punto de inicio" },
+  { en: "I used to live there.", es: "Antes vivía ahí. used to ≈ [yúustə]" },
+  { en: "I'll send it today.", es: "Lo envío hoy. (decisión / promesa)" },
+  { en: "I'm going to start tomorrow.", es: "Voy a empezar mañana. (plan)" },
+  { en: "It depends on you.", es: "Depende de ti. (no: depend of)" },
+  { en: "I agree with you.", es: "Estoy de acuerdo. (no: I am agree)" },
+  { en: "Could you explain that to me?", es: "¿Me lo podrías explicar? (no: explain me)" },
+  { en: "People are waiting.", es: "La gente está esperando. people = plural" },
+  { en: "I'm 25.", es: "Tengo 25 años. (no: I have 25 years)" },
+  { en: "What do you mean?", es: "¿Qué quieres decir?" },
+  { en: "Let me think.", es: "Déjame pensar." },
+  { en: "The thing is, I need more time.", es: "El tema es que necesito más tiempo." },
+  { en: "In my opinion, that's fine.", es: "En mi opinión, está bien." },
+  { en: "I don't think so.", es: "No creo / no me parece." },
+  { en: "That makes sense.", es: "Tiene sentido." },
+  { en: "Would you mind repeating that?", es: "¿Te importaría repetirlo?" },
+  { en: "Thanks for your help.", es: "Gracias por tu ayuda." },
 ];
 
 ENLAB.phrasesB2 = [
@@ -104,6 +198,14 @@ ENLAB.phrasesB2 = [
   { en: "It's kind of complicated.", es: "Es un poco complicado. kind of ≈ [káində]" },
   { en: "I would have done the same.", es: "Hubiera hecho lo mismo. would've ≈ [wúdəv]" },
   { en: "Let's get it over with.", es: "Terminemos de una vez." },
+  { en: "If I have time, I'll call you.", es: "Si tengo tiempo, te llamo. (first conditional)" },
+  { en: "I might be late.", es: "Puede que llegue tarde." },
+  { en: "To be honest, I'm not convinced.", es: "Sinceramente, no me convence." },
+  { en: "Could you walk me through it?", es: "¿Me lo podrías explicar paso a paso?" },
+  { en: "That actually helps.", es: "Eso sí ayuda. actually ≠ actualmente" },
+  { en: "I'll get back to you today.", es: "Te respondo hoy." },
+  { en: "We need to make a decision.", es: "Hay que tomar una decisión. make, no do" },
+  { en: "Can I borrow your charger?", es: "¿Me prestas el cargador? borrow = yo recibo" },
 ];
 
 ENLAB.bTips = [
@@ -206,14 +308,14 @@ ENLAB.bTips = [
     min: 3,
     tag: "B1 · calco",
     title: "Frases que delatan traducción",
-    body: "No es fonética, pero se oye en B1: I have 25 years → I'm 25. I am agree → I agree. Explain me → Explain it to me. People is → People are. Depend of → It depends on. Si las dices “bien pronunciadas” pero así, igual suenan a español.",
+    body: "No es fonética, pero se oye: I have 25 years → I'm 25. I am agree → I agree. I have hungry → I'm hungry. Explain me → Explain it to me. People is → People are. Depend of → It depends on. Actually no es «actualmente» (eso es currently). En Oído, «Calcos y pares» tiene make/do, say/tell, since/for y lend/borrow.",
     listen: ["I'm 25", "I agree", "Explain it to me", "People are waiting", "It depends on you"],
   },
   {
     min: 3,
     tag: "B1 · ¿ya llego?",
     title: "Checklist de oído B1 (este lab)",
-    body: "Esto NO es el B1 de Cambridge (faltan gramática, lectura y writing). En ESTE lab, B1 es: distingues ship/sheep y cap/cape; TH y V te salen; usas I've + participio; 40 verbos irregulares sin congelarte; marcas el golpe en deVElop. Si eso te sale, el lab hizo su parte. El resto es hablar con gente y oír inglés real 10 min al día.",
+    body: "Esto NO es el B1 de Cambridge (faltan gramática, lectura y writing). En ESTE lab, B1 es: distingues ship/sheep y cap/cape; TH y V te salen; usas I've + participio; 40 verbos irregulares sin congelarte; marcas el golpe en deVElop; sales del calco (I'm 25, I agree, It depends on). Si eso te sale, el lab hizo su parte. El resto es hablar con gente y oír inglés real 10 min al día.",
     listen: ["ship", "sheep", "I've done it", "develop"],
   },
   {
@@ -346,4 +448,217 @@ ENLAB.prompts = [
     title: "Diagnóstico B1 / B2 (oído)",
     text: "Soy hispanohablante. Nivel objetivo B1, quiero saber si me falta algo de oído/pronunciación para B1 o B2. No hagas un curso de gramática. Pregúntame 6 cosas cortas (TH, B/V, can/can't, I went vs I have, been, ritmo). Luego dime 3 agujeros y 3 drills de 5 minutos. Empieza.",
   },
+  {
+    title: "Simulacro de entrevista",
+    text: "Haz de reclutador para un puesto que yo te diré (LATAM, remoto). Habla en inglés simple (A2–B1). Después de cada respuesta: corrige solo 2 cosas (gramática o pronunciación descrita), reformula en inglés natural, y haz la siguiente pregunta. Empieza con: Why are you interested in this position?",
+  },
+  {
+    title: "Chunks y calcos",
+    text: "Soy hispanohablante, nivel [A1/A2/B1]. Quiero frases listas para la boca, no gramática larga. Dame 10 chunks. En cada uno: 1) la frase, 2) el calco típico en español, 3) por qué falla, 4) para repetir 5 veces. Hoy: pedir que repitan, I'm hungry, I agree, make vs do, say vs tell.",
+  },
 ];
+
+ENLAB.dialogsA1 = [
+  { a: { en: "Hi. How are you?", es: "Hola. ¿Cómo estás?" }, b: { en: "I'm fine, thanks. And you?", es: "Bien, gracias. ¿Y tú?" } },
+  { a: { en: "What's your name?", es: "¿Cómo te llamas?" }, b: { en: "My name is Ana. Nice to meet you.", es: "Me llamo Ana. Gusto en conocerte." } },
+  { a: { en: "Can you help me?", es: "¿Puedes ayudarme?" }, b: { en: "Sure. What's the problem?", es: "Claro. ¿Cuál es el problema?" } },
+  { a: { en: "Do you speak English?", es: "¿Hablas inglés?" }, b: { en: "A little. Please speak slowly.", es: "Un poco. Habla despacio, por favor." } },
+  { a: { en: "Sorry, I didn't catch that.", es: "Perdón, no te oí." }, b: { en: "Can you say that again, please?", es: "¿Puedes repetirlo, por favor?" } },
+  { a: { en: "Where is the bathroom?", es: "¿Dónde está el baño?" }, b: { en: "It's over there.", es: "Está por allá." } },
+  { a: { en: "Are you hungry?", es: "¿Tienes hambre?" }, b: { en: "Yes, I'm hungry.", es: "Sí, tengo hambre. (I'm hungry)" } },
+  { a: { en: "What time is it?", es: "¿Qué hora es?" }, b: { en: "It's three o'clock.", es: "Son las tres." } },
+];
+
+ENLAB.dialogsA2 = [
+  { a: { en: "What did you do yesterday?", es: "¿Qué hiciste ayer?" }, b: { en: "I went to work. Then I stayed home.", es: "Fui al trabajo. Luego me quedé en casa." } },
+  { a: { en: "Are you going to come?", es: "¿Vas a venir?" }, b: { en: "Yes, I'm going to come at six.", es: "Sí, voy a ir a las seis." } },
+  { a: { en: "Could you help me?", es: "¿Me podrías ayudar?" }, b: { en: "Sure, one second.", es: "Claro, un segundo." } },
+  { a: { en: "How much is this?", es: "¿Cuánto cuesta esto?" }, b: { en: "It's five fifty.", es: "$5.50. Se oye five fifty." } },
+  { a: { en: "Did you finish it?", es: "¿Lo terminaste?" }, b: { en: "Not yet. I need more time.", es: "Todavía no. Necesito más tiempo." } },
+  { a: { en: "Where did you go?", es: "¿Adónde fuiste?" }, b: { en: "I went home.", es: "Me fui a casa." } },
+];
+
+ENLAB.dialogsB1 = [
+  { a: { en: "Have you ever tried that?", es: "¿Alguna vez lo has probado?" }, b: { en: "I've never tried that.", es: "Nunca lo he probado." } },
+  { a: { en: "How long have you worked here?", es: "¿Cuánto llevas aquí?" }, b: { en: "I've worked here for two years.", es: "Llevo dos años. for = duración" } },
+  { a: { en: "Can I ask you something?", es: "¿Puedo preguntarte algo?" }, b: { en: "Sure, go ahead.", es: "Claro, dime." } },
+  { a: { en: "I didn't get it.", es: "No lo entendí." }, b: { en: "Let me explain it to you.", es: "Déjame explicártelo. (explain it to)" } },
+  { a: { en: "Are you free tomorrow?", es: "¿Estás libre mañana?" }, b: { en: "It depends. Let me check.", es: "Depende. Déjame revisar." } },
+  { a: { en: "Why are you interested in this position?", es: "¿Por qué te interesa este puesto?" }, b: { en: "I want to grow on this team.", es: "Quiero crecer en este equipo." } },
+];
+
+ENLAB.dialogsB2 = [
+  { a: { en: "I've been meaning to tell you.", es: "Tenía pensado decírtelo." }, b: { en: "What's up?", es: "¿Qué pasa?" } },
+  { a: { en: "Should we wait?", es: "¿Esperamos?" }, b: { en: "We're gonna have to wait.", es: "Vamos a tener que esperar." } },
+  { a: { en: "Did you see it?", es: "¿Lo viste? (rápido: didja)" }, b: { en: "Yeah, I saw it.", es: "Sí, lo vi." } },
+  { a: { en: "Can I borrow this?", es: "¿Me lo prestas? (borrow = yo tomo)" }, b: { en: "Sure, I can lend it to you.", es: "Claro, te lo presto. (lend = yo doy)" } },
+];
+
+ENLAB.chunkTips = [
+  {
+    min: 1,
+    tag: "A1 · calco",
+    title: "Tengo hambre ≠ I have hungry",
+    body: "Hambre, sed, frío, 25 años: en inglés es I AM, no I HAVE. I'm hungry. I'm thirsty. I'm cold. I'm 25. I have se queda para objetos: I have a question. I have a car.",
+    listen: ["I'm hungry", "I'm thirsty", "I'm cold", "I'm 25", "I have a question"],
+  },
+  {
+    min: 1,
+    tag: "A1 · aula",
+    title: "Pedir que repitan (el chunk que más se usa)",
+    body: "Sorry, I didn't catch that. Can you say that again, please? Please speak slowly. I don't understand. Practícalos hasta que salgan sin traducir. En clase real esto te salva más que 50 verbos raros.",
+    listen: ["Sorry, I didn't catch that", "Can you say that again, please?", "Please speak slowly", "I don't understand"],
+  },
+  {
+    min: 1,
+    tag: "A1 · calco",
+    title: "Estoy de acuerdo ≠ I am agree",
+    body: "Agree ya es verbo: I agree. I don't agree. I agree with you. Nunca I am agree ni I am agree with. People are waiting (people es plural). Explain it to me, no explain me.",
+    listen: ["I agree", "I don't agree", "I agree with you", "People are waiting", "Explain it to me"],
+  },
+  {
+    min: 2,
+    tag: "A2 · make / do",
+    title: "make vs do (no son “hacer”)",
+    body: "do = tareas y “lo hago”: do homework, do the dishes, do my best, I did it. make = crear o una decisión: make a cake, make a plan, make a mistake, make a decision. Trampa: make the bed. Si dudas, do it es más genérico; make a plan es el otro polo.",
+    listen: ["do homework", "I did it", "make a plan", "make a mistake", "make a decision", "make the bed"],
+  },
+  {
+    min: 2,
+    tag: "A2 · say / tell",
+    title: "say vs tell",
+    body: "say algo: She said no. He said that he was busy. tell alguien: Tell me. She told me the news. No: She said me. Excuse me y tell me se oyen distinto: excuse [ex-KYÚUZ] vs tell [tel].",
+    listen: ["She said no", "Tell me", "She told me the news", "What did you say?"],
+  },
+  {
+    min: 2,
+    tag: "A2 · actually",
+    title: "actually no es «actualmente»",
+    body: "actually = en realidad / de hecho (a veces corrige). Actualmente = currently / right now. I'm currently working vs I actually like it. Esta pareja delata en correos y entrevistas.",
+    listen: ["I actually like it", "I'm currently working", "That actually helps"],
+  },
+  {
+    min: 3,
+    tag: "B1 · since / for",
+    title: "since vs for con I have…",
+    body: "for + cantidad: for two years, for a week. since + punto de inicio: since 2020, since Monday. I've lived here for two years. I've lived here since 2020. No mezcles yesterday con have (I went yesterday).",
+    listen: ["I've lived here for two years", "I've lived here since 2020", "I went there yesterday"],
+  },
+  {
+    min: 3,
+    tag: "B1 · lend / borrow",
+    title: "lend vs borrow (prestar)",
+    body: "borrow = yo recibo (¿me lo prestas?): Can I borrow your charger? lend = yo doy: I can lend it to you. El español usa “prestar” para los dos lados; el inglés no. Can you lend me…? también vale.",
+    listen: ["Can I borrow your charger?", "I can lend it to you", "Can you lend me a pen?"],
+  },
+];
+
+ENLAB.regulars = [
+  { inf: "work", past: "worked", pp: "worked", es: "trabajar", pInf: "werk", pPast: "werkt", pPp: "werkt", fam: "reg", min: 1, work: true, iPast: "I worked yesterday.", iHave: "I have worked here." },
+  { inf: "live", past: "lived", pp: "lived", es: "vivir", pInf: "liv", pPast: "livd", pPp: "livd", fam: "reg", min: 1, iPast: "I lived there in 2020.", iHave: "I have lived here for two years." },
+  { inf: "play", past: "played", pp: "played", es: "jugar / tocar", pInf: "plei", pPast: "pleid", pPp: "pleid", fam: "reg", min: 1, iPast: "I played soccer yesterday.", iHave: "I have played this before." },
+  { inf: "want", past: "wanted", pp: "wanted", es: "querer", pInf: "want", pPast: "wántid", pPp: "wántid", fam: "reg", min: 1, iPast: "I wanted coffee.", iHave: "I have wanted this for years." },
+  { inf: "need", past: "needed", pp: "needed", es: "necesitar", pInf: "niid", pPast: "nídid", pPp: "nídid", fam: "reg", min: 1, work: true, iPast: "I needed help.", iHave: "I have needed this." },
+  { inf: "call", past: "called", pp: "called", es: "llamar", pInf: "kol", pPast: "kold", pPp: "kold", fam: "reg", min: 1, work: true, iPast: "I called you yesterday.", iHave: "I have called them." },
+  { inf: "ask", past: "asked", pp: "asked", es: "preguntar / pedir", pInf: "äsk", pPast: "äskt", pPp: "äskt", fam: "reg", min: 1, iPast: "I asked a question.", iHave: "I have asked before." },
+  { inf: "help", past: "helped", pp: "helped", es: "ayudar", pInf: "help", pPast: "helpt", pPp: "helpt", fam: "reg", min: 1, work: true, iPast: "I helped my team.", iHave: "I have helped before." },
+  { inf: "like", past: "liked", pp: "liked", es: "gustar", pInf: "laik", pPast: "laikt", pPp: "laikt", fam: "reg", min: 1, iPast: "I liked the class.", iHave: "I have liked this from the start." },
+  { inf: "start", past: "started", pp: "started", es: "empezar", pInf: "start", pPast: "stártid", pPp: "stártid", fam: "reg", min: 1, work: true, iPast: "I started yesterday.", iHave: "I have started the project." },
+  { inf: "talk", past: "talked", pp: "talked", es: "hablar", pInf: "tok", pPast: "tokt", pPp: "tokt", fam: "reg", min: 2, iPast: "I talked to her.", iHave: "I have talked to the team." },
+  { inf: "look", past: "looked", pp: "looked", es: "mirar / buscar", pInf: "luk", pPast: "lukt", pPp: "lukt", fam: "reg", min: 2, iPast: "I looked at the screen.", iHave: "I have looked it up." },
+  { inf: "try", past: "tried", pp: "tried", es: "intentar", pInf: "trai", pPast: "traid", pPp: "traid", fam: "reg", min: 2, iPast: "I tried it yesterday.", iHave: "I have tried that." },
+  { inf: "wait", past: "waited", pp: "waited", es: "esperar", pInf: "weit", pPast: "wéitid", pPp: "wéitid", fam: "reg", min: 2, iPast: "I waited for you.", iHave: "I have waited long enough." },
+  { inf: "watch", past: "watched", pp: "watched", es: "ver (pantalla)", pInf: "wach", pPast: "wacht", pPp: "wacht", fam: "reg", min: 2, iPast: "I watched a video.", iHave: "I have watched this before." },
+  { inf: "finish", past: "finished", pp: "finished", es: "terminar", pInf: "finish", pPast: "fínisht", pPp: "fínisht", fam: "reg", min: 2, work: true, iPast: "I finished at six.", iHave: "I have finished the task." },
+];
+
+ENLAB.regulars.forEach((v) => {
+  v.ed = {
+    work: "t", live: "d", play: "d", want: "id", need: "id", call: "d",
+    ask: "t", help: "t", like: "t", start: "id", talk: "t", look: "t",
+    try: "d", wait: "id", watch: "t", finish: "t",
+  }[v.inf];
+});
+
+ENLAB.edMore = [
+  { inf: "stop", past: "stopped", ed: "t", min: 2, why: "p sorda → [t]. stopped ≈ [stopt], no “estó-ped”." },
+  { inf: "miss", past: "missed", ed: "t", min: 2, why: "s sorda → [t]. missed ≈ [mist]." },
+  { inf: "love", past: "loved", ed: "d", min: 2, why: "v sonora → [d]. loved ≈ [lavd], una sílaba." },
+  { inf: "clean", past: "cleaned", ed: "d", min: 2, why: "n sonora → [d]. cleaned se pega." },
+  { inf: "decide", past: "decided", ed: "id", min: 2, why: "acaba en D → sílaba extra [id]. decided." },
+];
+
+ENLAB.plan = [
+  { text: "Familia ought: buy, bring, think, teach, catch, fight", infs: ["buy", "bring", "think", "teach", "catch", "fight"], pair: "th|TH|think" },
+  { text: "No cambian: cut, put, set, hit, cost, let, shut", infs: ["cut", "put", "set", "hit", "cost", "let", "shut"], pair: "E muda" },
+  { text: "i → ä → a: begin, drink, sing, swim, run", infs: ["begin", "drink", "sing", "swim", "run"], pair: "i corta vs ii|i vs ii" },
+  { text: "ew / own: know, grow, throw, fly, draw", infs: ["know", "grow", "throw", "fly", "draw"], pair: "now|know|ou" },
+  { text: "Tres formas: go, do, see, take, write, break", infs: ["go", "do", "see", "take", "write", "break"], pair: "E muda" },
+  { text: "Regulares -ed: liked / played / wanted", infs: ["work", "live", "play", "want", "need", "ask", "like", "start"], pair: "E muda", game: "ed" },
+  { text: "have + participio: I have written / built / done", infs: ["have", "write", "build", "do", "go", "see"], pair: "i vs ii" },
+  { text: "said, says, does, gone, been, put (excepciones de oído)", infs: ["say", "do", "go", "be", "put"], pair: "said|sed" },
+  { text: "read [riid] vs read [red]; live [liv] vs live [laiv]", infs: ["read", "live", "leave"], pair: "read|live|leave" },
+  { text: "Contracciones: I've, I'd, don't, can't, won't", infs: ["have", "do", "be", "get"], pair: "can" },
+  { text: "TH / V / H / W y pedir que repitan", infs: ["think", "have", "hear", "wear", "say"], pair: "TH vs|V vs|have" },
+  { text: "Acento: develop, interview, computer, engineer", infs: ["get", "make", "take", "give", "find"], pair: "E muda" },
+  { text: "ough: thought, through, though, tough, enough", infs: ["think", "buy", "teach", "catch"], pair: "thought|TH" },
+  { text: "Come / become / overcome", infs: ["come", "become", "go", "get"], pair: "come|comb" },
+  { text: "get / got / gotten y frases de trabajo", infs: ["get", "make", "do", "build", "keep"], pair: "E muda" },
+  { text: "understand, forget, tell, say (prefijos y pares)", infs: ["understand", "forget", "tell", "say", "speak"], pair: "i vs ii" },
+  { text: "wear / tear / hear (oído cotidiano)", infs: ["wear", "hear", "feel", "hurt", "sleep"], pair: "i vs ii|leave|live" },
+  { text: "Simulacro: frases de entrevista o “I agree / It depends”", infs: ["lead", "write", "build", "choose", "run"], pair: "E muda" },
+  { text: "Quiz mixto + make/do y say/tell", infs: ["make", "do", "say", "tell", "ask"], pair: "E muda", game: "uso" },
+  { text: "Repaso solo de débiles (los que fallaste)", infs: ["be", "have", "go", "get", "think"], pair: "i vs ii|E muda" },
+  { text: "Mazo del nivel: 10 verbos de tu CEFR (nada raro en A1)", infs: ["eat", "buy", "go", "see", "come", "work", "need"], pair: "E muda|i vs ii" },
+];
+
+ENLAB.usoQuiz = [
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "Tengo hambre.", a: "I'm hungry.", opts: ["I'm hungry.", "I have hungry."], why: "Hambre, sed, frío, edad: I AM, no I HAVE.", say: "I'm hungry." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "Tengo sed.", a: "I'm thirsty.", opts: ["I'm thirsty.", "I have thirsty."], why: "I'm thirsty. I have se queda para objetos: I have a glass.", say: "I'm thirsty." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "Tengo 25 años.", a: "I'm 25.", opts: ["I'm 25.", "I have 25 years."], why: "Edad: I'm 25. (I have 25 years es calco.)", say: "I'm 25." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "Estoy de acuerdo.", a: "I agree.", opts: ["I agree.", "I am agree."], why: "Agree ya es verbo: I agree / I don't agree.", say: "I agree." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "No entiendo.", a: "I don't understand.", opts: ["I don't understand.", "I no understand."], why: "Negación: don't / doesn't, no “I no…”.", say: "I don't understand." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "Me llamo Ana.", a: "My name is Ana.", opts: ["My name is Ana.", "I call me Ana."], why: "My name is… o I'm Ana. No “I call me”.", say: "My name is Ana." },
+  { min: 1, tag: "calco", q: "Elige la frase buena", prompt: "¿Cómo te llamas?", a: "What's your name?", opts: ["What's your name?", "How are you called?"], why: "What's your name? no es traducción literal de “cómo te llamas”.", say: "What's your name?" },
+  { min: 1, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You like this.", a: "Do you like this?", opts: ["Do you like this?", "You like this?", "Like you this?"], why: "Presente: Do you + infinitivo. No basta con subir la voz.", say: "Do you like this?" },
+  { min: 1, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You live here.", a: "Do you live here?", opts: ["Do you live here?", "You live here?", "Live you here?"], why: "Do you live…? (live no cambia).", say: "Do you live here?" },
+  { min: 1, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You can help me.", a: "Can you help me?", opts: ["Can you help me?", "You can help me?", "Do you can help me?"], why: "Con can no uses do: Can you…?", say: "Can you help me?" },
+  { min: 1, tag: "pregunta", q: "Elige la pregunta buena", prompt: "Quieres que repitan.", a: "Can you say that again, please?", opts: ["Can you say that again, please?", "You can repeat, please?"], why: "Say that again / Could you repeat that?", say: "Can you say that again, please?" },
+  { min: 2, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You went home yesterday.", a: "Did you go home yesterday?", opts: ["Did you go home yesterday?", "You went home yesterday?", "Did you went home yesterday?"], why: "Did + infinitivo: go, no went.", say: "Did you go home yesterday?" },
+  { min: 2, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You saw it.", a: "Did you see it?", opts: ["Did you see it?", "Did you saw it?", "You saw it?"], why: "Did you see (infinitivo). saw es el pasado, no va con did.", say: "Did you see it?" },
+  { min: 2, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You did the work.", a: "Did you do the work?", opts: ["Did you do the work?", "Did you did the work?", "You did the work?"], why: "Did you do…? Nunca did you did.", say: "Did you do the work?" },
+  { min: 2, tag: "pregunta", q: "Elige la pregunta buena", prompt: "¿Qué hiciste ayer?", a: "What did you do yesterday?", opts: ["What did you do yesterday?", "What did you did yesterday?", "What you did yesterday?"], why: "What did you do…? do vuelve a infinitivo.", say: "What did you do yesterday?" },
+  { min: 2, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "She likes it.", a: "Does she like it?", opts: ["Does she like it?", "Does she likes it?", "She likes it?"], why: "Does + like (sin -s). The -s ya está en does.", say: "Does she like it?" },
+  { min: 2, tag: "make-do", q: "¿make o do?", prompt: "I ____ a mistake.", a: "I made a mistake.", opts: ["I made a mistake.", "I did a mistake."], why: "make a mistake. do no va aquí.", say: "I made a mistake." },
+  { min: 2, tag: "make-do", q: "¿make o do?", prompt: "I need to ____ homework.", a: "I need to do homework.", opts: ["I need to do homework.", "I need to make homework."], why: "do homework / do the dishes = tareas.", say: "I need to do homework." },
+  { min: 2, tag: "make-do", q: "¿make o do?", prompt: "Let's ____ a plan.", a: "Let's make a plan.", opts: ["Let's make a plan.", "Let's do a plan."], why: "make a plan, make a decision: creas algo.", say: "Let's make a plan." },
+  { min: 2, tag: "make-do", q: "¿make o do?", prompt: "I ____ it yesterday. (lo hice)", a: "I did it yesterday.", opts: ["I did it yesterday.", "I made it yesterday."], why: "I did it = lo hice (genérico). made it = lo fabricaste / llegaste a tiempo.", say: "I did it yesterday." },
+  { min: 2, tag: "make-do", q: "¿make o do?", prompt: "Please ____ the bed.", a: "Please make the bed.", opts: ["Please make the bed.", "Please do the bed."], why: "make the bed (excepción útil).", say: "Please make the bed." },
+  { min: 2, tag: "say-tell", q: "¿say o tell?", prompt: "She ____ me the news.", a: "She told me the news.", opts: ["She told me the news.", "She said me the news."], why: "tell + persona: tell me. No said me.", say: "She told me the news." },
+  { min: 2, tag: "say-tell", q: "¿say o tell?", prompt: "She ____ no.", a: "She said no.", opts: ["She said no.", "She told no."], why: "say + lo dicho: She said no / She said that…", say: "She said no." },
+  { min: 2, tag: "say-tell", q: "¿say o tell?", prompt: "____ me what happened.", a: "Tell me what happened.", opts: ["Tell me what happened.", "Say me what happened."], why: "Tell me. (persona al lado del verbo)", say: "Tell me what happened." },
+  { min: 2, tag: "calco", q: "Elige la frase buena", prompt: "Trabajo aquí (es mi empleo).", a: "I work here.", opts: ["I work here.", "I'm working here."], why: "Empleo / hábito: I work. I'm working = ahora mismo, en este momento.", say: "I work here." },
+  { min: 2, tag: "calco", q: "Elige la frase buena", prompt: "Estoy trabajando ahora (en este momento).", a: "I'm working now.", opts: ["I'm working now.", "I work now."], why: "Acción en curso: I'm working. I work = hábito.", say: "I'm working now." },
+  { min: 2, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You are working.", a: "Are you working?", opts: ["Are you working?", "Do you working?", "You are working?"], why: "Con be: Are you…? No pongas do delante de -ing.", say: "Are you working?" },
+  { min: 2, tag: "calco", q: "Elige la frase buena", prompt: "Te voy a llamar.", a: "I'm going to call you.", opts: ["I'm going to call you.", "I will to call you."], why: "going to + infinitivo. will call (sin to).", say: "I'm going to call you." },
+  { min: 3, tag: "calco", q: "Elige la frase buena", prompt: "Explícame.", a: "Explain it to me.", opts: ["Explain it to me.", "Explain me."], why: "explain something to someone. No explain me.", say: "Explain it to me." },
+  { min: 3, tag: "calco", q: "Elige la frase buena", prompt: "La gente está esperando.", a: "People are waiting.", opts: ["People are waiting.", "People is waiting."], why: "people es plural: people are.", say: "People are waiting." },
+  { min: 3, tag: "calco", q: "Elige la frase buena", prompt: "Depende de ti.", a: "It depends on you.", opts: ["It depends on you.", "It depends of you."], why: "depend on, no depend of.", say: "It depends on you." },
+  { min: 3, tag: "calco", q: "Elige la frase buena", prompt: "De hecho me gusta.", a: "I actually like it.", opts: ["I actually like it.", "I currently like it."], why: "actually = en realidad. currently = ahora mismo (trabajo, etc.).", say: "I actually like it." },
+  { min: 3, tag: "since-for", q: "¿for o since?", prompt: "I've lived here ____ two years.", a: "I've lived here for two years.", opts: ["I've lived here for two years.", "I've lived here since two years."], why: "for + cantidad. since + fecha/punto.", say: "I've lived here for two years." },
+  { min: 3, tag: "since-for", q: "¿for o since?", prompt: "I've lived here ____ 2020.", a: "I've lived here since 2020.", opts: ["I've lived here since 2020.", "I've lived here for 2020."], why: "since 2020 = desde ese año.", say: "I've lived here since 2020." },
+  { min: 3, tag: "since-for", q: "Elige la frase buena", prompt: "Ayer fui.", a: "I went there yesterday.", opts: ["I went there yesterday.", "I have gone there yesterday."], why: "yesterday = pasado simple. No mezclar con have.", say: "I went there yesterday." },
+  { min: 3, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You have tried sushi.", a: "Have you tried sushi?", opts: ["Have you tried sushi?", "Did you have tried sushi?", "You have tried sushi?"], why: "Have you + participio. No Did you have tried.", say: "Have you tried sushi?" },
+  { min: 3, tag: "pregunta", q: "Elige la pregunta buena", prompt: "¿Cuánto llevas aquí?", a: "How long have you worked here?", opts: ["How long have you worked here?", "How long do you work here?", "How long you work here?"], why: "How long have you…? (desde entonces hasta ahora).", say: "How long have you worked here?" },
+  { min: 3, tag: "lend-borrow", q: "¿lend o borrow?", prompt: "¿Me prestas el cargador? (tú recibes)", a: "Can I borrow your charger?", opts: ["Can I borrow your charger?", "Can I lend your charger?"], why: "borrow = yo recibo. lend = yo doy.", say: "Can I borrow your charger?" },
+  { min: 3, tag: "lend-borrow", q: "¿lend o borrow?", prompt: "Claro, te lo presto. (tú das)", a: "Sure, I can lend it to you.", opts: ["Sure, I can lend it to you.", "Sure, I can borrow it to you."], why: "lend it to you = yo te lo doy.", say: "Sure, I can lend it to you." },
+  { min: 3, tag: "lend-borrow", q: "Elige la frase buena", prompt: "¿Me prestas un bolígrafo?", a: "Can you lend me a pen?", opts: ["Can you lend me a pen?", "Can you borrow me a pen?"], why: "lend me = préstame (tú me das). También: Can I borrow a pen?", say: "Can you lend me a pen?" },
+  { min: 3, tag: "make-do", q: "¿make o do?", prompt: "We need to ____ a decision.", a: "We need to make a decision.", opts: ["We need to make a decision.", "We need to do a decision."], why: "make a decision.", say: "We need to make a decision." },
+  { min: 4, tag: "pregunta", q: "Pasa esto a pregunta", prompt: "You would help me.", a: "Would you help me?", opts: ["Would you help me?", "Did you would help me?", "You would help me?"], why: "Would you…? Sin did.", say: "Would you help me?" },
+];
+
+ENLAB.familyNames.reg = "Regulares (-ed)";
+(ENLAB.regulars || []).forEach((v) => {
+  if (!ENLAB.verbs.some((x) => x.inf === v.inf)) ENLAB.verbs.push(v);
+});
+

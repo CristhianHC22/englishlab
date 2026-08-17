@@ -40,6 +40,7 @@
         <p class="lede" id="level-lede">Pulsa las palabras para oírlas. 15 minutos al día. Empieza en fácil (A1) y sube cuando ya no te trabe.</p>
         <div class="level-bar" role="group" aria-label="Nivel" id="level-bar"></div>
         <p class="muted" id="level-blurb"></p>
+        <div id="level-nudge" class="level-nudge" hidden></div>
         <div class="row rate-row" role="group" aria-label="Velocidad de la voz">
           <span class="muted">Voz:</span>
           <button type="button" class="chip" data-rate="slow">Lenta</button>
@@ -68,7 +69,12 @@
         <h2>15 minutos de oído</h2>
         <p class="muted" id="home-stats"></p>
         <p id="day-theme"></p>
+        <div id="hoy-game" class="hoy-game" hidden></div>
         <p class="muted" id="hoy-hint">La rutina cambia con el nivel.</p>
+        <div id="hoy-path" class="hoy-path">
+          <p id="hoy-path-copy" class="muted">Un botón te lleva por la sesión en orden.</p>
+          <button type="button" class="btn hoy-next">Empezar el camino</button>
+        </div>
         <div id="week-strip" class="week-strip"></div>
         <div class="session-head">
           <div>
@@ -87,7 +93,7 @@
           <button type="button" class="chip" id="remind-toggle" aria-pressed="false">Activar aviso</button>
           <p class="muted" id="remind-status">Elige una hora. Chrome avisa en este aparato; no hay servidor. La pestaña (o la app) tiene que seguir abierta.</p>
         </div>
-        <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> saltan a cada paso.</p>
+        <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> saltan a cada paso. O usa <strong>Siguiente</strong>.</p>
         <div id="hoy-misses" class="ear-misses" hidden></div>
         <details class="fold session-log-box">
           <summary>Sesiones guardadas</summary>
@@ -119,7 +125,7 @@
           </div>
           <div>
             <strong>Mazo del nivel</strong>
-            <div class="muted">Los verbos de tu CEFR: A1 = 15 básicos, A2–B1 = 40 frecuentes, B2 = los 193. No son “los débiles”.</div>
+            <div class="muted">A1 = 15 irregulares + 10 regulares (-ed). A2 = vida diaria (eat, buy, hear…). B1 = los 40 frecuentes + cotidianos. B2 = los 193. En A1 no aparecen verbos raros tipo arise.</div>
           </div>
           <div>
             <strong>Racha</strong>
@@ -170,19 +176,26 @@
         <div class="step-head">
           <span class="step-n" aria-hidden="true">4</span>
           <div>
-            <h3>Di estas frases</h3>
-            <p class="muted">Escucha. Luego ve a Hablar y grábate.</p>
+            <h3>Di este diálogo</h3>
+            <p class="muted">Oye A. Tú dices B: <em>Grabar B</em> graba y comprueba aquí, sin salir de Hoy.</p>
           </div>
         </div>
+        <div id="daily-dialog"></div>
         <div id="interview-list" class="grid"></div>
       </article>
+      <p class="hoy-path-foot">
+        <button type="button" class="btn hoy-next">Siguiente</button>
+      </p>
     </section>
 
     <section id="vocales" class="panel">
       <div class="card">
         <h2>Oír: por qué cambia cada vocal</h2>
         <p>Pulsa para oír. Empieza por las reglas. El mapa y los tips están más abajo. Meta: B1.</p>
-        <p><button type="button" class="btn" id="start-ear-from-oido">Jugar: ¿cap o cape?</button></p>
+        <p>
+          <button type="button" class="btn" id="start-ear-from-oido">Jugar: ¿cap o cape?</button>
+          <button type="button" class="btn ghost" data-start-quiz="ed">Jugar: liked / played / wanted</button>
+        </p>
         <nav class="oido-toc" id="oido-toc" aria-label="En esta página"></nav>
       </div>
       <div id="vowel-intro"></div>
@@ -220,12 +233,19 @@
       </div>
       <div id="block-endings">
         <h3 id="oido-endings">Terminaciones, C/G y el golpe</h3>
-        <p class="muted">-tion no es “ción”. En phrasals el golpe va en OFF/UP. C, G y CH cambian según la letra de al lado.</p>
+        <p class="muted">-tion no es “ción”. En phrasals el golpe va en OFF/UP. C, G y CH cambian según la letra de al lado. El -ed de liked / played / wanted está en Juego.</p>
+        <p><button type="button" class="btn" id="start-ed-from-oido">Jugar: liked, played, wanted</button></p>
         <div id="endings-list"></div>
       </div>
       <div id="block-rhythm">
         <h3 id="oido-ritmo">Ritmo y habla conectada</h3>
         <div id="rhythm-list"></div>
+      </div>
+      <div id="block-chunks">
+      <h3 id="oido-chunks">Calcos y pares de uso</h3>
+      <p class="muted">Esto no es fonética: es español metido en inglés. <em>I'm hungry</em>, make/do, say/tell, since/for, lend/borrow. Pulsa para oír la versión buena.</p>
+      <p><button type="button" class="btn" id="start-uso-from-oido">Jugar: make/do y Did you…?</button></p>
+      <div id="chunks-list"></div>
       </div>
       <div id="block-b-tips">
         <h3 id="oido-tips">Tips B1 / B2 — lo que suele faltar</h3>
@@ -236,8 +256,8 @@
 
     <section id="verbos" class="panel">
       <div class="card">
-        <h2>Verbos irregulares</h2>
-        <p class="muted">A1: 15 esenciales. A2–B1: 40 frecuentes. B2: los 193. <em>I + pasado</em> = ayer; <em>I have…</em> = experiencia.</p>
+        <h2>Verbos</h2>
+        <p class="muted">A1: 15 esenciales + regulares (-ed). A2: vida diaria. B1: 40 frecuentes + cotidianos. B2: los 193. <em>I + pasado</em> = ayer; <em>I have…</em> = experiencia.</p>
         <input id="verb-search" type="search" placeholder="Busca: go, ir, thought, escribir, I have…" />
         <div id="verb-filters" class="row" style="margin-top:10px"></div>
         <p class="muted" id="verb-count"></p>
@@ -249,8 +269,8 @@
     <section id="quiz" class="panel">
       <div class="card">
         <h2>Elige un juego</h2>
-        <p class="muted">Al terminar un round se marca en Hoy. En oído: teclas <strong>1</strong> y <strong>2</strong>; <strong>espacio</strong> = oír otra vez. En examen las palabras salen <em>después</em> de oír.</p>
-        <label class="muted"><input type="checkbox" id="quiz-starter" checked> Solo verbos de mi nivel</label>
+        <p class="muted">Al terminar un round se marca en Hoy. En oído: teclas <strong>1</strong> y <strong>2</strong>; <strong>espacio</strong> = oír otra vez. En uso y -ed: <strong>1</strong> <strong>2</strong> <strong>3</strong>. En examen las palabras salen <em>después</em> de oír.</p>
+        <label class="muted" id="quiz-starter-label"><input type="checkbox" id="quiz-starter" checked> Solo verbos de mi nivel</label>
         <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego">
           <button type="button" class="mode-pick on" data-quiz-mode="choice">
             <strong>Verbos</strong>
@@ -259,6 +279,14 @@
           <button type="button" class="mode-pick" data-quiz-mode="type">
             <strong>Escribir</strong>
             <span>Tú pones el pasado</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="uso">
+            <strong>Uso</strong>
+            <span>Calcos, make/do, Did you…?</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="ed">
+            <strong>-ed</strong>
+            <span>liked [t] / played [d] / wanted [id]</span>
           </button>
           <button type="button" class="mode-pick" data-quiz-mode="ear">
             <strong>Oído</strong>
@@ -272,6 +300,8 @@
         <select id="quiz-mode" hidden>
           <option value="choice">Verbos: opción múltiple</option>
           <option value="type">Verbos: escribir pasado / participio</option>
+          <option value="uso">Uso: calcos y preguntas</option>
+          <option value="ed">-ed: liked, played, wanted</option>
           <option value="ear">Oído: ¿qué palabra oíste?</option>
           <option value="exam">Examen de oído</option>
         </select>
@@ -284,20 +314,20 @@
     <section id="hablar" class="panel">
       <div class="card">
         <h2>Di esto</h2>
-        <p class="muted">Oye el modelo, grábate, escúchate y vuelve a oír. Si el micrófono no abre, oye y habla en voz alta igual.</p>
+        <p class="muted">Oye el modelo y pulsa <strong>Grabarme</strong>: graba y comprueba a la vez. <em>I'm</em> y <em>I am</em> cuentan igual.</p>
+        <p class="muted" id="speak-weak-hint" hidden></p>
         <div class="speak-steps" aria-hidden="true">
           <span>1 Oye</span>
-          <span>2 Graba</span>
+          <span>2 Graba (comprueba sola)</span>
           <span>3 Escúchate</span>
-          <span>4 Oye otra vez</span>
         </div>
         <label class="muted"><input type="checkbox" id="speak-starter" checked> Solo frases de mi nivel</label>
         <p class="quiz-q" id="speak-target"></p>
         <p class="muted" id="speak-help"></p>
+        <p><button type="button" class="chip" id="speak-hoy" hidden>Usar el diálogo de Hoy</button></p>
         <div class="row">
           <button class="btn ghost" id="speak-listen">Oír modelo</button>
           <button type="button" class="btn" id="speak-rec">Grabarme</button>
-          <button class="btn ghost" id="speak-go">¿Me entendió?</button>
           <button class="btn ghost" id="speak-next">Otra frase</button>
         </div>
         <audio id="speak-playback" controls hidden style="width:100%;margin-top:12px"></audio>

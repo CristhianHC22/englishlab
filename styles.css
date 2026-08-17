@@ -290,7 +290,7 @@ kbd {
   font-size: 14px;
 }
 
-.step-card { margin: 18px 0; }
+.step-card { margin: 18px 0; scroll-margin-top: 72px; }
 .step-head {
   display: flex;
   align-items: center;
@@ -495,7 +495,62 @@ select {
   color: var(--accent);
 }
 
-.quiz-q { font-size: clamp(22px, 4vw, 28px); margin: 8px 0 16px; font-weight: 800; }
+.quiz-prompt {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+#uso-why { margin-top: 12px; color: var(--accent); font-weight: 700; }
+
+.hoy-game {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 2px dashed var(--line);
+  border-radius: 16px;
+  background: var(--accent-soft);
+}
+.hoy-game .kicker { margin: 0 0 6px; }
+.hoy-game p { margin: 0 0 6px; }
+.hoy-path {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  background: var(--card);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.hoy-path p { margin: 0; flex: 1 1 16em; }
+.hoy-path-foot { margin: 8px 0 24px; display: flex; justify-content: flex-end; }
+.step-card.path-now {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 16px;
+}
+.level-nudge {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--accent-soft);
+}
+.level-nudge p { margin: 0 0 8px; }
+.dialog-card { margin-bottom: 12px; }
+.dialog-turn {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.dialog-turn:last-of-type { border-bottom: 0; }
+.dialog-turn p { margin: 0 0 6px; font-weight: 800; }
+.dialog-turn .muted { font-weight: 600; }
+.dialog-turn.you { background: var(--accent-soft); margin: 8px -14px 0; padding: 12px 14px; border-radius: 14px; border-bottom: 0; }
 .choices { display: grid; gap: 10px; }
 .choices button {
   text-align: left;
