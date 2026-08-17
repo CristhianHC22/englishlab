@@ -12,4 +12,4 @@ Este repo **es** el sitio: la raíz es la página.
 
 1. **Settings → Pages → Source: GitHub Actions**.
 2. Cada `push` a `main` publica sola. También puedes correr el workflow a mano.
-3. URL: `https://<usuario>.github.io/earlab/`
+3. URL: `https://<usuario>.github.io/englishlab/`
