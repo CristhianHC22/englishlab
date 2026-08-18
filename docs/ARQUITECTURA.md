@@ -65,15 +65,13 @@ No hay usuario en la nube. Aula pro = PIN local + roster + QR de transfer.
 
 ## Extensión a propósito (y su coste)
 
-`features-nr` y `features-plus` **envuelven** `startQuiz`, `makeQuizItems`, `renderQuiz`, `applySpeakVerdict`. Funciona porque el loader llama `NR.bootstrap` y después `PLUS.bootstrap`. Cada envoltura nueva es un riesgo de orden.
-
-Patrón bueno ya usado: `onTabPaint(fn)` / `onHomePaint(fn)` en vez de reemplazar `paintTab`.
+`features-nr` aún envuelve `renderQuiz` (reloj del cert). Formantes, diario de voz y onda usan `onSpeakVerdict` / `onRecording`, el mismo patrón que `onTabPaint`. No reemplaces `applySpeakVerdict` ni `toggleRecording`.
 
 ## Tests y CI
 
 - Funcional: `tests/*.spec.js` con `boot()` que espera packs y `PLUS`.
 - Visual: 6 pestañas × 3 temas (claro, oscuro, contraste). `tests/helpers/visual.js` **congela** reloj, week-strip, gráfica, diario y panel perf para que la fecha o el 90d no tumben baselines.
-- `npm test` **excluye** visual; el job `visual` de GitHub Actions lo corre en Ubuntu (snapshots `*-linux.png`).
+- `npm test` **excluye** visual; el job `visual` de GitHub Actions usa `mcr.microsoft.com/playwright:v1.62.1-jammy` (snapshots `*-linux.png`).
 - Playwright 1.62.x. Imagen Docker: `mcr.microsoft.com/playwright:v1.62.1-jammy`.
 
 ## PWA
@@ -84,13 +82,13 @@ Patrón bueno ya usado: `onTabPaint(fn)` / `onHomePaint(fn)` en vez de reemplaza
 
 ## Deuda conocida (no es olvido al azar)
 
-1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Cert y place ya se despachan con `if` nativo en `startQuiz` (sin envolver la función). Siguen wrappers en `applySpeakVerdict` / `toggleRecording`.
+1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Cert y place se despachan con `if` nativo en `startQuiz`. Hablar usa `onSpeakVerdict` / `onRecording`.
 2. **i18n dinámico** — STAR, tips, viaje, chat/duo, podcast y hoja de clase pasan por `t()`. Quedan pocos innerHTML de packs (contenido EN+ES del banco).
 3. **IDB = transfer** — `PROG_KEYS` vive en `idb-backup.js`. `localStorage.setItem` de esas claves se espeja solo.
 4. **Pages más flaco** — el workflow copia a `site/` sin tests, `.github`, scripts ni lockfile. Incluye `offline.html`.
-5. **Panel “Rendimiento”** — cuenta packs diferidos; no es Lighthouse real.
+5. **Panel “Rendimiento”** — cuenta packs diferidos, KB de JS y cuántos vinieron de cache; no es Lighthouse.
 6. **Tarea de clase** — se **resalta** al abrir Hoy, no se auto-lanza (evita romper tests y secuestrar la sesión).
-7. **Fuentes** — stack del sistema (`Segoe UI` / `Trebuchet` / `system-ui`). Sin Google Fonts. SW: navegación red-primero, fallback `index.html` → `offline.html`.
+7. **Fuentes** — stack del sistema (`Segoe UI` / `Trebuchet` / `system-ui`). Sin Google Fonts. SW: navegación red-primero, fallback `index.html` → `offline.html`. El job visual de CI usa la imagen jammy de Playwright.
 
 ## Cómo añadir algo nuevo
 

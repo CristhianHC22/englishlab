@@ -744,7 +744,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v31";
+  const SW_CACHE = "enlab-v32";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -801,12 +801,10 @@
     }
   }
 
-  function patchSpeakVerdict() {
-    if (window._speakVerdictSvPatched || typeof applySpeakVerdict !== "function") return;
-    window._speakVerdictSvPatched = true;
-    const orig = applySpeakVerdict;
-    window.applySpeakVerdict = function (said) {
-      orig(said);
+  function bindSpeakVerdict() {
+    if (window._speakVerdictSvBound || typeof onSpeakVerdict !== "function") return;
+    window._speakVerdictSvBound = true;
+    onSpeakVerdict((said) => {
       if (window._hoyPronPending && recState?.surface === "hoy") {
         const pending = window._hoyPronPending;
         window._hoyPronPending = null;
@@ -882,7 +880,7 @@
       } else {
         finish(scorePronunciation(said, p.ipaA, p.sayA || p.a, { pair: p }));
       }
-    };
+    });
   }
 
   function bindEvents() {
@@ -1032,7 +1030,7 @@
     if (window._svBootstrapped) return;
     window._svBootstrapped = true;
     patchPaintTab();
-    patchSpeakVerdict();
+    bindSpeakVerdict();
     patchI18n();
     applyA11y();
     renderOnboarding();

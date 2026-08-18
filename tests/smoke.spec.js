@@ -300,7 +300,10 @@ test("VAPID public key and PNG icons are wired", async ({ page, request }) => {
   await boot(page);
   const vapid = await page.evaluate(() => typeof window.ENLAB_VAPID_PUBLIC === "string" && window.ENLAB_VAPID_PUBLIC.length > 20);
   expect(vapid).toBe(true);
-  const hooks = await page.evaluate(() => typeof window.onTabPaint === "function" && typeof window.onHomePaint === "function");
+  const hooks = await page.evaluate(() => typeof window.onTabPaint === "function"
+    && typeof window.onHomePaint === "function"
+    && typeof window.onSpeakVerdict === "function"
+    && typeof window.onRecording === "function");
   expect(hooks).toBe(true);
   const man = await (await request.get("/manifest.webmanifest")).json();
   expect(man.icons.some((i) => i.src.includes("icon-192.png"))).toBe(true);

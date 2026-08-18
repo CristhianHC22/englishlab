@@ -406,6 +406,8 @@ function showTab(id) {
 
 const tabPaintHooks = [];
 const homePaintHooks = [];
+const speakVerdictHooks = [];
+const recordingHooks = [];
 
 function onTabPaint(fn) {
   if (typeof fn === "function" && !tabPaintHooks.includes(fn)) tabPaintHooks.push(fn);
@@ -413,6 +415,22 @@ function onTabPaint(fn) {
 
 function onHomePaint(fn) {
   if (typeof fn === "function" && !homePaintHooks.includes(fn)) homePaintHooks.push(fn);
+}
+
+function onSpeakVerdict(fn) {
+  if (typeof fn === "function" && !speakVerdictHooks.includes(fn)) speakVerdictHooks.push(fn);
+}
+
+function onRecording(fn) {
+  if (typeof fn === "function" && !recordingHooks.includes(fn)) recordingHooks.push(fn);
+}
+
+function fireSpeakVerdict(said, meta) {
+  speakVerdictHooks.forEach((fn) => { try { fn(said, meta); } catch { /* hook */ } });
+}
+
+function fireRecording(phase) {
+  recordingHooks.forEach((fn) => { try { fn(phase, recState); } catch { /* hook */ } });
 }
 
 function paintTab(id) {
@@ -2597,11 +2615,13 @@ function setRecStatus(text, cls = "") {
 
 function applySpeakVerdict(said) {
   const target = window._speakTarget?.target || "";
+  const surface = recState.surface;
   if (!said) {
     const extra = recState.speechOk === false
       ? ` ${t("speakNoTranscribe")}`
       : ` ${t("speakNoHear")}`;
     setRecStatus(`${t("speakRecReady")}${extra}`);
+    fireSpeakVerdict(said, { ok: false, target, surface });
     return;
   }
   const ok = speakHeardOk(said, target);
@@ -2622,6 +2642,7 @@ function applySpeakVerdict(said) {
   if (recState.surface === "hoy" && window.PRON && recState.lastBlob) {
     window._hoyPronPending = { said, target, blob: recState.lastBlob };
   }
+  fireSpeakVerdict(said, { ok, target, surface });
 }
 
 function stopRecordingTracks() {
@@ -2639,6 +2660,7 @@ function stopRecording(save) {
   stopSpeakListen();
   if (!save) stopRecordingTracks();
   resetRecButtons();
+  fireRecording("stop");
 }
 
 async function toggleRecording(surface) {
@@ -2646,6 +2668,7 @@ async function toggleRecording(surface) {
     setRecStatus(t("speakChecking"));
     await stopSpeakListen();
     recState.rec.stop();
+    fireRecording("stop");
     return;
   }
   if (surface) recState.surface = surface;
@@ -2704,6 +2727,7 @@ async function toggleRecording(surface) {
     ui.btn.classList.add("rec-on");
   }
   setRecStatus(t("speakRecording"));
+  fireRecording("start");
 }
 
 function speakKey(s) {

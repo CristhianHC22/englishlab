@@ -38,6 +38,7 @@ test("Plus: error journal and Anki export in Ayuda", async ({ page }) => {
   await expect(page.locator("#journal-csv")).toBeVisible();
   await expect(page.locator("#week-sheet-print")).toBeVisible();
   await expect(page.locator("#perf-panel")).toContainText(/paquete|pack/i);
+  await expect(page.locator("#perf-panel")).toContainText(/KB/i);
 });
 
 test("Plus: hard pairs and branched role-plays", async ({ page }) => {
@@ -92,4 +93,16 @@ test("Plus: IDB mirrors transfer keys", async ({ page }) => {
   expect(ok.roster).toBe(true);
   expect(ok.place).toBe(true);
   expect(ok.same).toBe(true);
+});
+
+test("Plus: speak hooks are native, not wrappers", async ({ page }) => {
+  await boot(page);
+  const ok = await page.evaluate(() => ({
+    hooks: typeof window.onSpeakVerdict === "function" && typeof window.onRecording === "function",
+    noWrapVerdict: !/orig\(said\)/.test(String(window.applySpeakVerdict)),
+    noWrapRec: !/orig\(surface\)/.test(String(window.toggleRecording)),
+  }));
+  expect(ok.hooks).toBe(true);
+  expect(ok.noWrapVerdict).toBe(true);
+  expect(ok.noWrapRec).toBe(true);
 });

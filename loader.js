@@ -33,10 +33,14 @@
 
   function afterFirstPaint(fn) {
     if (typeof requestAnimationFrame !== "function") {
+      window._enlabFirstPaint = typeof performance !== "undefined" ? performance.now() : Date.now();
       setTimeout(fn, 0);
       return;
     }
-    requestAnimationFrame(() => requestAnimationFrame(fn));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window._enlabFirstPaint = performance.now();
+      fn();
+    }));
   }
 
   function refreshAfterPacks() {
@@ -63,6 +67,10 @@
       if (window.PLUS?.bootstrap) window.PLUS.bootstrap();
     }
     refreshAfterPacks();
+    const start = window._enlabFirstPaint;
+    window._enlabPacksMs = typeof start === "number"
+      ? Math.max(0, Math.round(performance.now() - start))
+      : null;
     window.dispatchEvent(new CustomEvent("enlab-packs-ready"));
   }
 

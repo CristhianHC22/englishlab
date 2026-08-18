@@ -882,19 +882,17 @@
   }
 
   function patchDuoSpeakReturn() {
-    if (typeof applySpeakVerdict !== "function") return;
-    const orig = applySpeakVerdict;
-    window.applySpeakVerdict = function (said) {
-      orig(said);
-      if (window._duoPending && duoState.active) {
-        const ok = typeof speakHeardOk === "function" && speakHeardOk(said, window._duoPending);
-        window._duoPending = null;
-        duoNextTurn(!!ok);
-        showTab("hablar");
-        renderDuoCard();
-        document.querySelector("#duo-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    };
+    if (window._duoSpeakPatched || typeof onSpeakVerdict !== "function") return;
+    window._duoSpeakPatched = true;
+    onSpeakVerdict((said) => {
+      if (!window._duoPending || !duoState.active) return;
+      const ok = typeof speakHeardOk === "function" && speakHeardOk(said, window._duoPending);
+      window._duoPending = null;
+      duoNextTurn(!!ok);
+      showTab("hablar");
+      renderDuoCard();
+      document.querySelector("#duo-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   function bootstrap() {
@@ -907,10 +905,7 @@
     patchRenderQuiz();
     patchStartQuiz();
     patchPaintTab();
-    if (!window._duoSpeakPatched) {
-      window._duoSpeakPatched = true;
-      patchDuoSpeakReturn();
-    }
+    patchDuoSpeakReturn();
     renderTravelPanel();
     renderPodcastList();
     renderChatWork();

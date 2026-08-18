@@ -12,7 +12,7 @@ Lee esto **antes** de tocar código. El mapa largo y el “por qué” está en 
 - i18n: toda cadena nueva en **ES y EN** (`i18n.js`). `t("clave")` o `t("quizModes.place.t")`.
 - Visual: snapshots **win32 y linux**. Tras CSS/layout: `npm run test:visual:update` y Docker linux (comando en `tests/visual.spec.js`). El job CI visual usa esa misma imagen jammy.
 - No commitear `vapid-private.json`, `push-sub.json`, `node_modules`, `test-results/`.
-- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v31`). También cachear `offline.html`.
+- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v32`). También cachear `offline.html`.
 
 ## Arranque (orden)
 
@@ -55,7 +55,7 @@ npm run test:visual    # temas; CI linux
 
 ## Patches diferidos (frágil)
 
-`startQuiz` despacha `cert`/`place` con `if` nativos. Siguen wrappers en `applySpeakVerdict` (SV + Plus: formantes + diario) y `toggleRecording` (onda). El orden de bootstrap importa (NR → SV → PLUS). Prefiere un `if` nativo en `app.js` antes que otra envoltura.
+`startQuiz` despacha `cert`/`place` con `if` nativos. Formantes, diario y onda van por `onSpeakVerdict` / `onRecording` (como `onTabPaint`). Sigue un wrap de `renderQuiz` en NR para el reloj del cert. No envuelvas `applySpeakVerdict` ni `toggleRecording`.
 
 ## Producto (por qué existe)
 

@@ -304,24 +304,20 @@
   }
 
   function patchRecording() {
-    if (window._plusRecPatched || typeof toggleRecording !== "function") return;
+    if (window._plusRecPatched || typeof onRecording !== "function") return;
     window._plusRecPatched = true;
-    const orig = toggleRecording;
-    window.toggleRecording = async function (surface) {
-      await orig(surface);
-      if (recState?.rec?.state === "recording") startWave();
+    onRecording((phase) => {
+      if (phase === "start") startWave();
       else stopWave();
-    };
+    });
   }
 
   function patchVerdict() {
-    if (window._plusVerdictPatched || typeof applySpeakVerdict !== "function") return;
+    if (window._plusVerdictPatched || typeof onSpeakVerdict !== "function") return;
     window._plusVerdictPatched = true;
-    const orig = applySpeakVerdict;
-    window.applySpeakVerdict = function (said) {
-      orig(said);
-      const target = window._speakTarget?.target || "";
-      if (!said || !target || typeof speakHeardOk !== "function" || speakHeardOk(said, target)) return;
+    onSpeakVerdict((said, meta) => {
+      const target = meta?.target || window._speakTarget?.target || "";
+      if (!said || !target || meta?.ok) return;
       const blob = recState?.lastBlob;
       const finish = (extra) => logError({
         mode: "speak",
@@ -339,7 +335,7 @@
         return;
       }
       finish({});
-    };
+    });
   }
 
   function patchRoleplay() {
@@ -408,18 +404,49 @@
     });
   }
 
+  function scriptStats() {
+    const entries = (performance.getEntriesByType && performance.getEntriesByType("resource")) || [];
+    let transfer = 0;
+    let decoded = 0;
+    let js = 0;
+    let cached = 0;
+    entries.forEach((e) => {
+      if (!/\.js(\?|$)/i.test(e.name)) return;
+      js += 1;
+      const dec = e.decodedBodySize || e.encodedBodySize || 0;
+      decoded += dec;
+      if (typeof e.transferSize === "number") {
+        transfer += e.transferSize;
+        if (e.transferSize === 0 && dec > 0) cached += 1;
+      }
+    });
+    return { js, transfer, decoded, cached };
+  }
+
   function renderPerfHint() {
     const host = document.querySelector("#perf-panel");
     if (!host) return;
     const n = window.ENLAB_LOADER?.DEFERRED?.length || 0;
-    host.innerHTML = `<p class="kicker">${esc(tt("perfTitle"))}</p>
-      <p class="muted">${esc(tt("perfHint", { n }))}</p>`;
+    const stats = scriptStats();
+    const kb = Math.max(1, Math.round((stats.decoded || stats.transfer) / 1024)) || 0;
+    const ms = window._enlabPacksMs;
+    const lines = [
+      `<p class="kicker">${esc(tt("perfTitle"))}</p>`,
+      `<p class="muted">${esc(tt("perfHint", { n }))}</p>`,
+    ];
+    if (stats.js) {
+      lines.push(`<p class="muted">${esc(tt("perfWeight", { kb, cached: stats.cached, n: stats.js }))}</p>`);
+    }
+    if (typeof ms === "number") {
+      lines.push(`<p class="muted">${esc(tt("perfReady", { ms }))}</p>`);
+    }
+    host.innerHTML = lines.join("");
   }
 
   function bindPlus() {
     document.addEventListener("click", (e) => {
       if (e.target.closest("#place-start") || e.target.closest('[data-quiz-mode="place"]')) {
-        /* mode pick handled by app; startQuiz wrap catches place */
+        /* place se despacha en startQuiz de app.js */
       }
       if (e.target.closest("#place-apply")) {
         const lv = e.target.closest("#place-apply").dataset.cefr;
@@ -456,6 +483,7 @@
     bindPlus();
     renderErrorJournal();
     renderPerfHint();
+    window.addEventListener("enlab-packs-ready", () => renderPerfHint());
     if (typeof onTabPaint === "function") {
       onTabPaint((id) => {
         if (id === "ia") { renderErrorJournal(); renderPerfHint(); }
