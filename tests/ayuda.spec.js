@@ -1,14 +1,5 @@
 const { test, expect } = require("@playwright/test");
-
-async function boot(page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    localStorage.setItem("enlab-welcome-v2", "1");
-    localStorage.setItem("enlab-onboard-v3", "1");
-  });
-  await page.reload();
-  await page.waitForFunction(() => typeof window.SV?.bootstrap === "function");
-}
+const { boot } = require("./helpers/boot");
 
 test("Ayuda: audit A–Z rows", async ({ page }) => {
   await boot(page);

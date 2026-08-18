@@ -1,0 +1,1 @@
+window.ENLAB_VAPID_PUBLIC = "BOx1_-nqK6J7JNH2hzF-QLtjmQNbRcVpELGJczM9qm3-8c7iWHfE1BJewLOLdxgbM7-aLO89ngsCeLbagQmm4WE";

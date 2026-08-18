@@ -29,7 +29,10 @@ async function bootVisual(page, { theme = "light", contrast = false } = {}) {
     );
   }, { theme, contrast });
   await page.reload();
-  await page.waitForFunction(() => (window.ENLAB?.podcasts || []).length >= 40);
+  await page.waitForFunction(
+    () => window._enlabBootstrapped === true && (window.ENLAB?.podcasts || []).length >= 40,
+    { timeout: 90000 },
+  );
   await page.evaluate(() => document.fonts.ready);
 }
 
@@ -89,6 +92,12 @@ async function gotoTab(page, tab) {
   await page.locator(`#${tab}.panel.active`).waitFor({ state: "visible" });
   if (tab === "vocales") {
     await page.waitForSelector("#pron-panel .pron-pair");
+  }
+  if (tab === "quiz") {
+    await page.waitForSelector('[data-quiz-mode="dict"]');
+  }
+  if (tab === "hablar") {
+    await page.waitForSelector("#roleplay-card");
   }
   if (tab === "ia") {
     await page.waitForSelector("#a11y-bar .chip");

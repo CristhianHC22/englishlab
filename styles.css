@@ -516,6 +516,14 @@ select {
   border-radius: 16px;
   background: var(--accent-soft);
 }
+.hoy-story-chip {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent);
+  background: var(--card);
+  border-radius: 0 8px 8px 0;
+  border: 1px solid var(--line);
+}
 .hoy-review {
   margin-top: 14px;
   padding: 12px 14px;
@@ -848,7 +856,13 @@ body.kids-mode #lab-audit { display: none; }
 .vowel-target { fill: var(--accent); opacity: 0.85; }
 .vowel-rival { fill: var(--accent-2); opacity: 0.7; }
 .vowel-you { fill: #2ecc71; stroke: var(--ink); stroke-width: 0.8; }
-.vowel-chart-note { font-size: 13px; margin: 0 0 8px; }
+.pron-history-chart { display: flex; align-items: flex-end; gap: 6px; min-height: 80px; margin-top: 10px; }
+.pron-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pron-bar span { display: block; width: 100%; min-height: 4px; background: var(--accent); border-radius: 4px 4px 0 0; }
+.pron-bar em { font-size: 10px; color: var(--muted); font-style: normal; }
+.podcast-series { margin-bottom: 12px; border: 1px dashed var(--line); }
+.student-qr-box { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.student-qr-box canvas { display: block; margin-top: 8px; }
 .story-step { font-size: 13px; margin: 4px 0 10px; }
 .story-vocab-bank { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
 .story-vocab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

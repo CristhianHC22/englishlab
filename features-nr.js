@@ -96,9 +96,9 @@
       return { ok: n === 4 && banks >= 3, detail: `${n}/4 modos, ${banks}/4 bancos`, tip: "Juego del día rota entre ellos" };
     }},
     { id: "K", name: "Role-play + STAR entrevista", check: () => {
-      const rp = (ENLAB.roleplays || []).length >= 10;
+      const rp = (ENLAB.roleplays || []).length >= 50;
       const star = !!document.querySelector("#star-box");
-      return { ok: rp && star, detail: `${(ENLAB.roleplays || []).length} role-plays`, tip: "2 min por escena" };
+      return { ok: rp && star, detail: `${(ENLAB.roleplays || []).length} role-plays`, tip: "2 min por escena · 50 escenas" };
     }},
     { id: "L", name: "Tests + PIN aula + SW cache", check: () => {
       const pin = !!document.querySelector("#class-pin");
@@ -106,14 +106,17 @@
       return { ok: pin && sw, detail: "PIN aula + service worker", tip: "Playwright smoke en CI" };
     }},
     { id: "M", name: "Emails + examen semanal 12", check: () => {
-      const em = (ENLAB.emailSpeak || []).length >= 10;
+      const em = (ENLAB.emailSpeak || []).length >= 20;
+      const tone = (ENLAB.emailSpeak || []).filter((e) => e.tone).length >= 4;
       const wk = !!document.querySelector('[data-quiz-mode="weekly"]');
-      return { ok: em && wk, detail: `${(ENLAB.emailSpeak || []).length} emails, weekly quiz`, tip: "Examen semanal en Hoy" };
+      const et = !!document.querySelector('[data-quiz-mode="emailtone"]');
+      return { ok: em && tone && wk && et, detail: `${(ENLAB.emailSpeak || []).length} emails (${(ENLAB.emailSpeak || []).filter((e) => e.tone).length} tono)`, tip: "Quiz email tono formal/informal" };
     }},
-    { id: "N", name: "Podcasts + 20 pasajes extra", check: () => {
+    { id: "N", name: "Podcasts + series 3×3", check: () => {
       const p = (ENLAB.podcasts || []).length >= 40;
       const l = (ENLAB.listenPassages || []).length >= 25;
-      return { ok: p && l, detail: `${(ENLAB.podcasts || []).length} podcasts, ${(ENLAB.listenPassages || []).length} pasajes`, tip: "Podcast del día en Hoy + quiz al terminar" };
+      const series = (ENLAB.podcastSeries || []).length >= 3;
+      return { ok: p && l && series, detail: `${(ENLAB.podcasts || []).length} podcasts · ${(ENLAB.podcastSeries || []).length} series`, tip: "Quiz acumulativo por serie en Oír" };
     }},
     { id: "O", name: "50 mensajes Slack/Teams", check: () => {
       const c = ENLAB.chatWork || [];
@@ -142,9 +145,10 @@
       const chart = !!(window.PRON?.renderVowelChartSvg);
       return { ok: p && panel && chart, detail: `${(ENLAB.minimalPairs || []).length} pares · formantes`, tip: "LPC formantes F1/F2 + gráfico vocal" };
     }},
-    { id: "T", name: "Aula pro + CSV + tarea", check: () => {
+    { id: "T", name: "Aula pro + CSV + QR alumno", check: () => {
       const pro = !!document.querySelector("#class-pro-panel");
-      return { ok: pro, detail: "Dashboard aula pro", tip: "Importa códigos transfer" };
+      const qr = !!document.querySelector("#class-student-qr");
+      return { ok: pro && qr, detail: "Dashboard aula pro + QR alumno", tip: "Importa códigos transfer · CSV cert/SRS" };
     }},
     { id: "U", name: "20 historias ramificadas", check: () => {
       const stories = ENLAB.branchStories || [];
@@ -309,11 +313,39 @@
     if (!el) return;
     const n = lvlNum();
     const pods = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= n);
-    el.innerHTML = pods.map((p) => `
+    const series = (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n);
+    const seriesHtml = series.map((s) => `
+      <div class="card podcast-series">
+        <p class="kicker">${esc(s.title)} · 3 eps</p>
+        <p class="muted">${esc(s.titleEs || "")}</p>
+        <div class="row">${s.episodes.map((id) => {
+          const p = pods.find((x) => x.id === id);
+          return p ? `<button type="button" class="chip" data-podcast="${esc(id)}">${esc(p.title)}</button>` : "";
+        }).join("")}</div>
+        <button type="button" class="btn sm" data-series-quiz="${esc(s.id)}">${esc(typeof t === "function" ? t("seriesQuizGo") : "Quiz de la serie (9 preg.)")}</button>
+      </div>`).join("");
+    el.innerHTML = seriesHtml + pods.map((p) => `
       <button type="button" class="card podcast-card" data-podcast="${esc(p.id)}">
         <strong>${esc(p.title)}</strong>
-        <span class="muted">${esc(p.duration)} · ${p.segments.length} frases</span>
-      </button>`).join("") || "<p class='muted'>Sube de nivel para más podcasts.</p>";
+        <span class="muted">${esc(p.duration)} · ${p.segments.length} frases${p.seriesEp ? ` · ep ${p.seriesEp}/3` : ""}</span>
+      </button>`).join("") || `<p class="muted">${esc(typeof t === "function" ? t("podcastLevelUp") : "Sube de nivel para más podcasts.")}</p>`;
+  }
+
+  function startSeriesQuiz(seriesId) {
+    const s = (ENLAB.podcastSeries || []).find((x) => x.id === seriesId);
+    if (!s || typeof startQuiz !== "function") return;
+    const items = (s.seriesQs || []).map((q) => ({
+      type: "listen",
+      q: q.q,
+      a: q.a,
+      opts: q.opts,
+      say: q.a,
+      inf: `${seriesId}:${q.a}`,
+    }));
+    window.quiz = { i: 0, score: 0, items, fails: [], mode: "listen", host: "#quiz-box" };
+    if (typeof showTab === "function") showTab("quiz");
+    if (typeof renderQuiz === "function") renderQuiz();
+    document.querySelector("#quiz-box")?.scrollIntoView({ behavior: "smooth" });
   }
 
   /* ── Chat work (O) ── */
@@ -750,14 +782,15 @@
   }
 
   function patchPaintTab() {
-    if (typeof paintTab !== "function") return;
-    const orig = paintTab;
-    window.paintTab = function (id) {
-      orig(id);
-      if (id === "vocales") renderPodcastList();
-      if (id === "hablar") { renderChatWork(); renderDuoCard(); }
-      if (id === "ia") renderLabAudit();
-    };
+    if (window._paintTabNrPatched) return;
+    window._paintTabNrPatched = true;
+    if (typeof onTabPaint === "function") {
+      onTabPaint((id) => {
+        if (id === "vocales") renderPodcastList();
+        if (id === "hablar") { renderChatWork(); renderDuoCard(); }
+        if (id === "ia") renderLabAudit();
+      });
+    }
   }
 
   /* ── Patch makeQuizItems ── */
@@ -813,6 +846,9 @@
       }
       if (e.target.closest("[data-podcast]")) {
         playPodcast(e.target.closest("[data-podcast]").dataset.podcast);
+      }
+      if (e.target.closest("[data-series-quiz]")) {
+        startSeriesQuiz(e.target.closest("[data-series-quiz]").dataset.seriesQuiz);
       }
       if (e.target.closest("[data-chat-hear]")) {
         const i = Number(e.target.closest("[data-chat-hear]").dataset.chatHear);
@@ -886,13 +922,9 @@
     renderChatWork();
     renderDuoCard();
     bindEvents();
-    if (typeof renderHome === "function" && !window._renderHomePatched) {
+    if (typeof onHomePaint === "function" && !window._renderHomePatched) {
       window._renderHomePatched = true;
-      const orig = renderHome;
-      window.renderHome = function () {
-        orig();
-        renderTravelPanel();
-      };
+      onHomePaint(() => renderTravelPanel());
     }
   }
 

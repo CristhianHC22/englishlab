@@ -11,7 +11,7 @@ let verbLimit = 24;
 let hoyPairI = 0;
 let hoyPathI = -1;
 let hoyPathDay = "";
-const dirty = { vowels: true, verbs: true, speak: true, ai: true, hablar: true };
+const dirty = { vowels: true, verbs: true, speak: true, ai: true, hablar: true, hoy: true };
 const oidoPainted = new Set();
 let oidoObserver = null;
 
@@ -393,7 +393,23 @@ function showTab(id) {
   location.hash = id;
   localStorage.setItem("enlab-tab", id);
   paintTab(id);
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active?.postMessage({ type: "enlab-precache-tab", tab: id });
+    }).catch(() => {});
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+const tabPaintHooks = [];
+const homePaintHooks = [];
+
+function onTabPaint(fn) {
+  if (typeof fn === "function" && !tabPaintHooks.includes(fn)) tabPaintHooks.push(fn);
+}
+
+function onHomePaint(fn) {
+  if (typeof fn === "function" && !homePaintHooks.includes(fn)) homePaintHooks.push(fn);
 }
 
 function paintTab(id) {
@@ -424,6 +440,7 @@ function paintTab(id) {
     renderAI();
     dirty.ai = false;
   }
+  tabPaintHooks.forEach((fn) => { try { fn(id); } catch { /* hook */ } });
 }
 
 function speakForms(v) {
@@ -566,6 +583,16 @@ function todayGame() {
     return { game, label: "Hoy: 5 minutos de make/do", hint: "Calcos, make/do, Did you…?" };
   }
   const rot = ["art", "prep", "phrasal", "cond", "dict", "listen", "weekly"][t.i % 7];
+  const goal = localStorage.getItem("enlab-onboard-goal") || "";
+  if (!game && goal === "travel" && n >= 2 && t.i % 4 === 0) {
+    return { game: "travel", label: typeof t === "function" ? t("hoyGameTravel") : "Hoy: mapa de viaje", hint: typeof t === "function" ? t("hoyGameTravelHint") : "Aeropuerto, hotel, ciudad" };
+  }
+  if (!game && goal === "work" && n >= 2 && t.i % 4 === 1) {
+    return { game: "chat", label: typeof t === "function" ? t("hoyGameWork") : "Hoy: chat de trabajo", hint: typeof t === "function" ? t("hoyGameWorkHint") : "Slack/Teams formal e informal" };
+  }
+  if (!game && goal === "exam" && n >= 2 && t.i % 4 === 2) {
+    return { game: "weekly", label: typeof t === "function" ? t("hoyGameExam") : "Examen semanal (12)", hint: typeof t === "function" ? t("hoyGameExamHint") : "Mezcla oído, verbos, gramática y email" };
+  }
   if (n >= 2 && rot === "art") return { game: "art", label: "Hoy: a / an / the", hint: "an hour, a university, the sun" };
   if (n >= 2 && rot === "prep") return { game: "prep", label: "Hoy: in / on / at", hint: "on Monday · at 3 · in 1999" };
   if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: "Hoy: phrasals", hint: "look up, wrap up, run out" };
@@ -764,6 +791,29 @@ function renderSituationPhraseList(key) {
 }
 
 let sitShadowTimer = null;
+let hoyShadowTimer = null;
+
+function runHoyPairShadow() {
+  const pairs = window._dailyPairs || [];
+  if (!pairs.length) return;
+  clearTimeout(hoyShadowTimer);
+  let i = 0;
+  const list = pairs.slice(0, 4);
+  const step = () => {
+    if (i >= list.length) {
+      const el = $("#hoy-shadow-status");
+      if (el) el.textContent = t("sitShadowDone");
+      return;
+    }
+    const p = list[i];
+    i += 1;
+    const el = $("#hoy-shadow-status");
+    if (el) el.textContent = t("sitShadowNow", { n: i, total: list.length });
+    speak(p.long || p.short, true);
+    hoyShadowTimer = setTimeout(step, 4500);
+  };
+  step();
+}
 
 function runSituationShadow(key) {
   const sit = ENLAB.phrasesSituation || {};
@@ -864,7 +914,9 @@ function dialogsForLevel() {
   return [...life, ...b2, ...b1];
 }
 
-function renderHome() {
+function renderHome(force) {
+  if (!force && !dirty.hoy) return;
+  dirty.hoy = false;
   const theme = dayTheme();
   const hint = $("#hoy-hint");
   const meta = ENLAB.cefr && ENLAB.cefr[level()];
@@ -899,6 +951,7 @@ function renderHome() {
   upsertLog();
   renderClock();
   hoyPairI = 0;
+  homePaintHooks.forEach((fn) => { try { fn(); } catch { /* hook */ } });
 }
 
 function renderHoyGame() {
@@ -1978,6 +2031,7 @@ function makeQuizItems() {
   if (quiz.mode === "listen") return makeListenItems();
   if (quiz.mode === "weekly") return makeWeeklyExamItems();
   if (quiz.mode === "story") return makeStoryItems();
+  if (quiz.mode === "emailtone") return makeEmailToneItems();
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -2059,7 +2113,7 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story" || quiz.mode === "emailtone";
     const weekly = quiz.mode === "weekly";
     const cert = quiz.mode === "cert";
     if (cierre) {
@@ -2095,29 +2149,29 @@ function renderQuiz() {
       ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
       : "";
     box.innerHTML = `<div class="card">
-      <h3>${cierre ? "Sesión cerrada" : weekly ? "Examen semanal listo" : cert ? "Examen certificado" : "Terminado"}</h3>
+      <h3>${cierre ? t("quizClosed") : weekly ? t("quizWeeklyDone") : cert ? t("quizCertDone") : t("quizDone")}</h3>
       <p class="score">${quiz.score} / ${quiz.items.length}</p>
-      ${weekly ? `<p class="muted">Esta semana: ${quiz.score >= 9 ? "Muy bien." : quiz.score >= 7 ? "Bien. Repasa lo que fallaste." : "Repasa vencen hoy y el camino de Hoy."}</p>` : ""}
+      ${weekly ? `<p class="muted">${quiz.score >= 9 ? t("weeklyScoreGreat") : quiz.score >= 7 ? t("weeklyScoreGood") : t("weeklyScoreReview")}</p>` : ""}
       <p class="muted">${quiz.fails.length
         ? (ear
-          ? `Repite estos pares: ${quiz.fails.map((k) => k.replace("|", " / ")).join(", ")}`
+          ? t("quizFailsEar", { list: quiz.fails.map((k) => k.replace("|", " / ")).join(", ") })
           : pick || cierre
-            ? `Repasa: ${quiz.fails.join(" · ")}`
-            : `Se marcaron como débiles: ${quiz.fails.join(", ")}`)
-        : "Sin fallos. Bien."}</p>
-      ${ear ? `<p class="muted">Tip: oye gente real en <a href="https://youglish.com/pronounce/sheep/english" target="_blank" rel="noreferrer">YouGlish</a> (ship vs sheep).</p>` : ""}
-      ${quiz.mode === "uso" ? `<p class="muted">Tip: en Oído, <a href="#oido-chunks" data-jump="oido-chunks">Calcos y pares</a> explica make/do, say/tell y Did you…?</p>` : ""}
-      ${quiz.mode === "art" ? `<p class="muted">a + consonante; an + vocal (hour, honest). the = concreto o único.</p>` : ""}
-      ${quiz.mode === "prep" ? `<p class="muted">on Monday · in 1999 · at 3 p.m. · in the kitchen · on the table.</p>` : ""}
-      ${quiz.mode === "phrasal" ? `<p class="muted">El golpe va en UP/OUT/OFF. look it up = buscarlo.</p>` : ""}
-      ${quiz.mode === "cond" ? `<p class="muted">If it rains, I will… / If I were you, I would… / will → would en reported speech.</p>` : ""}
-      ${quiz.mode === "dict" ? `<p class="muted">I'm / I am cuentan. Escucha otra vez si hace falta.</p>` : ""}
-      ${quiz.mode === "listen" ? `<p class="muted">Vuelve a oír el párrafo. Las 3 preguntas son del mismo texto.</p>` : ""}
-      ${weekly ? `<p class="muted">Oído + verbos + gramática + email. Puedes repetirlo la próxima semana.</p>` : ""}
-      ${quiz.mode === "story" ? `<p class="muted">${esc(typeof t === "function" ? t("storyQuizTip") : "Repasa frases de historias. Las falladas vuelven mañana en Vence hoy.")}</p>` : ""}
-      ${cierre ? `<p class="muted">Esto cuenta como el quiz del día. El resto de Juego es extra.</p>` : ""}
+            ? t("quizFailsReview", { list: quiz.fails.join(" · ") })
+            : t("quizFailsWeak", { list: quiz.fails.join(", ") }))
+        : t("quizNoFails")}</p>
+      ${ear ? `<p class="muted">${t("quizTipEar")}</p>` : ""}
+      ${quiz.mode === "uso" ? `<p class="muted">${t("quizTipUso")}</p>` : ""}
+      ${quiz.mode === "art" ? `<p class="muted">${t("quizTipArt")}</p>` : ""}
+      ${quiz.mode === "prep" ? `<p class="muted">${t("quizTipPrep")}</p>` : ""}
+      ${quiz.mode === "phrasal" ? `<p class="muted">${t("quizTipPhrasal")}</p>` : ""}
+      ${quiz.mode === "cond" ? `<p class="muted">${t("quizTipCond")}</p>` : ""}
+      ${quiz.mode === "dict" ? `<p class="muted">${t("quizTipDict")}</p>` : ""}
+      ${quiz.mode === "listen" ? `<p class="muted">${t("quizTipListen")}</p>` : ""}
+      ${weekly ? `<p class="muted">${t("quizTipWeekly")}</p>` : ""}
+      ${quiz.mode === "story" ? `<p class="muted">${esc(t("storyQuizTip"))}</p>` : ""}
+      ${cierre ? `<p class="muted">${t("quizTipCierre")}</p>` : ""}
       ${extraGame}
-      <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : weekly ? "Otro examen (mezcla nueva)" : "Otro round"}</button>
+      <button class="btn" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
     </div>`;
     if (cierre) markSession("quizDone");
     syncRemindToSw();
@@ -2136,11 +2190,11 @@ function renderQuiz() {
   const it = quiz.items[quiz.i];
   if (it.type === "type") {
     box.innerHTML = `<div class="card">
-      <div class="muted">Pregunta ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="muted">${t("quizProgress", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
       <div class="quiz-q">${quizQ(it)}</div>
-      <div class="row"><button class="btn ghost" data-say="${esc(it.say)}">Escuchar</button></div>
-      <input id="quiz-input" type="text" autocomplete="off" placeholder="Escribe aquí (se acepta la 1ª forma: gotten o got)" />
-      <button class="btn" id="quiz-submit" style="margin-top:8px">Comprobar</button>
+      <div class="row"><button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizListen"))}</button></div>
+      <input id="quiz-input" type="text" autocomplete="off" placeholder="${esc(t("quizTypePh"))}" />
+      <button type="button" class="btn" id="quiz-submit" style="margin-top:8px">${esc(t("quizCheck"))}</button>
       <p class="status" id="quiz-typed"></p>
     </div>`;
     $("#quiz-input").focus();
@@ -2162,11 +2216,11 @@ function renderQuiz() {
   if (it.type === "email") {
     const em = it.email;
     box.innerHTML = `<div class="card email-quiz">
-      <div class="muted">Email ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="muted">${t("quizEmailN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
       <div class="quiz-q">${quizQ(it)}</div>
       ${em ? `<pre class="email-body">${esc(em.body)}</pre>` : ""}
       <div class="row">
-        <button type="button" class="btn ghost" data-say="${esc(it.say)}">Oír email</button>
+        <button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizHearEmail"))}</button>
       </div>
       <div class="choices" style="margin-top:12px">
         ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}">${i + 1}. ${esc(o)}</button>`).join("")}
@@ -2178,14 +2232,14 @@ function renderQuiz() {
   }
   if (it.type === "dict") {
     box.innerHTML = `<div class="card">
-      <div class="muted">Dictado ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="muted">${t("quizDictN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
       <div class="quiz-q">${quizQ(it)}</div>
       <div class="row">
-        <button class="btn" data-say="${esc(it.say)}" data-slow="1">Oír una vez</button>
-        <button class="btn ghost" data-say="${esc(it.say)}">Oír otra vez</button>
+        <button type="button" class="btn" data-say="${esc(it.say)}" data-slow="1">${esc(t("quizHearOnce"))}</button>
+        <button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizHearAgain"))}</button>
       </div>
-      <input id="quiz-input" type="text" autocomplete="off" placeholder="Escribe lo que oíste" />
-      <button class="btn" id="quiz-submit" style="margin-top:8px">Comprobar</button>
+      <input id="quiz-input" type="text" autocomplete="off" placeholder="${esc(t("quizDictPh"))}" />
+      <button type="button" class="btn" id="quiz-submit" style="margin-top:8px">${esc(t("quizCheck"))}</button>
       <p class="status" id="quiz-typed"></p>
     </div>`;
     speak(it.say, true);
@@ -2205,21 +2259,21 @@ function renderQuiz() {
     $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     return;
   }
-  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email" || it.type === "story") {
-    const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? "Escucha" : it.type === "story" ? (typeof t === "function" ? t("storyQuizMode") : "Historia") : "Uso";
+  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email" || it.type === "story" || it.type === "emailtone") {
+    const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? t("listen") : it.type === "story" ? t("storyQuizMode") : it.type === "emailtone" ? t("quizModes.emailtone.t") : t("uso");
     box.innerHTML = `<div class="card">
-      <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · ${t("quizHits", { score: quiz.score })}</div>
       <div class="quiz-q">${quizQ(it)}</div>
       ${it.prompt ? `<p class="quiz-prompt${/[áéíóúñ¿¡]/i.test(it.prompt) ? " es-line" : ""}">${esc(it.prompt)}</p>` : ""}
       <div class="row">
-        <button type="button" class="btn ghost" data-say="${esc(it.say)}">Oír ${it.type === "ed" ? it.say : "el modelo"}</button>
+        <button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(it.type === "ed" ? t("quizHearWord", { w: it.say }) : t("quizHearModel"))}</button>
       </div>
-      <p class="muted">Teclas 1 / 2 / 3${it.type === "ed" || it.type === "listen" ? " · espacio = oír otra vez" : ""}</p>
+      <p class="muted">${t("quizKeys")}${it.type === "ed" || it.type === "listen" ? t("quizKeysSpace") : ""}</p>
       <div class="choices" style="margin-top:12px">
         ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}">${i + 1}. ${esc(o)}</button>`).join("")}
       </div>
       ${it.why ? `<p class="muted" id="uso-why" hidden>${esc(it.why)}</p>` : ""}
-      ${it.type === "listen" && quiz.i === 0 ? `<p class="row" style="margin-top:10px"><button type="button" class="btn ghost sm" id="listen-next-pass">Otro pasaje</button></p>` : ""}
+      ${it.type === "listen" && quiz.i === 0 ? `<p class="row" style="margin-top:10px"><button type="button" class="btn ghost sm" id="listen-next-pass">${esc(t("quizNextPass"))}</button></p>` : ""}
     </div>`;
     if (it.type === "ed" || it.type === "listen") speak(it.say, it.type === "listen");
     return;
@@ -2229,23 +2283,23 @@ function renderQuiz() {
     const warm = !exam && quiz.mode !== "cierre" && earWarmupOn();
     const label = (o, i) => exam ? `${i + 1}. ${esc(o)}` : `${i + 1}. ${esc(it.labels[o] || o)}`;
     box.innerHTML = `<div class="card">
-      <div class="muted">${exam ? "Examen" : "Oído"} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}${exam ? "" : ` · ${esc(it.why)}`}</div>
+      <div class="muted">${exam ? t("quizExam") : t("quizEar")} ${quiz.i + 1} / ${quiz.items.length} · ${t("quizHits", { score: quiz.score })}${exam ? "" : ` · ${esc(it.why)}`}</div>
       <div class="quiz-q">${exam
-        ? "Oye primero. Las dos palabras aparecen al terminar."
-        : (warm ? "Primero oyes las dos. Después UNA. Elige esa." : "Oye UNA. Luego elige. (1 / 2 en el teclado)")}</div>
-      ${exam || quiz.mode === "cierre" ? "" : `<label class="muted"><input type="checkbox" id="ear-warmup" ${warm ? "checked" : ""}> Calentamiento: oír las dos y después la pregunta</label>`}
+        ? t("quizEarExamQ")
+        : (warm ? t("quizEarWarmQ") : t("quizEarQ"))}</div>
+      ${exam || quiz.mode === "cierre" ? "" : `<label class="muted"><input type="checkbox" id="ear-warmup" ${warm ? "checked" : ""}> ${esc(t("quizEarWarmLabel"))}</label>`}
       <div class="row" style="margin-top:10px">
-        ${exam ? "" : `<button type="button" class="btn ghost" id="ear-both">Oír las dos</button>`}
-        <button type="button" class="btn" id="ear-one">${exam ? "Oír otra vez" : "Oír la pregunta"}</button>
+        ${exam ? "" : `<button type="button" class="btn ghost" id="ear-both">${esc(t("quizEarBoth"))}</button>`}
+        <button type="button" class="btn" id="ear-one">${esc(exam ? t("quizHearAgain") : t("quizEarOne"))}</button>
         ${exam ? "" : `${ygLink(it.opts[0])} ${ygLink(it.opts[1])}`}
       </div>
       <div class="ear-choices-wrap">
-        ${exam ? `<div class="ear-veil" id="ear-veil">Escuchando…</div>` : ""}
+        ${exam ? `<div class="ear-veil" id="ear-veil">${esc(t("quizListening"))}</div>` : ""}
         <div class="choices ear" style="margin-top:14px">
           ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}" ${exam ? "disabled" : ""}>${label(o, i)}</button>`).join("")}
         </div>
       </div>
-      ${exam ? `<p class="muted">Sin calentamiento y sin ver las palabras hasta oír. Espacio = repetir.</p>` : `<p class="muted">YouGlish es nativo, pero revela la palabra: úsalo si ya respondiste o para estudiar el par.</p>`}
+      ${exam ? `<p class="muted">${t("quizEarExamHint")}</p>` : `<p class="muted">${t("quizEarYgHint")}</p>`}
     </div>`;
     $("#ear-warmup")?.addEventListener("change", (ev) => setEarWarmup(ev.target.checked));
     if (exam) {
@@ -2271,9 +2325,9 @@ function renderQuiz() {
     return;
   }
   box.innerHTML = `<div class="card">
-    <div class="muted">Pregunta ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+    <div class="muted">${t("quizProgress", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
     <div class="quiz-q">${quizQ(it)}</div>
-    <div class="row"><button class="btn ghost" data-say="${esc(it.say)}">Escuchar</button></div>
+    <div class="row"><button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizListen"))}</button></div>
     <div class="choices" style="margin-top:12px">
       ${it.opts.map((o) => `<button data-opt="${encodeURIComponent(o)}">${esc(o)}</button>`).join("")}
     </div>
@@ -2462,6 +2516,7 @@ function startSpeakListen() {
   };
   rec.onerror = (ev) => {
     if (ev.error === "not-allowed" || ev.error === "service-not-allowed") recState.speechOk = false;
+    else if (ev.error === "network" || (!navigator.onLine && ev.error !== "aborted")) recState.speechOk = false;
   };
   recState.speech = rec;
   try { rec.start(); } catch { recState.speechOk = false; recState.speech = null; }
@@ -2471,23 +2526,31 @@ function recEls() {
   if (recState.surface === "hoy") {
     return {
       btn: $("#hoy-speak-rec"),
-      idle: "Grabar B",
+      idle: t("hoySpeakRec"),
       status: $("#hoy-speak-status"),
       player: $("#hoy-speak-playback"),
+    };
+  }
+  if (recState.surface === "role") {
+    return {
+      btn: null,
+      idle: t("roleRec"),
+      status: $("#role-status"),
+      player: null,
     };
   }
   if (String(recState.surface || "").startsWith("interview-")) {
     const i = recState.surface.split("-")[1];
     return {
       btn: null,
-      idle: "Grabar respuesta",
+      idle: t("speakReply"),
       status: $(`#interview-status-${i}`),
       player: null,
     };
   }
   return {
     btn: $("#speak-rec"),
-    idle: "Grabarme",
+    idle: t("speakRec"),
     status: $("#speak-status"),
     player: $("#speak-playback"),
   };
@@ -2517,19 +2580,29 @@ function applySpeakVerdict(said) {
   const target = window._speakTarget?.target || "";
   if (!said) {
     const extra = recState.speechOk === false
-      ? " Este navegador no transcribe. Usa Chrome o Edge."
-      : " No pude transcribir (ruido o muy corto). Escúchate y vuelve a grabar.";
-    setRecStatus(`Grabación lista.${extra}`);
+      ? ` ${t("speakNoTranscribe")}`
+      : ` ${t("speakNoHear")}`;
+    setRecStatus(`${t("speakRecReady")}${extra}`);
     return;
   }
   const ok = speakHeardOk(said, target);
   bumpSpeakWeak(target, ok);
+  if (!ok && recState.surface === "hoy" && window._dailyDialog?.b?.en === target) {
+    srsBump("speak", `hoy-dialog:${target.slice(0, 48)}`, false);
+  }
   setRecStatus(
     ok
-      ? `Bien: te entendió “${said}”`
-      : `Dijo reconocer “${said}”. Objetivo: “${target}”. I'm / I am, don't / do not cuentan igual.`,
+      ? t("speakOk", { said })
+      : t("speakBad", { said, target }),
     ok ? "ok" : "bad"
   );
+  if (ok && recState.surface === "role" && window._roleplay) {
+    window._roleplay.i += 1;
+    setTimeout(() => paintRoleplayTurn(), 800);
+  }
+  if (recState.surface === "hoy" && window.PRON && recState.lastBlob) {
+    window._hoyPronPending = { said, target, blob: recState.lastBlob };
+  }
 }
 
 function stopRecordingTracks() {
@@ -2551,7 +2624,7 @@ function stopRecording(save) {
 
 async function toggleRecording(surface) {
   if (recState.rec && recState.rec.state === "recording") {
-    setRecStatus("Comprobando…");
+    setRecStatus(t("speakChecking"));
     await stopSpeakListen();
     recState.rec.stop();
     return;
@@ -2562,7 +2635,7 @@ async function toggleRecording(surface) {
   try {
     recState.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
-    setRecStatus("No hay micrófono o no diste permiso. En Chrome: candado de la barra de dirección → Micrófono.", "bad");
+    setRecStatus(t("speakMicDenied"), "bad");
     return;
   }
   recState.chunks = [];
@@ -2611,7 +2684,7 @@ async function toggleRecording(surface) {
     ui.btn.textContent = t("speakRecordStop");
     ui.btn.classList.add("rec-on");
   }
-  setRecStatus("Grabando… di la frase. Al detener, se comprueba sola.");
+  setRecStatus(t("speakRecording"));
 }
 
 function speakKey(s) {
@@ -2875,9 +2948,9 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-role-rec]")) {
     const turn = window._roleplay?.scene?.turns?.[window._roleplay.i];
     if (turn) {
-      window._speakTarget = { target: turn.b, help: "Respuesta B del role-play" };
-      recState.surface = "hablar";
-      toggleRecording("hablar");
+      window._speakTarget = { target: turn.b, help: t("roleRecHelp") };
+      recState.surface = "role";
+      toggleRecording("role");
     }
   }
 
@@ -2989,6 +3062,11 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  if (e.target.closest("#hoy-pair-shadow")) {
+    runHoyPairShadow();
+    return;
+  }
+
   if (e.target.closest("#start-story-quiz") || e.target.closest("[data-start-story-quiz]")) {
     startStoryQuiz();
     return;
@@ -3097,7 +3175,7 @@ document.addEventListener("click", (e) => {
   }
 
   const opt = e.target.closest("[data-opt]");
-  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen", "email", "story"];
+  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen", "email", "story", "emailtone"];
   if (opt && quiz.items[quiz.i] && pickTypes.includes(quiz.items[quiz.i].type)) {
     const val = decodeURIComponent(opt.dataset.opt);
     const it = quiz.items[quiz.i];
@@ -3119,6 +3197,7 @@ document.addEventListener("click", (e) => {
       const why = $("#uso-why");
       if (why) why.hidden = false;
       if (it.type === "story") srsBump("story", it.inf, val === it.a);
+      else if (it.type === "emailtone") srsBump("email", it.inf, val === it.a);
       else bumpPickWeak(it.type === "listen" ? "listen" : it.type, it.inf, val === it.a);
     }
     if (it.type === "ear") {
@@ -3415,6 +3494,51 @@ function toggleTimer() {
   renderClock();
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function ensurePushSubscription() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || location.protocol === "file:") return null;
+  const key = window.ENLAB_VAPID_PUBLIC;
+  if (!key) return null;
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(key),
+    });
+  }
+  try {
+    localStorage.setItem("enlab-push-sub", JSON.stringify(sub));
+    if (window.ENLAB_IDB?.mirror) window.ENLAB_IDB.mirror("enlab-push-sub", JSON.stringify(sub));
+  } catch { /* ignore */ }
+  return sub;
+}
+
+async function testPushNotification() {
+  if (!("serviceWorker" in navigator)) {
+    fireRemind();
+    return;
+  }
+  const due = typeof srsDueList === "function" ? srsDueList(99).length : 0;
+  const body = due >= 3 ? t("pushDueBody", { due }) : t("pushDailyBody");
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification(t("pushTitle"), {
+    body,
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    tag: "enlab-test",
+    data: { url: "./index.html#hoy" },
+  });
+}
+
 function remindOn() {
   return localStorage.getItem("enlab-remind-on") === "1";
 }
@@ -3441,7 +3565,10 @@ function renderRemind() {
   }
   if (on && Notification.permission === "granted") {
     const extra = isStandalone() ? t("remindExtraStandalone") : t("remindExtraBrowser");
-    st.textContent = t("remindScheduled", { time: remindTime(), extra });
+    const push = localStorage.getItem("enlab-push-sub") ? ` ${t("pushOn")}` : "";
+    st.textContent = t("remindScheduled", { time: remindTime(), extra }) + push;
+    const testBtn = $("#remind-push-test");
+    if (testBtn) testBtn.hidden = false;
     syncRemindToSw();
     return;
   }
@@ -3449,6 +3576,8 @@ function renderRemind() {
     st.textContent = t("remindBlocked");
     return;
   }
+  const testBtn = $("#remind-push-test");
+  if (testBtn) testBtn.hidden = true;
   st.textContent = t("remindDefault");
   syncRemindToSw();
 }
@@ -3473,6 +3602,7 @@ async function toggleRemind() {
   }
   localStorage.setItem("enlab-remind-on", "1");
   localStorage.setItem("enlab-remind-time", $("#remind-time")?.value || remindTime());
+  ensurePushSubscription().catch(() => {});
   renderRemind();
   paintPwaButtons();
   syncRemindToSw();
@@ -3496,12 +3626,14 @@ function syncRemindToSw() {
     complete: sessionCompleteToday() ? todayKey() : "",
     today: todayKey(),
     dueCount,
+    lang: typeof uiLang === "function" ? uiLang() : "es",
   };
   navigator.serviceWorker.ready.then((reg) => {
     reg.active?.postMessage({ type: "enlab-remind", payload });
     if (remindOn() && "periodicSync" in reg) {
       reg.periodicSync.register("enlab-remind", { minInterval: 12 * 60 * 60 * 1000 }).catch(() => {});
     }
+    if (remindOn()) ensurePushSubscription().catch(() => {});
   }).catch(() => {});
 }
 
@@ -3516,10 +3648,12 @@ function paintPwaButtons() {
 function fireRemind() {
   localStorage.setItem("enlab-remind-last", todayKey());
   buzz(true);
+  const due = typeof srsDueList === "function" ? srsDueList(99).length : 0;
+  const body = due >= 3 ? t("pushDueBody", { due }) : t("pushDailyBody");
   try {
-    new Notification("English Lab", {
-      body: "Son 15 minutos. Abre Hoy y pulsa Empezar.",
-      icon: "./icon.svg",
+    new Notification(t("pushTitle"), {
+      body,
+      icon: "./icon-192.png",
       tag: "enlab-daily",
     });
   } catch { /* ignore */ }
@@ -3542,6 +3676,7 @@ function setupRemind() {
     renderRemind();
   });
   $("#remind-toggle")?.addEventListener("click", () => { toggleRemind(); });
+  $("#remind-push-test")?.addEventListener("click", () => { testPushNotification(); });
   setInterval(tickRemind, 20000);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") tickRemind();
@@ -3637,7 +3772,7 @@ function applyUiLang() {
     "#ui-lang-toggle": "uiLang", "#kids-toggle": "kids", "#travel-toggle": "travel",
     "#repaso-btn": "repaso", "#repaso-quiz-btn": "quizWeak", "#repaso-exit": "repasoExit",
     "#hoy-timer-btn": "hoyTimerStart", "#remind-toggle": "remindOn",
-    "#quiz-start": "quizStart", "#speak-listen": "speakListen", "#speak-rec": "speakRec",
+    "#remind-push-test": "pushTest", "#quiz-start": "quizStart", "#speak-listen": "speakListen", "#speak-rec": "speakRec",
     "#speak-next": "speakNext", "#shadow-go": "shadowGo", "#transfer-copy": "transferCopy",
     "#transfer-import": "transferImport", "#class-pin-save": "classPinSave",
     "#class-pin-clear": "classPinClear", "#class-print": "classPrint",
@@ -3669,6 +3804,8 @@ function applyUiLang() {
   if (typeof renderRemind === "function") renderRemind();
   if (typeof renderWeekReport === "function") renderWeekReport();
   if (typeof renderClassPin === "function") renderClassPin();
+  if (typeof quiz !== "undefined" && quiz?.items?.length && typeof renderQuiz === "function") renderQuiz();
+  if (window.SV?.renderHoyStoryChip) window.SV.renderHoyStoryChip();
   dirty.hablar = true;
   if (currentTab === "hablar") paintTab("hablar");
   if (window.NR?.renderLabAudit && currentTab === "ia") window.NR.renderLabAudit();
@@ -4021,6 +4158,26 @@ function makeStoryItems() {
   });
 }
 
+function makeEmailToneItems() {
+  const pool = (ENLAB.emailSpeak || []).filter((e) => (e.min || 1) <= lvlNum() && e.tone && (e.qs || []).length);
+  if (!pool.length) return [];
+  return shuffle(pool).slice(0, 8).map((em) => {
+    const q = em.qs.find((x) => /tono|tone|formal|informal/i.test(x.q)) || em.qs[0];
+    const wrongTones = em.tone === "formal" ? ["informal", "casual", "slang"] : ["formal", "legal", "stiff"];
+    const opts = shuffle([em.tone, ...wrongTones.filter((x) => x !== em.tone)].slice(0, 2));
+    return {
+      type: "emailtone",
+      q: q.q,
+      esHint: em.subject,
+      a: q.a,
+      opts: q.opts || opts,
+      say: em.say || em.reply,
+      inf: em.subject,
+      email: em,
+    };
+  });
+}
+
 function startStoryQuiz() {
   quiz = { i: 0, score: 0, items: makeStoryItems(), fails: [], mode: "story", host: "#quiz-box" };
   if (!quiz.items.length) {
@@ -4278,19 +4435,19 @@ function paintRoleplayTurn() {
   const turn = st.scene.turns[st.i];
   const left = st.until ? Math.max(0, Math.ceil((st.until - Date.now()) / 1000)) : 0;
   if (!turn || left <= 0) {
-    box.innerHTML = `<p class="session-done">${left <= 0 && turn ? "Se acabaron los 2 minutos." : "Role-play listo."} Puedes repetirlo o elegir otro.</p>`;
+    box.innerHTML = `<p class="session-done">${left <= 0 && turn ? t("roleTimeUp") : t("roleDone")}</p>`;
     if (window._roleTick) { clearInterval(window._roleTick); window._roleTick = null; }
     return;
   }
   box.innerHTML = `
     <p class="kicker">${esc(st.scene.title)} · ${st.i + 1}/${st.scene.turns.length} · <span id="role-timer">${left}s</span></p>
     <p class="muted es-line">${esc(st.scene.es)}</p>
-    <p><strong>A:</strong> ${esc(turn.a)}</p>
-    <p><strong>Tú:</strong> ${esc(turn.b)}</p>
+    <p><strong>${esc(t("roleSpeakerA"))}:</strong> ${esc(turn.a)}</p>
+    <p><strong>${esc(t("roleYou"))}:</strong> ${esc(turn.b)}</p>
     <div class="row">
-      <button type="button" class="btn ghost" data-role-play-a>Oír A</button>
-      <button type="button" class="btn" data-role-rec>Grabar B</button>
-      <button type="button" class="btn ghost" data-role-next>Siguiente giro</button>
+      <button type="button" class="btn ghost" data-role-play-a>${esc(t("roleHearA"))}</button>
+      <button type="button" class="btn" data-role-rec>${esc(t("roleRec"))}</button>
+      <button type="button" class="btn ghost" data-role-next>${esc(t("roleNextTurn"))}</button>
     </div>
     <p class="status" id="role-status"></p>`;
   if (window._roleTick) clearInterval(window._roleTick);
@@ -4411,7 +4568,7 @@ function importProgress(file) {
   reader.readAsText(file);
 }
 
-function applyLevel() {
+function applyLevel(opts = {}) {
   renderLevelBar();
   renderRateBar();
   applyTheme();
@@ -4434,9 +4591,10 @@ function applyLevel() {
   dirty.speak = true;
   dirty.ai = true;
   dirty.hablar = true;
-  renderHome();
+  dirty.hoy = true;
+  if (!opts.skipHome) renderHome(true);
   renderInterview();
-  paintTab(currentTab);
+  if (!opts.skipPaint) paintTab(currentTab);
 }
 
 function init() {
@@ -4444,12 +4602,13 @@ function init() {
   applyHideEs();
   applyKidsMode();
   applyUiLang();
-  applyLevel();
+  applyLevel({ skipHome: true, skipPaint: true });
   const allowed = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
   const fromHash = (location.hash || "").replace("#", "");
   const fromMem = localStorage.getItem("enlab-tab") || "";
   const id = allowed.includes(fromHash) ? fromHash : (allowed.includes(fromMem) ? fromMem : "hoy");
   showTab(id);
+  renderHome(true);
   if (timerState().running) {
     startTimerLoop();
     requestWake();
@@ -4510,6 +4669,7 @@ function setupPwaInstall() {
 
 $("#welcome-go")?.addEventListener("click", () => {
   localStorage.setItem("enlab-welcome-v2", "1");
+  localStorage.setItem("enlab-onboard-v3", "1");
   const el = $("#welcome");
   if (el) el.hidden = true;
 });
@@ -4522,7 +4682,8 @@ $("#kids-toggle")?.addEventListener("click", () => {
 $("#ui-lang-toggle")?.addEventListener("click", () => {
   localStorage.setItem("enlab-ui-lang", uiLang() === "en" ? "es" : "en");
   applyUiLang();
-  renderHome();
+  dirty.hoy = true;
+  renderHome(true);
 });
 
 $("#repaso-btn")?.addEventListener("click", () => startRepasoMode());

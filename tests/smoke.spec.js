@@ -1,14 +1,5 @@
 const { test, expect } = require("@playwright/test");
-
-async function boot(page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    localStorage.setItem("enlab-welcome-v2", "1");
-    localStorage.setItem("enlab-onboard-v3", "1");
-  });
-  await page.reload();
-  await page.waitForFunction(() => (window.ENLAB?.podcasts || []).length >= 40);
-}
+const { boot } = require("./helpers/boot");
 
 test("loads Hoy path and tabs", async ({ page }) => {
   await boot(page);
@@ -38,8 +29,10 @@ test("packs A–R content is wired", async ({ page }) => {
   await boot(page);
   const ok = await page.evaluate(() => ({
     listen: (window.ENLAB.listenPassages || []).length >= 25,
-    role: (window.ENLAB.roleplays || []).length >= 12,
-    email: (window.ENLAB.emailSpeak || []).length >= 10,
+    role: (window.ENLAB.roleplays || []).length >= 50,
+    email: (window.ENLAB.emailSpeak || []).length >= 20,
+    emailTone: (window.ENLAB.emailSpeak || []).filter((e) => e.tone).length >= 4,
+    series: (window.ENLAB.podcastSeries || []).length >= 3,
     situations: Object.keys(window.ENLAB.phrasesSituation || {}).length >= 25,
     restaurant: !!window.ENLAB.phrasesSituation?.restaurant?.length,
     podcasts: (window.ENLAB.podcasts || []).length >= 40,
@@ -61,6 +54,8 @@ test("packs A–R content is wired", async ({ page }) => {
   expect(ok.listen).toBe(true);
   expect(ok.role).toBe(true);
   expect(ok.email).toBe(true);
+  expect(ok.emailTone).toBe(true);
+  expect(ok.series).toBe(true);
   expect(ok.situations).toBe(true);
   expect(ok.restaurant).toBe(true);
   expect(ok.podcasts).toBe(true);
@@ -103,6 +98,28 @@ test("quiz modes include dictation, weekly, cert and cond", async ({ page }) => 
   await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
 });
 
+test("Hoy shadowing button on pairs step", async ({ page }) => {
+  await boot(page);
+  await page.locator(".hoy-next").first().click();
+  await expect(page.locator("#hoy-pair-shadow")).toBeVisible();
+});
+
+test("quiz email tone mode", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="quiz"]').click();
+  await expect(page.locator('[data-quiz-mode="emailtone"]')).toBeVisible();
+  await page.locator('[data-quiz-mode="emailtone"]').click();
+  await page.locator("#quiz-start").click();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
+});
+
+test("podcast series blocks in Oír", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="vocales"]').click();
+  await expect(page.locator(".podcast-series").first()).toBeVisible();
+  await expect(page.locator("[data-series-quiz]").first()).toBeVisible();
+});
+
 test("transfer code roundtrip", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
@@ -110,6 +127,10 @@ test("transfer code roundtrip", async ({ page }) => {
     localStorage.setItem("enlab-weak", JSON.stringify(["go", "see"]));
   });
   await page.reload();
+  await page.waitForFunction(
+    () => window._enlabBootstrapped === true && (window.ENLAB?.roleplays || []).length >= 50,
+    { timeout: 90000 },
+  );
   await page.locator("#transfer-box").locator("summary").click();
   const code = await page.locator("#transfer-code").inputValue();
   expect(code.length).toBeGreaterThan(20);
@@ -258,12 +279,27 @@ test("quiz débiles button always on Hoy", async ({ page }) => {
   await expect(page.locator("#repaso-quiz-btn")).toBeVisible();
 });
 
-test("index.html defers pack-m/n/o/q to loader", async ({ request }) => {
+test("index.html defers pack-m/n/o/q and feature bundles to loader", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/<script src="pack-m\.js">/);
   expect(html).not.toMatch(/<script src="pack-n\.js">/);
   expect(html).not.toMatch(/<script src="pack-o\.js">/);
   expect(html).not.toMatch(/<script src="pack-q\.js">/);
+  expect(html).not.toMatch(/<script src="features-nr\.js">/);
+  expect(html).not.toMatch(/<script src="features-sv\.js">/);
   expect(html).toMatch(/<script src="pack\.js">/);
   expect(html).toMatch(/<script src="loader\.js">/);
+});
+
+test("VAPID public key and PNG icons are wired", async ({ page, request }) => {
+  await boot(page);
+  const vapid = await page.evaluate(() => typeof window.ENLAB_VAPID_PUBLIC === "string" && window.ENLAB_VAPID_PUBLIC.length > 20);
+  expect(vapid).toBe(true);
+  const hooks = await page.evaluate(() => typeof window.onTabPaint === "function" && typeof window.onHomePaint === "function");
+  expect(hooks).toBe(true);
+  const man = await (await request.get("/manifest.webmanifest")).json();
+  expect(man.icons.some((i) => i.src.includes("icon-192.png"))).toBe(true);
+  expect(man.icons.some((i) => i.purpose === "maskable")).toBe(true);
+  const png = await request.get("/icon-192.png");
+  expect(png.status()).toBe(200);
 });

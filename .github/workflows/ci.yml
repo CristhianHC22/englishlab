@@ -19,3 +19,15 @@ jobs:
       - run: npm run check
       - run: npx playwright install chromium --with-deps
       - run: npm test
+
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run test:visual

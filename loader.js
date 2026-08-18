@@ -2,6 +2,7 @@
 (function () {
   "use strict";
 
+  const FEATURES = ["./features-nr.js", "./features-sv.js"];
   const DEFERRED = [
     "./pack-m.js",
     "./pack-n.js",
@@ -12,6 +13,9 @@
     "./pack-v.js",
     "./pack-bulk.js",
     "./pack-podcasts.js",
+    "./pack-roleplays-bulk.js",
+    "./pack-emails-extra.js",
+    "./pack-podcast-series.js",
   ];
 
   function loadScript(src) {
@@ -35,15 +39,22 @@
   }
 
   function refreshAfterPacks() {
-    if (typeof renderHome === "function") renderHome();
+    if (typeof dirty === "object") dirty.hoy = true;
+    if (typeof renderHome === "function") renderHome(true);
     if (window.SV?.refreshPanels) window.SV.refreshPanels();
     if (window.NR?.renderLabAudit) window.NR.renderLabAudit();
-    if (typeof dirty === "object") dirty.hablar = true;
+    dirty.hablar = true;
     if (typeof currentTab === "string" && typeof paintTab === "function") paintTab(currentTab);
   }
 
   async function loadDeferred() {
-    await Promise.all(DEFERRED.map((src) => loadScript(src).catch(() => {})));
+    window._enlabLoadFails = window._enlabLoadFails || [];
+    for (const src of FEATURES) {
+      try { await loadScript(src); } catch (e) { window._enlabLoadFails.push(src); }
+    }
+    await Promise.all(DEFERRED.map((src) => loadScript(src).catch((e) => {
+      window._enlabLoadFails.push(src);
+    })));
     if (!window._enlabBootstrapped) {
       window._enlabBootstrapped = true;
       if (window.NR?.bootstrap) window.NR.bootstrap();
@@ -57,7 +68,7 @@
     afterFirstPaint(loadDeferred);
   }
 
-  window.ENLAB_LOADER = { DEFERRED, loadDeferred, refreshAfterPacks };
+  window.ENLAB_LOADER = { FEATURES, DEFERRED, loadDeferred, refreshAfterPacks };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);

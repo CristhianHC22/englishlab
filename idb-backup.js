@@ -1,10 +1,22 @@
-/* IndexedDB mirror for SRS + story progress (offline resilience) */
+/* IndexedDB mirror for progress keys (offline resilience) */
 (function () {
   "use strict";
 
   const DB_NAME = "englishlab-backup";
   const STORE = "kv";
-  const KEYS = ["enlab-srs", "enlab-story-progress"];
+  const KEYS = [
+    "enlab-srs",
+    "enlab-story-progress",
+    "enlab-weak",
+    "enlab-known",
+    "enlab-ear-weak",
+    "enlab-speak-weak",
+    "enlab-stats",
+    "enlab-log",
+    "enlab-pron-log",
+    "enlab-writing-done",
+    "enlab-push-sub",
+  ];
 
   function openDb() {
     return new Promise((resolve, reject) => {

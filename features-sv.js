@@ -214,15 +214,17 @@
       <details style="margin-top:14px">
         <summary>${esc(typeof t === "function" ? t("accentMap") : "Mapa US / UK")}</summary>
         <div class="grid grid-2" style="margin-top:10px">
-          ${(ENLAB.accentMap || []).slice(0, 10).map((a) => `
-            <div class="card">
+          ${(ENLAB.accentMap || []).slice(0, 10).map((a, ai) => `
+            <div class="card" data-accent-i="${ai}">
               <strong>${esc(a.word)}</strong>
               <p class="muted">US ${esc(a.us)} · UK ${esc(a.uk)}</p>
               <p class="muted">${esc(a.note)}</p>
               <div class="row">
                 <button type="button" class="chip say" data-say="${esc(a.usSay)}">US</button>
                 <button type="button" class="chip say" data-say="${esc(a.ukSay)}">UK</button>
+                <button type="button" class="btn sm" data-accent-rec="${ai}">${esc(typeof t === "function" ? t("accentRec") : "Grabar palabra")}</button>
               </div>
+              <p class="pron-score muted accent-compare" id="accent-score-${ai}" hidden></p>
             </div>`).join("")}
         </div>
       </details>
@@ -233,11 +235,71 @@
             `<button type="button" class="chip say" data-say="${esc(w)}" title="${esc(ipa)}">${esc(w)}</button>`
           ).join("")}
         </div>
+      </details>
+      <details style="margin-top:14px">
+        <summary>${esc(typeof t === "function" ? t("pronHistory") : "Historial formantes (7 días)")}</summary>
+        <div id="pron-history-chart" class="pron-history-chart"></div>
       </details>`;
+    renderPronHistoryChart();
     window._pronPairs = pairs;
+    window._accentMap = (ENLAB.accentMap || []).slice(0, 10);
   }
 
-  /* ── Render: Branching stories (Lote U) ── */
+  function renderPronHistoryChart() {
+    const host = document.querySelector("#pron-history-chart");
+    if (!host) return;
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem("enlab-pron-log") || "[]"); } catch { log = []; }
+    const week = Date.now() - 7 * 86400000;
+    const rows = log.filter((r) => r.at >= week);
+    if (!rows.length) {
+      host.innerHTML = `<p class="muted">${esc(typeof t === "function" ? t("pronHistoryEmpty") : "Graba pares en Pronunciación para ver progreso.")}</p>`;
+      return;
+    }
+    const max = Math.max(...rows.map((r) => r.pct || 0), 1);
+    host.innerHTML = rows.slice(-14).map((r) => {
+      const h = Math.round(((r.pct || 0) / max) * 100);
+      return `<div class="pron-bar" title="${esc(r.pair)} · ${r.pct}% · F1 ${r.f1 || "?"}"><span style="height:${h}%"></span><em>${esc(String(r.pair).slice(0, 6))}</em></div>`;
+    }).join("");
+  }
+
+  function findContinuableStory() {
+    const prog = loadStoryProgress();
+    const stories = ENLAB.branchStories || [];
+    const rows = Object.keys(prog).map((id) => {
+      const story = stories.find((s) => s.id === id);
+      const nodeId = prog[id]?.node;
+      const node = story?.nodes?.[nodeId];
+      if (!story || !node || node.ending) return null;
+      return { id, story, nodeId, at: prog[id].at || 0 };
+    }).filter(Boolean);
+    rows.sort((a, b) => b.at - a.at);
+    return rows[0] || null;
+  }
+
+  function resumeStory(storyId) {
+    const story = (ENLAB.branchStories || []).find((s) => s.id === storyId);
+    if (!story) return;
+    const nodeId = loadStoryProgress()[storyId]?.node || story.start;
+    if (typeof showTab === "function") showTab("vocales");
+    paintStory(storyId, nodeId);
+    document.querySelector("#story-now")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function renderHoyStoryChip() {
+    const host = document.querySelector("#hoy-story-chip");
+    if (!host) return;
+    const hit = findContinuableStory();
+    if (!hit) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    host.hidden = false;
+    host.innerHTML = `
+      <p class="muted">${esc(typeof t === "function" ? t("hoyStoryChipHint") : "Retoma el nodo donde lo dejaste.")}</p>
+      <button type="button" class="btn sm" data-story-resume="${esc(hit.id)}">${esc(typeof t === "function" ? t("hoyStoryContinue", { title: hit.story.title }) : hit.story.title)}</button>`;
+  }
   function renderStoriesPanel() {
     const host = document.querySelector("#stories-panel");
     if (!host || !ENLAB.branchStories) return;
@@ -386,36 +448,58 @@
     if (!host) return;
     const roster = loadRoster();
     const task = localStorage.getItem("enlab-class-task") || "path";
+    const weekKey = typeof todayKey === "function" ? todayKey().slice(0, 7) : "";
     const tasks = [
-      { id: "path", label: "Camino de Hoy" },
-      { id: "weekly", label: "Examen semanal" },
-      { id: "podcast", label: "Podcast del día" },
-      { id: "pron", label: "Pronunciación" },
-      { id: "story", label: "Historia ramificada" },
+      { id: "path", label: t("classTaskPath") },
+      { id: "weekly", label: t("classTaskWeekly") },
+      { id: "podcast", label: t("classTaskPodcast") },
+      { id: "pron", label: t("classTaskPron") },
+      { id: "story", label: t("classTaskStory") },
     ];
     host.innerHTML = `
-      <p class="kicker">${esc(typeof t === "function" ? t("classPro") : "Aula pro — dashboard")}</p>
-      <p class="muted">PIN + roster local. Importa códigos de alumnos.</p>
-      <label class="muted">Tarea de hoy:
+      <p class="kicker">${esc(t("classPro"))}</p>
+      <p class="muted">${esc(t("classProHint"))}</p>
+      <label class="muted">${esc(t("classTaskLabel"))}
         <select id="class-task-pick">${tasks.map((x) => `<option value="${esc(x.id)}" ${task === x.id ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>
       </label>
-      <div class="row" style="margin-top:10px">
-        <input id="class-student-name" placeholder="Nombre alumno" />
-        <button type="button" class="btn sm" id="class-add-student">Añadir</button>
-        <button type="button" class="btn ghost sm" id="class-import-code">Importar código</button>
-        <button type="button" class="btn ghost sm" id="class-export-csv">Export CSV</button>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+        <input id="class-student-name" placeholder="${esc(t("classStudentPh"))}" value="${esc(localStorage.getItem("enlab-student-name") || "")}" />
+        <button type="button" class="btn sm" id="class-add-student">${esc(t("classAdd"))}</button>
+        <button type="button" class="btn ghost sm" id="class-import-code">${esc(t("classImport"))}</button>
+        <button type="button" class="btn ghost sm" id="class-export-csv">${esc(t("classExportCsv"))}</button>
+        <button type="button" class="btn ghost sm" id="class-student-qr">${esc(t("classStudentQr"))}</button>
       </div>
+      <div id="class-student-qr-box" class="student-qr-box" hidden></div>
       <table class="class-roster-table" style="margin-top:12px;width:100%">
-        <thead><tr><th>Alumno</th><th>Semanal</th><th>Última sync</th><th></th></tr></thead>
+        <thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColWeekly"))}</th><th>${esc(t("classColCert"))}</th><th>${esc(t("classColDue"))}</th><th>${esc(t("classColSync"))}</th><th></th></tr></thead>
         <tbody>${roster.length ? roster.map((s, i) => `
           <tr>
             <td>${esc(s.name)}</td>
             <td>${s.weeklyDone ? "✓" : "—"}</td>
+            <td>${s.certDone ? "✓" : "—"}</td>
+            <td>${s.srsDue != null ? esc(String(s.srsDue)) : "—"}</td>
             <td class="muted">${s.synced ? new Date(s.synced).toLocaleDateString() : "—"}</td>
             <td><button type="button" class="chip sm" data-roster-rm="${i}">×</button></td>
-          </tr>`).join("") : `<tr><td colspan="4" class="muted">Sin alumnos — añade o importa código transfer.</td></tr>`}
+          </tr>`).join("") : `<tr><td colspan="6" class="muted">${esc(t("classRosterEmpty"))}</td></tr>`}
         </tbody>
       </table>`;
+  }
+
+  function renderStudentQrBox() {
+    const box = document.querySelector("#class-student-qr-box");
+    if (!box) return;
+    const name = localStorage.getItem("enlab-student-name");
+    if (!name || typeof buildTransferPayload !== "function" || typeof transferEncode !== "function") {
+      box.hidden = true;
+      return;
+    }
+    const code = transferEncode(buildTransferPayload());
+    box.hidden = false;
+    box.innerHTML = `
+      <p class="muted">${esc(t("classStudentQrHint", { name }))}</p>
+      <textarea class="transfer-code" rows="2" readonly>${esc(code)}</textarea>
+      <canvas id="student-qr-canvas" width="160" height="160" aria-hidden="true"></canvas>`;
+    if (typeof drawTransferQr === "function") drawTransferQr(document.querySelector("#student-qr-canvas"), code);
   }
 
   function importStudentFromCode(code) {
@@ -425,14 +509,24 @@
       if (!payload) return false;
       const name = payload["enlab-student-name"] || `Alumno ${Date.now() % 1000}`;
       const weekly = payload["enlab-weekly-exam"] === (typeof todayKey === "function" ? todayKey() : "");
+      const certDone = !!payload["enlab-cert-done"];
+      let srsDue = 0;
+      try {
+        const srs = JSON.parse(payload["enlab-srs"] || "{}");
+        const today = typeof todayKey === "function" ? todayKey() : "";
+        srsDue = Object.values(srs).filter((r) => r?.due && r.due <= today).length;
+      } catch { /* ignore */ }
       const roster = loadRoster();
       const hit = roster.find((s) => s.name === name);
       if (hit) {
         hit.weeklyDone = weekly || hit.weeklyDone;
+        hit.certDone = certDone || hit.certDone;
+        hit.srsDue = srsDue;
         hit.synced = Date.now();
         hit.stats = payload["enlab-stats"];
+        hit.level = payload["enlab-cefr"];
       } else {
-        roster.push({ name, weeklyDone: weekly, synced: Date.now(), stats: payload["enlab-stats"] });
+        roster.push({ name, weeklyDone: weekly, certDone, srsDue, synced: Date.now(), stats: payload["enlab-stats"], level: payload["enlab-cefr"] });
       }
       saveRoster(roster);
       return true;
@@ -441,8 +535,16 @@
 
   function exportRosterCsv() {
     const roster = loadRoster();
-    const rows = [["name", "weekly_done", "last_sync", "task_today"]];
-    roster.forEach((s) => rows.push([s.name, s.weeklyDone ? "yes" : "no", s.synced ? new Date(s.synced).toISOString() : "", localStorage.getItem("enlab-class-task") || ""]));
+    const rows = [["name", "weekly_done", "cert_done", "srs_due", "level", "last_sync", "task_today"]];
+    roster.forEach((s) => rows.push([
+      s.name,
+      s.weeklyDone ? "yes" : "no",
+      s.certDone ? "yes" : "no",
+      s.srsDue != null ? String(s.srsDue) : "",
+      s.level || "",
+      s.synced ? new Date(s.synced).toISOString() : "",
+      localStorage.getItem("enlab-class-task") || "",
+    ]));
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
@@ -457,38 +559,80 @@
     const task = localStorage.getItem("enlab-class-task");
     const student = localStorage.getItem("enlab-student-name");
     if (!task) { host.hidden = true; return; }
-    const labels = { path: "Camino de Hoy", weekly: "Examen semanal", podcast: "Podcast", pron: "Pronunciación", story: "Historia" };
+    const labels = {
+      path: t("classTaskPath"),
+      weekly: t("classTaskWeekly"),
+      podcast: t("classTaskPodcast"),
+      pron: t("classTaskPron"),
+      story: t("classTaskStory"),
+    };
     host.hidden = false;
-    host.innerHTML = `<p class="muted">📋 Tarea del profe: <strong>${esc(labels[task] || task)}</strong>${student ? ` · ${esc(student)}` : ""}</p>`;
+    host.innerHTML = `<p class="muted">📋 ${esc(t("classTaskBanner", { task: labels[task] || task }))}${student ? ` · ${esc(student)}` : ""}
+      <button type="button" class="btn sm" id="class-task-go">${esc(t("classTaskGo"))}</button></p>`;
+  }
+
+  function startClassTask() {
+    const task = localStorage.getItem("enlab-class-task");
+    if (!task) return;
+    if (task === "path") {
+      document.querySelector(".hoy-next")?.click();
+      return;
+    }
+    if (task === "weekly" && typeof startWeeklyExam === "function") {
+      startWeeklyExam();
+      return;
+    }
+    if (task === "podcast") {
+      showTab("vocales");
+      document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (task === "pron") {
+      showTab("vocales");
+      document.querySelector("#pron-panel")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (task === "story") {
+      showTab("vocales");
+      document.querySelector("#stories-panel")?.scrollIntoView({ behavior: "smooth" });
+    }
   }
 
   /* ── Onboarding v3 (60s) ── */
   function renderOnboarding() {
     const el = document.querySelector("#welcome");
-    if (!el || localStorage.getItem("enlab-onboard-v3") === "1") return;
+    if (!el || localStorage.getItem("enlab-onboard-v3") === "1" || localStorage.getItem("enlab-welcome-v2") === "1") return;
     el.hidden = false;
     el.innerHTML = `
       <div class="card welcome-card onboard-steps">
         <div class="onboard-step" data-step="1">
-          <p class="kicker">${esc(typeof t === "function" ? t("onboard") : "Bienvenida · 60 s")}</p>
-          <h2>¿Tu nivel?</h2>
+          <p class="kicker">${esc(t("onboard"))}</p>
+          <h2 data-i18n="onboardLevel">¿Tu nivel?</h2>
           <div class="row">${["A1", "A2", "B1", "B2"].map((l) => `<button type="button" class="chip onboard-level" data-level="${l}">${l}</button>`).join("")}</div>
         </div>
         <div class="onboard-step" data-step="2" hidden>
-          <h2>¿Tu meta?</h2>
+          <h2 data-i18n="onboardGoal">¿Tu meta?</h2>
           <div class="row">
-            <button type="button" class="chip onboard-goal" data-goal="travel">Viaje</button>
-            <button type="button" class="chip onboard-goal" data-goal="work">Trabajo</button>
-            <button type="button" class="chip onboard-goal" data-goal="exam">Examen</button>
+            <button type="button" class="chip onboard-goal" data-goal="travel" data-i18n="onboardGoalTravel">Viaje</button>
+            <button type="button" class="chip onboard-goal" data-goal="work" data-i18n="onboardGoalWork">Trabajo</button>
+            <button type="button" class="chip onboard-goal" data-goal="exam" data-i18n="onboardGoalExam">Examen</button>
           </div>
         </div>
         <div class="onboard-step" data-step="3" hidden>
-          <h2>Primera sesión</h2>
-          <p class="muted">15 min: oír → hablar → 3 preguntas. Todo local.</p>
-          <button type="button" class="btn" id="onboard-start-path">Empezar el camino</button>
-          <button type="button" class="btn ghost" id="onboard-skip">Saltar</button>
+          <h2 data-i18n="onboardSession">Primera sesión</h2>
+          <p class="muted" data-i18n="onboardSessionHint">15 min: oír → hablar → 3 preguntas. Todo local.</p>
+          <button type="button" class="btn" id="onboard-start-path" data-i18n="onboardStart">Empezar el camino</button>
+          <button type="button" class="btn ghost" id="onboard-skip" data-i18n="onboardSkip">Saltar</button>
         </div>
       </div>`;
+    if (typeof applyUiLang === "function") applyUiLang();
+  }
+
+  function applyOnboardGoal() {
+    const goal = localStorage.getItem("enlab-onboard-goal");
+    if (goal === "travel" && window.NR?.travelOn && !window.NR.travelOn()) {
+      document.querySelector("#travel-toggle")?.click();
+    }
   }
 
   function finishOnboarding() {
@@ -496,6 +640,9 @@
     localStorage.setItem("enlab-welcome-v2", "1");
     const el = document.querySelector("#welcome");
     if (el) el.hidden = true;
+    applyOnboardGoal();
+    if (typeof dirty === "object") dirty.hoy = true;
+    if (typeof renderHome === "function") renderHome(true);
   }
 
   /* ── Offline indicator ── */
@@ -511,23 +658,29 @@
     caches?.keys?.().then((keys) => {
       const ready = keys.some((k) => k.startsWith("enlab-v"));
       badge.textContent = online
-        ? (ready ? (typeof t === "function" ? t("offlineReady") : "✓ Listo sin red") : "…")
+        ? (ready
+          ? (window._enlabLoadFails?.length
+            ? (typeof t === "function" ? t("offlinePartial") : "⚠ Carga parcial")
+            : (typeof t === "function" ? t("offlineReady") : "✓ Listo sin red"))
+          : "…")
         : (typeof t === "function" ? t("offlineMode") : "Modo sin conexión");
       badge.classList.toggle("offline-on", !online);
       badge.classList.toggle("offline-ready", online && ready);
     }).catch(() => {});
   }
 
+  const SW_CACHE = "enlab-v27";
+
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
     const tabAssets = {
-      vocales: ["./pack-s.js", "./pack-n.js", "./pack-bulk.js"],
-      hablar: ["./pack-o.js", "./pack-v.js", "./pack-u.js"],
-      quiz: ["./pack.js", "./pack-m.js"],
+      vocales: ["./pack-s.js", "./pack-n.js", "./pack-bulk.js", "./pack-podcast-series.js"],
+      hablar: ["./pack-o.js", "./pack-v.js", "./pack-u.js", "./pack-roleplays-bulk.js", "./pack-emails-extra.js"],
+      quiz: ["./pack.js", "./pack-m.js", "./pack-emails-extra.js"],
       hoy: ["./pack-q.js", "./pack-bulk.js"],
     };
     const files = tabAssets[tab] || [];
-    const cache = await caches.open(typeof CACHE !== "undefined" ? CACHE : "enlab-v24");
+    const cache = await caches.open(SW_CACHE);
     await Promise.all(files.map((f) => fetch(f).then((r) => r.ok && cache.put(f, r)).catch(() => {})));
     renderOfflineBadge();
   }
@@ -560,17 +713,17 @@
   }
 
   function patchPaintTab() {
-    if (window._paintTabSvPatched || typeof paintTab !== "function") return;
+    if (window._paintTabSvPatched) return;
     window._paintTabSvPatched = true;
-    const orig = paintTab;
-    window.paintTab = function (tab) {
-      orig(tab);
-      if (tab === "vocales" && ENLAB.minimalPairs) { renderPronPanel(); renderStoriesPanel(); }
-      if (tab === "hablar" && ENLAB.writingPrompts) { renderWritingPanel(); }
-      if (tab === "hoy") { renderClassTaskBanner(); }
-      if (tab === "ia") { renderClassPro(); renderA11yBar(); }
-      if (window._enlabBootstrapped) precacheTab(tab);
-    };
+    if (typeof onTabPaint === "function") {
+      onTabPaint((tab) => {
+        if (tab === "vocales" && ENLAB.minimalPairs) { renderPronPanel(); renderStoriesPanel(); }
+        if (tab === "hablar" && ENLAB.writingPrompts) { renderWritingPanel(); }
+        if (tab === "hoy") { renderClassTaskBanner(); renderHoyStoryChip(); }
+        if (tab === "ia") { renderClassPro(); renderA11yBar(); }
+        if (window._enlabBootstrapped) precacheTab(tab);
+      });
+    }
   }
 
   function patchSpeakVerdict() {
@@ -579,7 +732,42 @@
     const orig = applySpeakVerdict;
     window.applySpeakVerdict = function (said) {
       orig(said);
-      if (window._pronPending == null) return;
+      if (window._hoyPronPending && recState?.surface === "hoy") {
+        const pending = window._hoyPronPending;
+        window._hoyPronPending = null;
+        const el = document.querySelector("#hoy-speak-status");
+        if (el && window.PRON && pending.blob && typeof scorePronunciationAsync === "function") {
+          scorePronunciationAsync(pending.said, null, pending.target, pending.blob, null).then((r) => {
+            if (r?.formants && window.PRON.plotFormantOnChart) {
+              window.PRON.plotFormantOnChart(r.formants.f1, r.formants.f2, null);
+            }
+            const drill = window.PRON.formantDrill?.(r.formants, null);
+            if (drill) el.title = drill;
+            if (r?.pct != null) el.textContent += ` · ${r.pct}% pron`;
+          }).catch(() => {});
+        }
+      }
+      if (window._pronPending == null && window._accentPending == null) return;
+      const accentI = window._accentPending;
+      if (accentI != null) {
+        window._accentPending = null;
+        const a = window._accentMap?.[accentI];
+        const el = document.querySelector(`#accent-score-${accentI}`);
+        const blob = typeof recState !== "undefined" ? recState.lastBlob : null;
+        if (!a || !el || !blob || !window.PRON?.compareAccent) return;
+        el.hidden = false;
+        el.textContent = typeof t === "function" ? "Analizando…" : "Analizando…";
+        window.PRON.analyzeFormants(blob).then((m) => {
+          const cmp = window.PRON.compareAccent(m, a.us, a.uk);
+          if (!cmp) { el.textContent = ""; el.hidden = true; return; }
+          const vowel = cmp.closer === "US" ? cmp.us : cmp.uk;
+          el.textContent = typeof t === "function"
+            ? t("accentCompare", { accent: cmp.closer, vowel })
+            : `Closer to ${cmp.closer} (/${vowel}/)`;
+          el.classList.toggle("ok", true);
+        }).catch(() => { el.hidden = true; });
+        return;
+      }
       const i = window._pronPending;
       const p = window._pronPairs?.[i];
       const el = document.querySelector(`#pron-score-${i}`);
@@ -596,6 +784,9 @@
         if (r.formants && window.PRON?.plotFormantOnChart) {
           window.PRON.plotFormantOnChart(r.formants.f1, r.formants.f2, p);
         }
+        const drill = window.PRON?.formantDrill?.(r.formants, p);
+        if (drill) el.title = drill;
+        renderPronHistoryChart();
         try {
           const log = JSON.parse(localStorage.getItem("enlab-pron-log") || "[]");
           log.push({
@@ -622,6 +813,17 @@
   function bindEvents() {
     document.addEventListener("click", (e) => {
       if (e.target.closest("#accent-pref")) return;
+      if (e.target.closest("[data-accent-rec]")) {
+        const ai = Number(e.target.closest("[data-accent-rec]").dataset.accentRec);
+        const a = window._accentMap?.[ai];
+        if (a) {
+          window._accentPending = ai;
+          window._speakTarget = { target: a.usSay || a.word, help: a.word };
+          if (typeof setSpeakTarget === "function") setSpeakTarget(window._speakTarget);
+          showTab("hablar");
+          document.querySelector("#speak-rec")?.click();
+        }
+      }
       if (e.target.closest("[data-pron-rec]")) {
         const i = Number(e.target.closest("[data-pron-rec]").dataset.pronRec);
         const p = window._pronPairs?.[i];
@@ -632,6 +834,9 @@
           showTab("hablar");
           document.querySelector("#speak-rec")?.click();
         }
+      }
+      if (e.target.closest("[data-story-resume]")) {
+        resumeStory(e.target.closest("[data-story-resume]").dataset.storyResume);
       }
       if (e.target.closest("[data-story]")) {
         beginStoryRun(e.target.closest("[data-story]").dataset.story);
@@ -657,12 +862,19 @@
       if (e.target.closest("#class-add-student")) {
         const name = document.querySelector("#class-student-name")?.value?.trim();
         if (name) {
-          const roster = loadRoster();
-          roster.push({ name, weeklyDone: false, synced: null });
-          saveRoster(roster);
           localStorage.setItem("enlab-student-name", name);
+          const roster = loadRoster();
+          if (!roster.find((s) => s.name === name)) {
+            roster.push({ name, weeklyDone: false, certDone: false, srsDue: 0, synced: null });
+          }
+          saveRoster(roster);
           renderClassPro();
         }
+      }
+      if (e.target.closest("#class-task-go")) startClassTask();
+      if (e.target.closest("#class-student-qr")) {
+        renderStudentQrBox();
+        document.querySelector("#class-student-qr-box")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest("#class-import-code")) {
         const code = window.prompt("Pega código transfer del alumno:");
@@ -734,6 +946,7 @@
     renderWritingPanel();
     renderClassPro();
     renderClassTaskBanner();
+    renderHoyStoryChip();
     renderA11yBar();
     renderOfflineBadge();
   }
@@ -762,6 +975,9 @@
     storyMaxSteps,
     unlockChoiceVocab,
     beginStoryRun,
+    resumeStory,
+    renderHoyStoryChip,
+    findContinuableStory,
     advanceStory,
     renderWritingPanel,
     renderClassPro,

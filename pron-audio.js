@@ -299,6 +299,32 @@
     host.innerHTML = renderVowelChartSvg({ f1, f2, targetVowel: target, rivalVowel: rival });
   }
 
+  function formantDrill(measured, pair) {
+    if (!measured?.f1 || !measured?.f2) return "";
+    const target = pair ? extractPrimaryVowel(pair.ipaA) : null;
+    const tV = target && VOWEL[target];
+    if (!tV) return `F1 ${measured.f1} · F2 ${measured.f2} Hz`;
+    const df1 = measured.f1 - tV.f1;
+    const df2 = measured.f2 - tV.f2;
+    const parts = [];
+    if (Math.abs(df1) > 80) parts.push(df1 > 0 ? "open mouth less (lower F1)" : "open mouth more (raise F1)");
+    if (Math.abs(df2) > 120) parts.push(df2 > 0 ? "spread lips less (lower F2)" : "spread lips more (raise F2)");
+    if (!parts.length) return "Formants on target — keep it up";
+    return parts.join(" · ");
+  }
+
+  function compareAccent(measured, usIpa, ukIpa) {
+    const us = extractPrimaryVowel(usIpa);
+    const uk = extractPrimaryVowel(ukIpa);
+    if (!measured || !us || !uk) return null;
+    const tUs = VOWEL[us];
+    const tUk = VOWEL[uk];
+    if (!tUs || !tUk) return null;
+    const dUs = vowelDist(measured.f1, measured.f2, tUs);
+    const dUk = vowelDist(measured.f1, measured.f2, tUk);
+    return { closer: dUs <= dUk ? "US" : "UK", dUs, dUk, us, uk };
+  }
+
   window.PRON = {
     VOWEL,
     extractPrimaryVowel,
@@ -311,5 +337,7 @@
     chartCoords,
     renderVowelChartSvg,
     plotFormantOnChart,
+    formantDrill,
+    compareAccent,
   };
 })();

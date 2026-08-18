@@ -1,14 +1,5 @@
 const { test, expect } = require("@playwright/test");
-
-async function boot(page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    localStorage.setItem("enlab-welcome-v2", "1");
-    localStorage.setItem("enlab-onboard-v3", "1");
-  });
-  await page.reload();
-  await page.waitForFunction(() => (window.ENLAB?.dictation || []).length >= 100);
-}
+const { boot } = require("./helpers/boot");
 
 test("Quiz: dictation and listen modes", async ({ page }) => {
   await boot(page);
@@ -19,6 +10,17 @@ test("Quiz: dictation and listen modes", async ({ page }) => {
   await page.locator('[data-quiz-mode="listen"]').click();
   await page.locator("#quiz-start").click();
   await expect(page.locator("#listen-next-pass")).toBeVisible();
+});
+
+test("Quiz: English UI check button", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => localStorage.setItem("enlab-ui-lang", "en"));
+  await page.reload();
+  await page.waitForFunction(() => window.ENLAB?.ui?.en?.quizCheck);
+  await page.locator('[data-tab="quiz"]').click();
+  await page.locator('[data-quiz-mode="dict"]').click();
+  await page.locator("#quiz-start").click();
+  await expect(page.locator("#quiz-submit")).toHaveText(/Check/i);
 });
 
 test("Quiz: cert mode visible", async ({ page }) => {

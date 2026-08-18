@@ -1,0 +1,30 @@
+name: Push remind (manual)
+
+# Sends one Web Push using secrets. Store a subscription JSON in PUSH_SUBSCRIPTION.
+# Generate keys with npm run vapid; put private key in VAPID_PRIVATE.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm i -D web-push
+      - name: Write subscription
+        env:
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+        run: |
+          test -n "$PUSH_SUBSCRIPTION"
+          printf '%s' "$PUSH_SUBSCRIPTION" > push-sub.json
+      - name: Send
+        env:
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: node scripts/push-remind.js

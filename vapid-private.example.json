@@ -1,0 +1,5 @@
+{
+  "publicKey": "REPLACE_WITH_PUBLIC",
+  "privateKey": "REPLACE_WITH_PRIVATE",
+  "subject": "mailto:you@example.com"
+}
