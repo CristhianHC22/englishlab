@@ -39,20 +39,27 @@
         <div class="level-bar" role="group" aria-label="Nivel" id="level-bar" data-i18n-aria="levelAria"></div>
         <p class="muted" id="level-blurb"></p>
         <div id="level-nudge" class="level-nudge" hidden></div>
-        <div class="row rate-row" role="group" aria-label="Velocidad de la voz">
-          <span class="muted" data-i18n="voiceLabel">Voz:</span>
-          <button type="button" class="chip" data-rate="slow" data-i18n="rateSlow">Lenta</button>
-          <button type="button" class="chip" data-rate="normal" data-i18n="rateNormal">Normal</button>
-          <button type="button" class="chip" data-rate="fast" data-i18n="rateFast">Rápida</button>
-          <span class="muted" data-i18n="themeLabel">Fondo:</span>
-          <button type="button" class="chip" data-theme-set="light" data-i18n="themeLight">Claro</button>
-          <button type="button" class="chip" data-theme-set="dark" data-i18n="themeDark">Oscuro</button>
-          <button type="button" class="chip" data-hide-es aria-pressed="false" data-i18n-title="hideEsTitle" title="Oculta las traducciones" data-i18n="hideEs">Reto: sin español</button>
-          <button type="button" class="chip" id="kids-toggle" aria-pressed="false" data-i18n="kids">Modo niño</button>
-          <button type="button" class="chip" id="ui-lang-toggle" aria-pressed="false" data-i18n="uiLang">English UI</button>
-          <button type="button" class="chip" id="travel-toggle" aria-pressed="false" data-i18n-title="travelTitle" title="Mapa del día: aeropuerto, hotel, ciudad o emergencia" data-i18n="travel">Modo viaje</button>
-          <button type="button" class="chip" data-pwa-install hidden data-i18n="installApp">Instalar app</button>
+        <div class="hero-controls">
+          <div class="ctrl-group" role="group" aria-label="Velocidad de la voz" data-i18n-aria="voiceLabel">
+            <span class="ctrl-label" data-i18n="voiceLabel">Voz:</span>
+            <button type="button" class="chip" data-rate="slow" data-i18n="rateSlow">Lenta</button>
+            <button type="button" class="chip" data-rate="normal" data-i18n="rateNormal">Normal</button>
+            <button type="button" class="chip" data-rate="fast" data-i18n="rateFast">Rápida</button>
+          </div>
+          <div class="ctrl-group" role="group" aria-label="Fondo" data-i18n-aria="themeLabel">
+            <span class="ctrl-label" data-i18n="themeLabel">Fondo:</span>
+            <button type="button" class="chip" data-theme-set="light" data-i18n="themeLight">Claro</button>
+            <button type="button" class="chip" data-theme-set="dark" data-i18n="themeDark">Oscuro</button>
+          </div>
+          <div class="ctrl-group ctrl-toggles" role="group" aria-label="Opciones">
+            <button type="button" class="chip" data-hide-es aria-pressed="false" data-i18n-title="hideEsTitle" title="Oculta las traducciones" data-i18n="hideEs">Reto: sin español</button>
+            <button type="button" class="chip" id="kids-toggle" aria-pressed="false" data-i18n="kids">Modo niño</button>
+            <button type="button" class="chip" id="ui-lang-toggle" aria-pressed="false" data-i18n="uiLang">English UI</button>
+            <button type="button" class="chip" id="travel-toggle" aria-pressed="false" data-i18n-title="travelTitle" title="Mapa del día: aeropuerto, hotel, ciudad o emergencia" data-i18n="travel">Modo viaje</button>
+            <button type="button" class="chip" data-pwa-install hidden data-i18n="installApp">Instalar app</button>
+          </div>
         </div>
+        <p id="kids-banner" class="kids-banner" hidden data-i18n="kidsBanner">Modo niño activo: letra más grande, voz lenta y menos paneles.</p>
       </div>
     </header>
 

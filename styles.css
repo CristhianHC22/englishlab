@@ -88,6 +88,35 @@ button.say:focus-visible, nav.tabs button:focus-visible, .mode-pick:focus-visibl
 }
 
 .rate-row { margin-top: 10px; }
+.hero-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 12px;
+  align-items: center;
+}
+.ctrl-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ctrl-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.ctrl-toggles { gap: 8px; }
+.kids-banner {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+}
 #level-blurb { margin: 6px 0 0; }
 
 .oido-toc {
@@ -362,6 +391,10 @@ button.btn.ghost, a.btn.ghost {
   border: 2px solid var(--accent);
   box-shadow: none;
 }
+button.btn.ghost.on {
+  background: var(--accent);
+  color: #fff;
+}
 button.btn.warn { background: var(--accent-2); box-shadow: 0 4px 0 #b8441b; }
 button.say {
   border: 2px solid transparent;
@@ -449,8 +482,21 @@ input[type="search"], input[type="text"] {
   font: inherit;
   font-size: 14px;
   font-weight: 700;
+  color: var(--ink);
 }
-.chip.on { background: var(--accent); color: white; border-color: var(--accent); }
+.chip:hover {
+  border-color: var(--accent);
+}
+.chip.on,
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.chip.on:hover,
+.chip[aria-pressed="true"]:hover {
+  filter: brightness(1.05);
+}
 button.btn.sm { min-height: 36px; padding: 6px 10px; font-size: 13px; }
 select {
   margin-left: 8px;
@@ -723,6 +769,42 @@ html[data-theme="dark"] nav.tabs {
 }
 html[data-theme="dark"] .role-card { background: #14332f; }
 html[data-theme="dark"] pre.prompt { background: #0c1816; }
+html[data-theme="dark"] .chip.on,
+html[data-theme="dark"] .chip[aria-pressed="true"] {
+  background: var(--accent);
+  color: #082824;
+  border-color: var(--accent);
+}
+html[data-theme="dark"] nav.tabs button[aria-current="page"] {
+  background: var(--accent);
+  color: #082824;
+  border-color: var(--accent);
+}
+html[data-theme="dark"] .level-chip.on {
+  background: var(--accent);
+  color: #082824;
+  border-color: var(--accent);
+}
+html[data-theme="dark"] .level-chip.on span { color: #134640; }
+html[data-theme="dark"] .mode-pick.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+html[data-theme="dark"] .choices button.ok {
+  background: #1a4a32;
+  border-color: var(--ok);
+  color: var(--ink);
+}
+html[data-theme="dark"] .choices button.bad {
+  background: #4a1e1c;
+  border-color: var(--bad);
+  color: var(--ink);
+}
+html[data-theme="dark"] button.btn.rec-on {
+  background: var(--bad);
+  color: #fff;
+}
 
 footer {
   margin-top: 28px;
@@ -927,7 +1009,26 @@ body.a11y-contrast select {
 body.a11y-contrast nav.tabs { background: #000; }
 body.a11y-contrast .role-card,
 body.a11y-contrast pre.prompt { background: #111; color: #fff; }
-body.a11y-contrast .chip, body.a11y-contrast .btn { border-width: 2px; }
+body.a11y-contrast .chip.on,
+body.a11y-contrast .chip[aria-pressed="true"],
+body.a11y-contrast nav.tabs button[aria-current="page"],
+body.a11y-contrast .level-chip.on,
+body.a11y-contrast .mode-pick.on {
+  background: var(--accent);
+  color: #000;
+  border-color: #fff;
+}
+body.a11y-contrast .level-chip.on span { color: #003830; }
+body.a11y-contrast .choices button.ok {
+  background: #003830;
+  border-color: var(--ok);
+  color: #fff;
+}
+body.a11y-contrast .choices button.bad {
+  background: #3a0000;
+  border-color: var(--bad);
+  color: #fff;
+}
 body.reduced-motion *, body.a11y-motion.reduced-motion * {
   animation: none !important;
   transition: none !important;

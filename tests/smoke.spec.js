@@ -180,11 +180,14 @@ test("kids mode sets slow voice", async ({ page }) => {
   await page.evaluate(() => {
     localStorage.setItem("enlab-rate", "normal");
     localStorage.setItem("enlab-kids", "0");
+    if (typeof applyKidsMode === "function") applyKidsMode();
+    if (typeof renderRateBar === "function") renderRateBar();
   });
-  await page.reload();
-  await page.waitForFunction(() => typeof applyKidsMode === "function");
   await page.locator("#kids-toggle").click();
   expect(await page.evaluate(() => localStorage.getItem("enlab-rate"))).toBe("slow");
+  await expect(page.locator("#kids-toggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#kids-toggle")).toHaveClass(/on/);
+  await expect(page.locator("#kids-banner")).toBeVisible();
 });
 
 test("repaso mode filters weak and shows quiz btn", async ({ page }) => {

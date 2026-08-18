@@ -744,7 +744,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v34";
+  const SW_CACHE = "enlab-v35";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -772,8 +772,8 @@
     const host = document.querySelector("#a11y-bar");
     if (!host) return;
     host.innerHTML = `
-      <button type="button" class="chip sm" id="a11y-contrast-btn" aria-pressed="${localStorage.getItem("enlab-a11y-contrast") === "1"}">${esc(typeof t === "function" ? t("contrast") : "Contraste alto")}</button>
-      <button type="button" class="chip sm" id="a11y-motion-btn" aria-pressed="${localStorage.getItem("enlab-a11y-motion") !== "0"}">${esc(typeof t === "function" ? t("motion") : "Animaciones")}</button>
+      <button type="button" class="chip sm${localStorage.getItem("enlab-a11y-contrast") === "1" ? " on" : ""}" id="a11y-contrast-btn" aria-pressed="${localStorage.getItem("enlab-a11y-contrast") === "1"}">${esc(typeof t === "function" ? t("contrast") : "Contraste alto")}</button>
+      <button type="button" class="chip sm${localStorage.getItem("enlab-a11y-motion") !== "0" ? " on" : ""}" id="a11y-motion-btn" aria-pressed="${localStorage.getItem("enlab-a11y-motion") !== "0"}">${esc(typeof t === "function" ? t("motion") : "Animaciones")}</button>
       <span class="muted keys-hint"><kbd>Tab</kbd> navega · <kbd>Alt+1-6</kbd> pestañas</span>`;
     document.querySelector("#a11y-contrast-btn")?.addEventListener("click", () => {
       localStorage.setItem("enlab-a11y-contrast", localStorage.getItem("enlab-a11y-contrast") === "1" ? "0" : "1");
@@ -962,13 +962,17 @@
         renderClassPro();
       }
       if (e.target.closest(".onboard-level")) {
-        const l = e.target.closest(".onboard-level").dataset.level;
+        const btn = e.target.closest(".onboard-level");
+        document.querySelectorAll(".onboard-level").forEach((b) => b.classList.toggle("on", b === btn));
+        const l = btn.dataset.level;
         if (typeof setCefr === "function") setCefr(l);
         document.querySelector('[data-step="1"]')?.setAttribute("hidden", "");
         document.querySelector('[data-step="2"]')?.removeAttribute("hidden");
       }
       if (e.target.closest(".onboard-goal")) {
-        localStorage.setItem("enlab-onboard-goal", e.target.closest(".onboard-goal").dataset.goal);
+        const btn = e.target.closest(".onboard-goal");
+        document.querySelectorAll(".onboard-goal").forEach((b) => b.classList.toggle("on", b === btn));
+        localStorage.setItem("enlab-onboard-goal", btn.dataset.goal);
         document.querySelector('[data-step="2"]')?.setAttribute("hidden", "");
         document.querySelector('[data-step="3"]')?.removeAttribute("hidden");
       }

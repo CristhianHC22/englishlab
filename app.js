@@ -60,9 +60,15 @@ function speakRate() {
   return "normal";
 }
 
+function setPressed(el, on) {
+  if (!el) return;
+  el.classList.toggle("on", !!on);
+  el.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
 function renderRateBar() {
   const cur = speakRate();
-  $$("[data-rate]").forEach((b) => b.classList.toggle("on", b.dataset.rate === cur));
+  $$("[data-rate]").forEach((b) => setPressed(b, b.dataset.rate === cur));
 }
 
 function themePref() {
@@ -76,7 +82,7 @@ function applyTheme() {
   document.documentElement.dataset.theme = t;
   const meta = $("#theme-color");
   if (meta) meta.content = t === "dark" ? "#12201e" : "#0b7a72";
-  $$("[data-theme-set]").forEach((b) => b.classList.toggle("on", b.dataset.themeSet === t));
+  $$("[data-theme-set]").forEach((b) => setPressed(b, b.dataset.themeSet === t));
 }
 
 function hideEsOn() {
@@ -86,10 +92,7 @@ function hideEsOn() {
 function applyHideEs() {
   const on = hideEsOn();
   document.documentElement.classList.toggle("hide-es", on);
-  $$("[data-hide-es]").forEach((b) => {
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-pressed", on ? "true" : "false");
-  });
+  $$("[data-hide-es]").forEach((b) => setPressed(b, on));
 }
 
 function buzz(ok) {
@@ -3486,6 +3489,7 @@ function renderClock() {
   if (btn) {
     if (left <= 0 && !timerState().running) btn.textContent = t("timerAgain");
     else btn.textContent = timerState().running ? t("timerPause") : t("hoyTimerStart");
+    setPressed(btn, !!timerState().running);
   }
 }
 
@@ -3589,8 +3593,7 @@ function renderRemind() {
   const on = remindOn();
   const btn = $("#remind-toggle");
   if (btn) {
-    btn.classList.toggle("on", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    setPressed(btn, on);
     btn.textContent = on ? t("remindOnBtn") : t("remindOn");
   }
   const st = $("#remind-status");
@@ -3764,16 +3767,28 @@ function autoPathOn() {
 }
 
 function applyKidsMode() {
-  document.body.classList.toggle("kids-mode", kidsOn());
-  const btn = $("#kids-toggle");
-  if (btn) btn.setAttribute("aria-pressed", kidsOn() ? "true" : "false");
-  if (kidsOn() && localStorage.getItem("enlab-rate") !== "slow") {
+  const on = kidsOn();
+  document.body.classList.toggle("kids-mode", on);
+  setPressed($("#kids-toggle"), on);
+  const banner = $("#kids-banner");
+  if (banner) banner.hidden = !on;
+  if (on && localStorage.getItem("enlab-rate") !== "slow") {
     localStorage.setItem("enlab-rate", "slow");
-    if (typeof renderRateBar === "function") renderRateBar();
   }
+  if (typeof renderRateBar === "function") renderRateBar();
 }
 
 function applyUiLang() {
+  if (window._enlabApplyingUi) return;
+  window._enlabApplyingUi = true;
+  try {
+    applyUiLangBody();
+  } finally {
+    window._enlabApplyingUi = false;
+  }
+}
+
+function applyUiLangBody() {
   const lang = uiLang();
   document.documentElement.lang = lang === "en" ? "en" : "es";
   document.title = "English Lab";
@@ -3799,8 +3814,10 @@ function applyUiLang() {
   });
   const levelBar = $("#level-bar");
   if (levelBar) levelBar.setAttribute("aria-label", t("levelAria"));
-  const rateRow = document.querySelector(".rate-row");
-  if (rateRow) rateRow.setAttribute("aria-label", t("voiceLabel"));
+  const voiceGroup = document.querySelector(".ctrl-group[data-i18n-aria=\"voiceLabel\"]");
+  if (voiceGroup) voiceGroup.setAttribute("aria-label", t("voiceLabel"));
+  const themeGroup = document.querySelector(".ctrl-group[data-i18n-aria=\"themeLabel\"]");
+  if (themeGroup) themeGroup.setAttribute("aria-label", t("themeLabel"));
   const nav = document.querySelector("nav.tabs");
   if (nav) nav.setAttribute("aria-label", t("navAria"));
   $$("[data-tab]").forEach((tab) => {
@@ -3811,7 +3828,6 @@ function applyUiLang() {
   const map = {
     "#ui-lang-toggle": "uiLang", "#kids-toggle": "kids", "#travel-toggle": "travel",
     "#repaso-btn": "repaso", "#repaso-quiz-btn": "quizWeak", "#repaso-exit": "repasoExit",
-    "#hoy-timer-btn": "hoyTimerStart", "#remind-toggle": "remindOn",
     "#remind-push-test": "pushTest", "#quiz-start": "quizStart", "#speak-listen": "speakListen", "#speak-rec": "speakRec",
     "#speak-next": "speakNext", "#shadow-go": "shadowGo", "#transfer-copy": "transferCopy",
     "#transfer-import": "transferImport", "#class-pin-save": "classPinSave",
@@ -3825,6 +3841,15 @@ function applyUiLang() {
     const el = $(sel);
     if (el) el.textContent = t(key);
   });
+  if ($("#speak-rec")?.classList.contains("rec-on")) $("#speak-rec").textContent = t("speakRecordStop");
+  if ($("#hoy-speak-rec")?.classList.contains("rec-on")) $("#hoy-speak-rec").textContent = t("speakRecordStop");
+  setPressed($("#kids-toggle"), kidsOn());
+  const kidsBanner = $("#kids-banner");
+  if (kidsBanner) kidsBanner.hidden = !kidsOn();
+  applyHideEs();
+  setPressed($("#ui-lang-toggle"), uiLang() === "en");
+  setPressed($("#travel-toggle"), localStorage.getItem("enlab-travel") === "1");
+  applyTheme();
   const footNext = document.querySelector(".hoy-path-foot .hoy-next");
   if (footNext && hoyPathI >= 0 && hoyPathI < hoyPath().length - 1) footNext.textContent = t("hoyNext");
   $$(".hoy-path-actions .hoy-next, #hoy-path .hoy-next").forEach((b) => {
@@ -3843,6 +3868,7 @@ function applyUiLang() {
   if (typeof renderVerbs === "function" && currentTab === "verbos") renderVerbs();
   if (typeof renderOidoToc === "function" && currentTab === "vocales") renderOidoToc();
   if (typeof renderRemind === "function") renderRemind();
+  if (typeof renderClock === "function") renderClock();
   if (typeof renderWeekReport === "function") renderWeekReport();
   if (typeof renderClassPin === "function") renderClassPin();
   if (typeof quiz !== "undefined" && quiz?.items?.length && typeof renderQuiz === "function") renderQuiz();
@@ -3907,6 +3933,7 @@ function startRepasoMode() {
   sessionStorage.setItem("enlab-repaso-speak-only", speakOnlyWeakOn() ? "1" : "0");
   localStorage.setItem("enlab-speak-only-weak", "1");
   document.body.classList.add("repaso-active");
+  setPressed($("#repaso-btn"), true);
   showTab("hoy");
   $$(".hoy-next").forEach((b) => { b.hidden = true; });
   renderHoyReview();
@@ -3925,6 +3952,7 @@ function clearRepasoMode() {
   if (localStorage.getItem("enlab-repaso") !== "1") return;
   localStorage.removeItem("enlab-repaso");
   document.body.classList.remove("repaso-active");
+  setPressed($("#repaso-btn"), false);
   const prev = sessionStorage.getItem("enlab-repaso-speak-only");
   if (prev === "0") localStorage.setItem("enlab-speak-only-weak", "0");
   sessionStorage.removeItem("enlab-repaso-speak-only");

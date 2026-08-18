@@ -227,10 +227,7 @@
     const toggle = document.querySelector("#travel-toggle");
     const on = travelOn();
     document.body.classList.toggle("travel-mode", on);
-    if (toggle) {
-      toggle.setAttribute("aria-pressed", on ? "true" : "false");
-      toggle.classList.toggle("on", on);
-    }
+    if (toggle) setPressed(toggle, on);
     if (!mapEl) return;
     const map = travelMapToday();
     if (!map) { mapEl.hidden = true; return; }
