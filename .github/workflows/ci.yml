@@ -21,13 +21,12 @@ jobs:
       - run: npm test
 
   visual:
+    # Misma imagen que el update local (comentario en tests/visual.spec.js).
+    # ubuntu-latest (24.04) pinta fuentes distinto y rompe los *-linux.png.
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-jammy
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
       - run: npm ci
-      - run: npx playwright install chromium --with-deps
       - run: npm run test:visual

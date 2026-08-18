@@ -3,7 +3,8 @@ const { test } = require("@playwright/test");
  * Regresión visual: claro / oscuro / contraste alto.
  * Baselines por plataforma (*-win32.png, *-linux.png).
  * Tras cambiar CSS: npm run test:visual:update
- * Linux desde Windows: docker run --rm -v ${PWD}:/work -w /work mcr.microsoft.com/playwright:v1.62.1-jammy bash -c "npm ci && npm run test:visual:update"
+ * Linux desde Windows (misma imagen que el job visual de CI):
+ * docker run --rm -v ${PWD}:/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.62.1-jammy bash -c "npm ci && npm run test:visual:update"
  */
 const {
   VISUAL_THEMES,
