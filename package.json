@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "check": "node --check app.js && node --check extras.js && node --check i18n.js && node --check idb-backup.js && node --check vapid-public.js && node --check pron-audio.js && node --check pack.js && node --check pack-m.js && node --check pack-n.js && node --check pack-o.js && node --check pack-q.js && node --check pack-s.js && node --check pack-u.js && node --check pack-v.js && node --check pack-bulk.js && node --check pack-podcasts.js && node --check pack-roleplays-bulk.js && node --check pack-emails-extra.js && node --check pack-podcast-series.js && node --check pack-plus.js && node --check features-nr.js && node --check features-sv.js && node --check features-plus.js && node --check loader.js && node --check sw.js",
-    "test": "playwright test",
+    "test": "playwright test --grep-invert \"regresión visual\"",
     "test:visual": "playwright test tests/visual.spec.js",
     "test:visual:update": "playwright test tests/visual.spec.js --update-snapshots",
     "icons": "node scripts/gen-icons.js",

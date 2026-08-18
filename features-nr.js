@@ -58,7 +58,7 @@
     { id: "D", name: "Shadowing + racha 30 días", check: () => {
       const sh = !!document.querySelector("#speak-shadow");
       const chart = !!document.querySelector("#hoy-streak-chart");
-      return { ok: sh && chart, detail: "Shadow + gráfica racha", tip: "Gráfica muestra últimos 30 días" };
+      return { ok: sh && chart, detail: "Shadow + gráfica racha 90 días", tip: "Gráfica muestra últimos 90 días" };
     }},
     { id: "E", name: "Transfer código/QR", check: () => {
       const box = !!document.querySelector("#transfer-box");

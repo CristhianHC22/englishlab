@@ -1,0 +1,16 @@
+---
+description: Convenciones English Lab — vanilla PWA, tests y cache
+alwaysApply: true
+---
+
+# English Lab
+
+PWA vanilla en la raíz del repo. Lee `AGENTS.md` y `docs/ARQUITECTURA.md` antes de refactorizar.
+
+- Sin bundler, React o TS. Contenido nuevo → `pack-*.js` diferido. UI tardía → `features-*.js`. Núcleo → `app.js`.
+- No envuelvas `paintTab`. Usa `onTabPaint` / `onHomePaint`.
+- Auditoría A–Z = 26 filas. No añadas la 27.ª sin cambiar `tests/smoke.spec.js` y `tests/ayuda.spec.js`.
+- Cadenas de UI: ES y EN en `i18n.js`, vía `t()`.
+- Visual: actualizar snapshots **win32 y linux** (Docker en el comentario de `tests/visual.spec.js`).
+- Cache SW: mismo `enlab-vNN` en `sw.js` y `features-sv.js`.
+- No commitear `vapid-private.json`, `push-sub.json`, `node_modules`, `test-results/`.
