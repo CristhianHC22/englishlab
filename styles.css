@@ -774,4 +774,6 @@ body.kids-mode #block-b-tips, body.kids-mode #block-chunks { display: none; }
 .due-today { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 .star-list { margin: 8px 0 12px; padding-left: 1.2em; }
 .roleplay-now { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.email-body { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 13px; background: var(--accent-soft); padding: 12px; border-radius: 8px; margin: 10px 0; overflow-x: auto; }
+.email-quiz .email-body { max-height: 160px; }
 

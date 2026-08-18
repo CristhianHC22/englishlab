@@ -148,6 +148,8 @@ ENLAB.ui = {
     listen: "Escucha",
     role: "Role-play",
     class: "Modo aula",
+    weekly: "Examen semanal",
+    email: "Emails",
   },
   en: {
     tabs: { hoy: "Today", vocales: "Listen", verbos: "Verbs", quiz: "Play", hablar: "Speak", ia: "Help" },
@@ -168,5 +170,7 @@ ENLAB.ui = {
     listen: "Listening",
     role: "Role-play",
     class: "Classroom",
+    weekly: "Weekly exam",
+    email: "Emails",
   },
 };

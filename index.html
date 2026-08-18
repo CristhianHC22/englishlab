@@ -372,6 +372,10 @@
             <strong>Escucha</strong>
             <span>Un párrafo y 3 preguntas</span>
           </button>
+          <button type="button" class="mode-pick" data-quiz-mode="weekly">
+            <strong>Examen semanal</strong>
+            <span>12 preguntas mixtas</span>
+          </button>
         </div>
         <select id="quiz-mode" hidden>
           <option value="choice">Verbos: opción múltiple</option>
@@ -386,6 +390,7 @@
           <option value="cond">Condicionales</option>
           <option value="dict">Dictado</option>
           <option value="listen">Escucha larga</option>
+          <option value="weekly">Examen semanal</option>
         </select>
         <div><button class="btn" id="quiz-start">¡Jugar!</button></div>
       </div>
@@ -422,6 +427,11 @@
         <div id="voice-history" class="voice-history" hidden></div>
         <p class="status" id="speak-status"></p>
       </div>
+      <div class="card" id="email-card">
+        <h3>Emails en voz alta</h3>
+        <p class="muted">Oye el correo como lo diría alguien. Luego graba tu respuesta corta.</p>
+        <div id="email-list"></div>
+      </div>
       <div class="card" id="roleplay-card">
         <h3>Role-play (2 min)</h3>
         <p class="muted">La app dice A. Tú grabas B. Tres giros. No hace falta perfecto.</p>
@@ -457,6 +467,7 @@
   <script src="levels.js"></script>
   <script src="extras.js"></script>
   <script src="pack.js"></script>
+  <script src="pack-m.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

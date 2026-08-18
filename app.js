@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
@@ -397,6 +397,7 @@ function paintTab(id) {
     renderVoiceHistory();
     renderRoleplays();
     renderStarBox();
+    renderEmails();
   }
   if (id === "ia" && dirty.ai) {
     renderAI();
@@ -543,12 +544,13 @@ function todayGame() {
   if (game === "uso") {
     return { game, label: "Hoy: 5 minutos de make/do", hint: "Calcos, make/do, Did you…?" };
   }
-  const rot = ["art", "prep", "phrasal", "dict", "listen"][t.i % 5];
+  const rot = ["art", "prep", "phrasal", "dict", "listen", "weekly"][t.i % 6];
   if (n >= 2 && rot === "art") return { game: "art", label: "Hoy: a / an / the", hint: "an hour, a university, the sun" };
   if (n >= 2 && rot === "prep") return { game: "prep", label: "Hoy: in / on / at", hint: "on Monday · at 3 · in 1999" };
   if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: "Hoy: phrasals", hint: "look up, wrap up, run out" };
   if (rot === "dict") return { game: "dict", label: "Hoy: dictado", hint: "Oye una vez y escribe" };
   if (n >= 2 && rot === "listen") return { game: "listen", label: "Hoy: escucha un párrafo", hint: "Oyes un texto y 3 preguntas" };
+  if (n >= 2 && rot === "weekly") return { game: "weekly", label: "Examen semanal (12)", hint: "Mezcla oído, verbos, gramática y email" };
   return { game: "", label: "", hint: "" };
 }
 
@@ -890,6 +892,10 @@ function startHoyGame() {
   hoyPathI = hoyPath().length;
   persistHoyPath();
   renderHoyPath();
+  if (g.game === "weekly") {
+    startWeeklyExam();
+    return true;
+  }
   const sel = $("#quiz-mode");
   if (sel && g.game) sel.value = g.game;
   syncQuizModePicks();
@@ -1554,8 +1560,10 @@ function makeDictItems() {
 
 function makeListenItems() {
   const bank = (ENLAB.listenPassages || []).filter((x) => (x.min || 1) <= lvlNum());
-  const p = (seededShuffle(bank)[0]) || bank[0];
-  if (!p) return [];
+  if (!bank.length) return [];
+  const rnd = seedFromDay();
+  let idx = Math.floor(rnd() * bank.length);
+  const p = bank[idx] || bank[0];
   return (p.qs || []).map((q, i) => ({
     type: "listen",
     q: q.q,
@@ -1569,6 +1577,88 @@ function makeListenItems() {
   }));
 }
 
+function weekStartKey() {
+  const d = new Date();
+  const diff = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  return dateKey(d);
+}
+
+function weeklyExamDone() {
+  return localStorage.getItem("enlab-weekly-exam") === weekStartKey();
+}
+
+function markWeeklyExamDone(score, total) {
+  localStorage.setItem("enlab-weekly-exam", weekStartKey());
+  localStorage.setItem("enlab-weekly-score", JSON.stringify({ week: weekStartKey(), score, total, at: todayKey() }));
+}
+
+function weeklyScoreText() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-weekly-score") || "null");
+    if (raw && raw.week === weekStartKey()) return `${raw.score}/${raw.total}`;
+  } catch { /* ignore */ }
+  return "";
+}
+
+function makeWeeklyExamItems() {
+  const items = [];
+  items.push(...makeEarItems(false).slice(0, 2));
+  const source = verbSource();
+  const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
+  const verbs = shuffle([...weak, ...shuffle(source)]).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 2);
+  verbs.forEach((v) => {
+    items.push({
+      type: "choice",
+      q: `Pasado de “${v.inf}”`,
+      esHint: v.es,
+      a: v.past.split(" / ")[0],
+      opts: uniqueOpts(v.past.split(" / ")[0], source.map((x) => x.past)),
+      say: v.inf,
+      inf: v.inf,
+    });
+  });
+  const ed = makeEdItems();
+  if (ed[0]) items.push(ed[0]);
+  const uso = makeUsoItems();
+  if (uso[0]) items.push(uso[0]);
+  const art = makePickBankItems(ENLAB.artQuiz, "art");
+  if (art[0]) items.push(art[0]);
+  const prep = makePickBankItems(ENLAB.prepQuiz, "prep");
+  if (prep[0]) items.push(prep[0]);
+  const ph = makePickBankItems(ENLAB.phrasalQuiz, "phrasal");
+  if (ph[0]) items.push(ph[0]);
+  const dict = makeDictItems();
+  if (dict[0]) items.push(dict[0]);
+  const listen = makeListenItems();
+  if (listen[0]) items.push(listen[0]);
+  const emails = (ENLAB.emailSpeak || []).filter((e) => (e.min || 1) <= lvlNum());
+  const em = seededShuffle(emails)[0];
+  if (em?.qs?.[0]) {
+    const q = em.qs[0];
+    items.push({
+      type: "email",
+      q: q.q,
+      prompt: `${em.subject} — ${em.from}`,
+      a: q.a,
+      opts: shuffle([...(q.opts || [])]),
+      say: em.say || em.body.replace(/\n+/g, " "),
+      why: em.es || em.body,
+      inf: `email:${em.subject}:${q.a}`,
+      email: em,
+    });
+  }
+  return items.filter(Boolean).slice(0, 12);
+}
+
+function startWeeklyExam() {
+  if (recState.rec && recState.rec.state === "recording") stopRecording(false);
+  quiz = { i: 0, score: 0, items: makeWeeklyExamItems(), fails: [], mode: "weekly", host: "#quiz-box" };
+  showTab("quiz");
+  renderQuiz();
+  quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function makeQuizItems() {
   if (quiz.mode === "ear" || quiz.mode === "exam") return makeEarItems(quiz.mode === "exam");
   if (quiz.mode === "uso") return makeUsoItems();
@@ -1579,6 +1669,7 @@ function makeQuizItems() {
   if (quiz.mode === "cond") return makePickBankItems(ENLAB.condQuiz, "cond");
   if (quiz.mode === "dict") return makeDictItems();
   if (quiz.mode === "listen") return makeListenItems();
+  if (quiz.mode === "weekly") return makeWeeklyExamItems();
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -1655,7 +1746,8 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly";
+    const weekly = quiz.mode === "weekly";
     if (cierre) {
       const w = weakSet();
       quiz.items.forEach((it) => {
@@ -1674,16 +1766,24 @@ function renderQuiz() {
       saveSet("enlab-ear-weak", w);
     }
     if (pick && quiz.fails.length) {
-      quiz.fails.forEach((k) => bumpPickWeak(quiz.mode, k, false));
+      quiz.fails.forEach((k) => {
+        if (weekly) {
+          const hit = quiz.items.find((x) => x.inf === k);
+          const mode = hit?.type === "email" ? "listen" : (hit?.type || "uso");
+          bumpPickWeak(mode, k, false);
+        } else bumpPickWeak(quiz.mode, k, false);
+      });
     }
+    if (weekly) markWeeklyExamDone(quiz.score, quiz.items.length);
     if (!quiz.fails.length) buzz(true);
     const g = todayGame();
     const extraGame = cierre && g.game
       ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
       : "";
     box.innerHTML = `<div class="card">
-      <h3>${cierre ? "Sesión cerrada" : "Terminado"}</h3>
+      <h3>${cierre ? "Sesión cerrada" : weekly ? "Examen semanal listo" : "Terminado"}</h3>
       <p class="score">${quiz.score} / ${quiz.items.length}</p>
+      ${weekly ? `<p class="muted">Esta semana: ${quiz.score >= 9 ? "Muy bien." : quiz.score >= 7 ? "Bien. Repasa lo que fallaste." : "Repasa vencen hoy y el camino de Hoy."}</p>` : ""}
       <p class="muted">${quiz.fails.length
         ? (ear
           ? `Repite estos pares: ${quiz.fails.map((k) => k.replace("|", " / ")).join(", ")}`
@@ -1699,13 +1799,14 @@ function renderQuiz() {
       ${quiz.mode === "cond" ? `<p class="muted">If it rains, I will… / If I were you, I would… / will → would en reported speech.</p>` : ""}
       ${quiz.mode === "dict" ? `<p class="muted">I'm / I am cuentan. Escucha otra vez si hace falta.</p>` : ""}
       ${quiz.mode === "listen" ? `<p class="muted">Vuelve a oír el párrafo. Las 3 preguntas son del mismo texto.</p>` : ""}
+      ${weekly ? `<p class="muted">Oído + verbos + gramática + email. Puedes repetirlo la próxima semana.</p>` : ""}
       ${cierre ? `<p class="muted">Esto cuenta como el quiz del día. El resto de Juego es extra.</p>` : ""}
       ${extraGame}
-      <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : "Otro round"}</button>
+      <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : weekly ? "Otro examen (mezcla nueva)" : "Otro round"}</button>
     </div>`;
-    markSession("quizDone");
+    if (cierre) markSession("quizDone");
     syncRemindToSw();
-    $("#quiz-again")?.addEventListener("click", cierre ? startCierreQuiz : startQuiz);
+    $("#quiz-again")?.addEventListener("click", cierre ? startCierreQuiz : weekly ? startWeeklyExam : startQuiz);
     renderVerbs();
     if (cierre) {
       renderHoyCheck();
@@ -1743,6 +1844,23 @@ function renderQuiz() {
     $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     return;
   }
+  if (it.type === "email") {
+    const em = it.email;
+    box.innerHTML = `<div class="card email-quiz">
+      <div class="muted">Email ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="quiz-q">${quizQ(it)}</div>
+      ${em ? `<pre class="email-body">${esc(em.body)}</pre>` : ""}
+      <div class="row">
+        <button type="button" class="btn ghost" data-say="${esc(it.say)}">Oír email</button>
+      </div>
+      <div class="choices" style="margin-top:12px">
+        ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}">${i + 1}. ${esc(o)}</button>`).join("")}
+      </div>
+      ${it.why ? `<p class="muted es-line" id="uso-why" hidden>${esc(it.why)}</p>` : ""}
+    </div>`;
+    speak(it.say, true);
+    return;
+  }
   if (it.type === "dict") {
     box.innerHTML = `<div class="card">
       <div class="muted">Dictado ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
@@ -1772,7 +1890,7 @@ function renderQuiz() {
     $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     return;
   }
-  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen") {
+  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email") {
     const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? "Escucha" : "Uso";
     box.innerHTML = `<div class="card">
       <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
@@ -1908,6 +2026,10 @@ function speakPool() {
   return [
     ...extra.map((s) => ({ target: s.en, helpHtml: `<span class="es-line">${esc(s.es)}</span>` })),
     ...phrasals.map((p) => ({ target: p.say, helpHtml: `<span class="es-line">${esc(p.es)}</span> · phrasal` })),
+    ...(ENLAB.emailSpeak || []).filter((e) => (e.min || 2) <= n).map((e) => ({
+      target: e.reply,
+      helpHtml: `Email · ${esc(e.subject)} · <span class="es-line">${esc(e.es)}</span>`,
+    })),
     ...dialogs.flatMap((d) => [
       { target: d.a.en, helpHtml: `A · <span class="es-line">${esc(d.a.es)}</span>` },
       { target: d.b.en, helpHtml: `Tú · <span class="es-line">${esc(d.b.es)}</span>` },
@@ -2446,6 +2568,25 @@ document.addEventListener("click", (e) => {
     }
   }
 
+  if (e.target.closest("[data-email-say]")) {
+    const em = window._dailyEmail;
+    if (em) speakQueue((em.say || em.body).split(/(?<=[.!?])\s+/), true);
+  }
+
+  if (e.target.closest("[data-email-reply]")) {
+    const em = window._dailyEmail;
+    if (em) {
+      window._speakTarget = { target: em.reply, helpHtml: `Respuesta a: ${esc(em.subject)}` };
+      showTab("hablar");
+      setSpeakTarget(window._speakTarget);
+      toggleRecording("hablar");
+    }
+  }
+
+  if (e.target.closest("#weekly-exam-btn")) {
+    startWeeklyExam();
+  }
+
   const nudgeTo = e.target.closest("[data-nudge-to]");
   if (nudgeTo) setCefr(nudgeTo.dataset.nudgeTo);
 
@@ -2534,7 +2675,7 @@ document.addEventListener("click", (e) => {
   }
 
   const opt = e.target.closest("[data-opt]");
-  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
+  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen", "email"];
   if (opt && quiz.items[quiz.i] && pickTypes.includes(quiz.items[quiz.i].type)) {
     const val = decodeURIComponent(opt.dataset.opt);
     const it = quiz.items[quiz.i];
@@ -3393,7 +3534,12 @@ function renderWeekReport() {
     spoke += s;
   }
   el.hidden = false;
-  el.innerHTML = `<p class="muted">${esc(t("week"))}: ${days}/7 días · ${heard} oídas · ${quizN} quiz · ${spoke} voz · ${srsDueList(99).length} vencen hoy</p>`;
+  const done = weeklyExamDone();
+  const wscore = weeklyScoreText();
+  const weeklyBtn = done
+    ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
+    : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
+  el.innerHTML = `<p class="muted">${esc(t("week"))}: ${days}/7 días · ${heard} oídas · ${quizN} quiz · ${spoke} voz · ${srsDueList(99).length} vencen hoy</p><p class="row">${weeklyBtn}</p>`;
 }
 
 function classroomPin() {
@@ -3506,6 +3652,28 @@ function paintRoleplayTurn() {
       <button type="button" class="btn ghost" data-role-next>Siguiente giro</button>
     </div>
     <p class="status" id="role-status"></p>`;
+}
+
+function renderEmails() {
+  const box = $("#email-list");
+  if (!box) return;
+  const items = (ENLAB.emailSpeak || []).filter((e) => (e.min || 1) <= lvlNum());
+  if (!items.length) {
+    box.innerHTML = `<p class="muted">Disponible desde A2.</p>`;
+    return;
+  }
+  const em = seededShuffle(items)[0];
+  window._dailyEmail = em;
+  box.innerHTML = `
+    <p class="kicker">Email de hoy</p>
+    <p><strong>${esc(em.subject)}</strong> <span class="muted">· ${esc(em.from)}</span></p>
+    <pre class="email-body">${esc(em.body)}</pre>
+    <p class="muted es-line">${esc(em.es)}</p>
+    <div class="row">
+      <button type="button" class="btn ghost" data-email-say>Oír en voz alta</button>
+      <button type="button" class="btn sm" data-email-reply>Grabar respuesta</button>
+    </div>
+    <p class="muted">Respuesta modelo: <em>${esc(em.reply)}</em></p>`;
 }
 
 function renderInterviewSim() {
@@ -3645,6 +3813,7 @@ function init() {
   renderVoiceHistory();
   renderRoleplays();
   renderStarBox();
+  renderEmails();
   renderClassPin();
 }
 
