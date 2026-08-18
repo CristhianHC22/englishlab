@@ -136,6 +136,41 @@
       const d = !!document.querySelector("#duo-card");
       return { ok: d, detail: duoState.active ? "Partida en curso" : "Listo para 2 jugadores", tip: "Turnos A/B mismo dispositivo" };
     }},
+    { id: "S", name: "Pronunciación + IPA + mínimos pares", check: () => {
+      const p = (ENLAB.minimalPairs || []).length >= 25;
+      const panel = !!document.querySelector("#pron-panel");
+      return { ok: p && panel, detail: `${(ENLAB.minimalPairs || []).length} pares`, tip: "Graba y compara fonética" };
+    }},
+    { id: "T", name: "Aula pro + CSV + tarea", check: () => {
+      const pro = !!document.querySelector("#class-pro-panel");
+      return { ok: pro, detail: "Dashboard aula pro", tip: "Importa códigos transfer" };
+    }},
+    { id: "U", name: "20 historias ramificadas", check: () => {
+      const n = (ENLAB.branchStories || []).length;
+      return { ok: n >= 20 && !!document.querySelector("#stories-panel"), detail: `${n} historias`, tip: "Progreso guardado" };
+    }},
+    { id: "V", name: "Writing + rúbrica", check: () => {
+      const n = (ENLAB.writingPrompts || []).length;
+      return { ok: n >= 6 && !!document.querySelector("#writing-panel"), detail: `${n} prompts`, tip: "Compara con modelo" };
+    }},
+    { id: "W", name: "500 frases · 25 situaciones", check: () => {
+      const sit = ENLAB.phrasesSituation || {};
+      const total = Object.keys(sit).reduce((n, k) => n + (sit[k]?.length || 0), 0);
+      return { ok: Object.keys(sit).length >= 25 && total >= 480, detail: `${Object.keys(sit).length} escenarios, ${total} frases`, tip: "Shadowing en situaciones" };
+    }},
+    { id: "X", name: "100 dictados + 40 podcasts", check: () => {
+      return { ok: (ENLAB.dictation || []).length >= 100 && (ENLAB.podcasts || []).length >= 40, detail: `${(ENLAB.dictation || []).length} dict, ${(ENLAB.podcasts || []).length} pod`, tip: "Hints fonéticos" };
+    }},
+    { id: "Y", name: "Onboarding + offline + a11y", check: () => {
+      const off = !!document.querySelector("#offline-badge");
+      const a11y = !!document.querySelector("#a11y-bar");
+      return { ok: off && a11y, detail: `offline ${off ? "✓" : "✗"}, a11y ${a11y ? "✓" : "✗"}`, tip: "Contraste alto" };
+    }},
+    { id: "Z", name: "i18n EN + bundle split", check: () => {
+      const ui = !!(ENLAB.ui?.en?.pron && ENLAB.ui?.en?.onboard);
+      const loader = !!window.ENLAB_LOADER;
+      return { ok: ui && loader, detail: `EN UI ${ui ? "✓" : "—"}, loader ${loader ? "✓" : "—"}`, tip: "English UI toggle" };
+    }},
   ];
 
   function renderLabAudit() {
@@ -154,7 +189,7 @@
     const okN = LOT_AUDIT.filter((l) => { try { return l.check().ok; } catch { return false; } }).length;
     host.innerHTML = `
       <p class="kicker">Auditoría A–R</p>
-      <p><strong>${okN}/${LOT_AUDIT.length}</strong> lotes en verde. Revisa qué falta optimizar.</p>
+      <p><strong>${okN}/${LOT_AUDIT.length}</strong> lotes en verde (A–Z). Revisa qué falta optimizar.</p>
       <div class="audit-scroll">
         <table class="audit-table">
           <thead><tr><th>Lote</th><th>Nombre</th><th>Estado</th><th>Mejora sugerida</th></tr></thead>
@@ -850,5 +885,5 @@
     renderLabAudit,
   };
 
-  NR.bootstrap();
+  if (!window.ENLAB_LOADER) NR.bootstrap();
 })();

@@ -1,0 +1,478 @@
+/* Contenido masivo: 500 frases situacionales, 100 dictados, 40 podcasts */
+window.ENLAB = window.ENLAB || {};
+
+(function bulkContent() {
+  const TARGET = 20;
+
+  const newScenarios = {
+    gym: [
+      { en: "Is this machine free?", es: "¿Está libre esta máquina?", min: 1 },
+      { en: "How do I adjust the seat?", es: "¿Cómo ajusto el asiento?", min: 1 },
+      { en: "Where are the towels?", es: "¿Dónde están las toallas?", min: 1 },
+      { en: "First time here — any tour?", es: "Primera vez — ¿hay tour?", min: 2 },
+      { en: "Do you offer a day pass?", es: "¿Hay pase de un día?", min: 2 },
+      { en: "The locker code isn't working.", es: "El código del locker no funciona.", min: 2 },
+      { en: "Please wipe down the equipment.", es: "Limpia el equipo después.", min: 2 },
+      { en: "What time does the pool close?", es: "¿A qué hora cierra la piscina?", min: 2 },
+      { en: "I'd like to cancel my membership.", es: "Quiero cancelar la membresía.", min: 3 },
+      { en: "Can I freeze my account?", es: "¿Puedo congelar la cuenta?", min: 3 },
+      { en: "Is there a trainer available?", es: "¿Hay entrenador disponible?", min: 2 },
+      { en: "How many reps should I do?", es: "¿Cuántas repeticiones?", min: 2 },
+      { en: "I'm feeling dizzy.", es: "Me siento mareado.", min: 2 },
+      { en: "Where is the stretching area?", es: "¿Dónde estiran?", min: 1 },
+      { en: "Do you have yoga classes?", es: "¿Hay clases de yoga?", min: 2 },
+      { en: "My membership card expired.", es: "Mi tarjeta expiró.", min: 2 },
+      { en: "Can I bring a guest?", es: "¿Puedo traer un invitado?", min: 2 },
+      { en: "The AC is too cold.", es: "El aire está muy frío.", min: 2 },
+      { en: "Thanks for spotting me.", es: "Gracias por ayudarme con el peso.", min: 3 },
+      { en: "See you next week.", es: "Nos vemos la próxima semana.", min: 1 },
+    ],
+    dentist: [
+      { en: "I'd like to schedule a cleaning.", es: "Quiero agendar una limpieza.", min: 2 },
+      { en: "I have a toothache.", es: "Me duele un diente.", min: 2 },
+      { en: "How long will it take?", es: "¿Cuánto tardará?", min: 2 },
+      { en: "Do you take my insurance?", es: "¿Aceptan mi seguro?", min: 2 },
+      { en: "I'm nervous about needles.", es: "Me dan nervios las agujas.", min: 2 },
+      { en: "Can I get numbing gel?", es: "¿Hay gel anestésico?", min: 3 },
+      { en: "My gums are bleeding.", es: "Me sangran las encías.", min: 2 },
+      { en: "When should I come back?", es: "¿Cuándo debo volver?", min: 2 },
+      { en: "Is this covered?", es: "¿Esto lo cubre el seguro?", min: 3 },
+      { en: "I broke a filling.", es: "Se me rompió un empaste.", min: 3 },
+      { en: "Do I need X-rays?", es: "¿Necesito radiografías?", min: 2 },
+      { en: "It hurts when I bite.", es: "Duele al morder.", min: 2 },
+      { en: "Can you send the bill by email?", es: "¿Mandan la factura por email?", min: 2 },
+      { en: "I need a receipt for insurance.", es: "Necesito recibo para el seguro.", min: 3 },
+      { en: "What should I avoid eating?", es: "¿Qué no debo comer?", min: 2 },
+      { en: "My jaw is sore.", es: "Me duele la mandíbula.", min: 2 },
+      { en: "Is sedation available?", es: "¿Hay sedación?", min: 3 },
+      { en: "Thank you for being gentle.", es: "Gracias por ser cuidadoso.", min: 2 },
+      { en: "I'll call if it gets worse.", es: "Llamo si empeora.", min: 2 },
+      { en: "Same time next month?", es: "¿Misma hora el próximo mes?", min: 2 },
+    ],
+    postoffice: [
+      { en: "I'd like to send this to Spain.", es: "Quiero enviar esto a España.", min: 2 },
+      { en: "How much is express shipping?", es: "¿Cuánto cuesta express?", min: 2 },
+      { en: "Do I need to fill out a customs form?", es: "¿Formulario de aduana?", min: 3 },
+      { en: "Can I track this package?", es: "¿Puedo rastrear el paquete?", min: 2 },
+      { en: "I need stamps, please.", es: "Necesito sellos.", min: 1 },
+      { en: "Where is the pickup window?", es: "¿Dónde retiro?", min: 2 },
+      { en: "This is fragile.", es: "Es frágil.", min: 2 },
+      { en: "I'd like registered mail.", es: "Quiero correo certificado.", min: 3 },
+      { en: "My package wasn't delivered.", es: "No entregaron mi paquete.", min: 2 },
+      { en: "Can someone else pick it up?", es: "¿Otra persona puede retirarlo?", min: 2 },
+      { en: "What's the weight limit?", es: "¿Límite de peso?", min: 2 },
+      { en: "I need a PO box.", es: "Necesito apartado postal.", min: 3 },
+      { en: "Is there a notary here?", es: "¿Hay notario?", min: 3 },
+      { en: "How long until it arrives?", es: "¿Cuánto tarda en llegar?", min: 2 },
+      { en: "Can I insure this?", es: "¿Puedo asegurarlo?", min: 3 },
+      { en: "Wrong address on the label.", es: "Dirección incorrecta en la etiqueta.", min: 2 },
+      { en: "Do you have bubble wrap?", es: "¿Tienen plástico de burbujas?", min: 2 },
+      { en: "I need a money order.", es: "Necesito giro postal.", min: 3 },
+      { en: "Closing time today?", es: "¿Hora de cierre hoy?", min: 1 },
+      { en: "Thanks, have a good day.", es: "Gracias, buen día.", min: 1 },
+    ],
+    library: [
+      { en: "Where is the fiction section?", es: "¿Dónde está ficción?", min: 1 },
+      { en: "I'd like to renew these books.", es: "Quiero renovar estos libros.", min: 2 },
+      { en: "Do you have this title in stock?", es: "¿Tienen este título?", min: 2 },
+      { en: "How do I get a library card?", es: "¿Cómo saco la tarjeta?", min: 2 },
+      { en: "When are these due back?", es: "¿Cuándo devolver?", min: 2 },
+      { en: "Is there a quiet study room?", es: "¿Hay sala de estudio?", min: 2 },
+      { en: "Can I print from here?", es: "¿Puedo imprimir aquí?", min: 2 },
+      { en: "The Wi-Fi password, please.", es: "Contraseña del Wi-Fi.", min: 2 },
+      { en: "I lost my library card.", es: "Perdí mi tarjeta.", min: 2 },
+      { en: "Are there ebooks available?", es: "¿Hay ebooks?", min: 2 },
+      { en: "I'd like to reserve this book.", es: "Quiero reservar este libro.", min: 2 },
+      { en: "Story time for kids today?", es: "¿Cuento para niños hoy?", min: 2 },
+      { en: "Where are the restrooms?", es: "¿Dónde están los baños?", min: 1 },
+      { en: "Can I donate these books?", es: "¿Puedo donar estos libros?", min: 2 },
+      { en: "Is interlibrary loan available?", es: "¿Préstamo entre bibliotecas?", min: 3 },
+      { en: "The return slot is full.", es: "El buzón de devolución está lleno.", min: 2 },
+      { en: "Do you host book clubs?", es: "¿Hay club de lectura?", min: 3 },
+      { en: "I have a fine to pay.", es: "Tengo una multa que pagar.", min: 2 },
+      { en: "Thanks for your help.", es: "Gracias por la ayuda.", min: 1 },
+      { en: "See you next week.", es: "Hasta la próxima semana.", min: 1 },
+    ],
+    train: [
+      { en: "Which platform for Boston?", es: "¿Andén para Boston?", min: 2 },
+      { en: "Is this seat taken?", es: "¿Está ocupado este asiento?", min: 2 },
+      { en: "One ticket to downtown, please.", es: "Un boleto al centro.", min: 2 },
+      { en: "Is the train on time?", es: "¿El tren va a tiempo?", min: 2 },
+      { en: "Where do I change trains?", es: "¿Dónde transbordo?", min: 2 },
+      { en: "Can I get a refund?", es: "¿Puedo obtener reembolso?", min: 3 },
+      { en: "The AC isn't working.", es: "El aire no funciona.", min: 2 },
+      { en: "Excuse me, that's my stop.", es: "Perdón, esa es mi parada.", min: 2 },
+      { en: "Is there Wi-Fi on board?", es: "¿Hay Wi-Fi a bordo?", min: 2 },
+      { en: "How long is the delay?", es: "¿Cuánto es el retraso?", min: 2 },
+      { en: "I'd like a window seat.", es: "Quisiera ventana.", min: 2 },
+      { en: "Where can I store my luggage?", es: "¿Dónde dejo el equipaje?", min: 2 },
+      { en: "Is this the quiet car?", es: "¿Es el vagón silencioso?", min: 3 },
+      { en: "My ticket won't scan.", es: "Mi boleto no escanea.", min: 2 },
+      { en: "Do you validate tickets here?", es: "¿Validan boletos aquí?", min: 2 },
+      { en: "Next stop, please?", es: "¿Próxima parada?", min: 2 },
+      { en: "Is food allowed?", es: "¿Se permite comer?", min: 2 },
+      { en: "I missed my connection.", es: "Perdí mi conexión.", min: 3 },
+      { en: "Thank you, conductor.", es: "Gracias, conductor.", min: 1 },
+      { en: "Have a safe trip.", es: "Buen viaje.", min: 1 },
+    ],
+    coworking: [
+      { en: "I'd like a day pass.", es: "Quiero pase de un día.", min: 2 },
+      { en: "Is there a meeting room free?", es: "¿Hay sala libre?", min: 3 },
+      { en: "What's the Wi-Fi password?", es: "¿Contraseña Wi-Fi?", min: 2 },
+      { en: "Can I print documents?", es: "¿Puedo imprimir?", min: 2 },
+      { en: "Where is the phone booth?", es: "¿Cabina telefónica?", min: 3 },
+      { en: "Is coffee included?", es: "¿Incluye café?", min: 2 },
+      { en: "I need a dedicated desk.", es: "Necesito escritorio fijo.", min: 3 },
+      { en: "What are your hours?", es: "¿Horario?", min: 2 },
+      { en: "Can I host a client here?", es: "¿Puedo recibir un cliente?", min: 3 },
+      { en: "The printer is jammed.", es: "La impresora atascada.", min: 2 },
+      { en: "Is it okay to take calls here?", es: "¿Puedo llamar aquí?", min: 2 },
+      { en: "I'd like to upgrade my plan.", es: "Quiero subir de plan.", min: 3 },
+      { en: "Where are the lockers?", es: "¿Lockers?", min: 2 },
+      { en: "Do you have standing desks?", es: "¿Escritorios de pie?", min: 3 },
+      { en: "Community event tonight?", es: "¿Evento hoy?", min: 2 },
+      { en: "My key fob stopped working.", es: "Mi llave no funciona.", min: 2 },
+      { en: "Can I get a tour?", es: "¿Hay tour?", min: 2 },
+      { en: "Invoice by email, please.", es: "Factura por email.", min: 3 },
+      { en: "Thanks for the quiet space.", es: "Gracias por el espacio.", min: 2 },
+      { en: "See you tomorrow.", es: "Nos vemos mañana.", min: 1 },
+    ],
+    emergency: [
+      { en: "Call an ambulance!", es: "¡Llama una ambulancia!", min: 2 },
+      { en: "I need help — someone fainted.", es: "Ayuda — alguien se desmayó.", min: 2 },
+      { en: "Where is the nearest hospital?", es: "¿Hospital más cercano?", min: 2 },
+      { en: "I'm lost. Can you help?", es: "Estoy perdido. ¿Ayuda?", min: 1 },
+      { en: "My wallet was stolen.", es: "Me robaron la cartera.", min: 2 },
+      { en: "I need to report an accident.", es: "Reportar un accidente.", min: 3 },
+      { en: "Is anyone here a doctor?", es: "¿Hay médico?", min: 2 },
+      { en: "Fire! Evacuate the building.", es: "¡Fuego! Evacuar.", min: 2 },
+      { en: "I'm allergic — call 911.", es: "Alergia — llama al 911.", min: 2 },
+      { en: "Stay calm. Help is coming.", es: "Calma. Viene ayuda.", min: 2 },
+      { en: "Don't move — you might be hurt.", es: "No te muevas.", min: 2 },
+      { en: "What's your emergency?", es: "¿Cuál es la emergencia?", min: 2 },
+      { en: "Give me your location.", es: "Dame tu ubicación.", min: 2 },
+      { en: "I can't breathe well.", es: "No respiro bien.", min: 2 },
+      { en: "There's been a car crash.", es: "Choque de autos.", min: 2 },
+      { en: "Please stay on the line.", es: "No cuelgues.", min: 2 },
+      { en: "Are you safe right now?", es: "¿Estás a salvo?", min: 2 },
+      { en: "Help is three minutes away.", es: "Ayuda en 3 minutos.", min: 2 },
+      { en: "Thank you for responding.", es: "Gracias por responder.", min: 2 },
+      { en: "I'll wait here.", es: "Espero aquí.", min: 1 },
+    ],
+    landlord: [
+      { en: "The sink is leaking.", es: "El fregadero gotea.", min: 2 },
+      { en: "When can maintenance come?", es: "¿Cuándo viene mantenimiento?", min: 2 },
+      { en: "I'd like to renew my lease.", es: "Quiero renovar el contrato.", min: 3 },
+      { en: "Can I get my deposit back?", es: "¿Recupero el depósito?", min: 3 },
+      { en: "The heat isn't working.", es: "La calefacción no funciona.", min: 2 },
+      { en: "There's mold in the bathroom.", es: "Hay moho en el baño.", min: 3 },
+      { en: "My neighbor is too loud.", es: "El vecino hace mucho ruido.", min: 2 },
+      { en: "I lost my keys.", es: "Perdí las llaves.", min: 2 },
+      { en: "Can I paint the walls?", es: "¿Puedo pintar?", min: 2 },
+      { en: "Rent is due on the first.", es: "Renta el día 1.", min: 2 },
+      { en: "I'll be out of town next month.", es: "Estaré fuera el próximo mes.", min: 2 },
+      { en: "Is subletting allowed?", es: "¿Se permite subarrendar?", min: 3 },
+      { en: "The dishwasher broke.", es: "El lavavajillas se rompió.", min: 2 },
+      { en: "I need a receipt for rent.", es: "Necesito recibo de renta.", min: 2 },
+      { en: "Parking spot assignment?", es: "¿Asignación de estacionamiento?", min: 2 },
+      { en: "Smoke detector beeping.", es: "Detector pita.", min: 2 },
+      { en: "I'll give 30 days notice.", es: "Aviso con 30 días.", min: 3 },
+      { en: "Can we schedule an inspection?", es: "¿Inspección?", min: 3 },
+      { en: "Thank you for fixing it quickly.", es: "Gracias por arreglarlo rápido.", min: 2 },
+      { en: "I'll send photos by email.", es: "Mando fotos por email.", min: 2 },
+    ],
+    cinema: [
+      { en: "Two tickets for the eight o'clock show.", es: "Dos boletos para las ocho.", min: 2 },
+      { en: "Is this movie subtitled?", es: "¿Subtitulada?", min: 2 },
+      { en: "Where is theater three?", es: "¿Sala tres?", min: 2 },
+      { en: "Can we sit in the back?", es: "¿Al fondo?", min: 2 },
+      { en: "Large popcorn, please.", es: "Palomitas grandes.", min: 1 },
+      { en: "Do you have student discount?", es: "¿Descuento estudiante?", min: 2 },
+      { en: "The sound is too loud.", es: "El sonido muy alto.", min: 2 },
+      { en: "Excuse me — your phone.", es: "Perdón — tu teléfono.", min: 2 },
+      { en: "Where are the restrooms?", es: "¿Baños?", min: 1 },
+      { en: "Is the 3D worth it?", es: "¿Vale la pena 3D?", min: 3 },
+      { en: "What time does it end?", es: "¿A qué hora termina?", min: 2 },
+      { en: "I'd like aisle seats.", es: "Asientos pasillo.", min: 2 },
+      { en: "Can I get a refund?", es: "¿Reembolso?", min: 3 },
+      { en: "Trailers are too long.", es: "Trailers muy largos.", min: 2 },
+      { en: "Great movie!", es: "¡Buena película!", min: 1 },
+      { en: "Where did we park?", es: "¿Dónde estacionamos?", min: 2 },
+      { en: "Next one is at nine thirty.", es: "La siguiente a las nueve y media.", min: 2 },
+      { en: "No spoilers, please.", es: "Sin spoilers.", min: 2 },
+      { en: "Thanks for the recommendation.", es: "Gracias por la recomendación.", min: 2 },
+      { en: "See you at the sequel.", es: "Nos vemos en la secuela.", min: 2 },
+    ],
+    vet: [
+      { en: "My dog isn't eating.", es: "Mi perro no come.", min: 2 },
+      { en: "She's been vomiting.", es: "Ha vomitado.", min: 2 },
+      { en: "When was the last vaccine?", es: "¿Última vacuna?", min: 2 },
+      { en: "Do you take walk-ins?", es: "¿Sin cita?", min: 2 },
+      { en: "Is this an emergency?", es: "¿Es emergencia?", min: 2 },
+      { en: "How much is a check-up?", es: "¿Cuánto cuesta revisión?", min: 2 },
+      { en: "Can you microchip her?", es: "¿Microchip?", min: 3 },
+      { en: "He limps on his left paw.", es: "Coje la pata izquierda.", min: 2 },
+      { en: "What food do you recommend?", es: "¿Qué comida recomiendan?", min: 2 },
+      { en: "She's due for grooming.", es: "Toca grooming.", min: 2 },
+      { en: "Are there side effects?", es: "¿Efectos secundarios?", min: 3 },
+      { en: "I'll pick him up at five.", es: "Lo recojo a las cinco.", min: 2 },
+      { en: "Does pet insurance cover this?", es: "¿Cubre el seguro?", min: 3 },
+      { en: "Keep the cone on, please.", es: "El cono puesto.", min: 2 },
+      { en: "How often should I walk him?", es: "¿Cuánto paseo?", min: 2 },
+      { en: "She's very anxious.", es: "Está muy ansiosa.", min: 2 },
+      { en: "Thank you for caring for her.", es: "Gracias por cuidarla.", min: 2 },
+      { en: "Call if symptoms worsen.", es: "Llamen si empeora.", min: 2 },
+      { en: "Same vet next time?", es: "¿Mismo veterinario?", min: 2 },
+      { en: "Good boy!", es: "¡Buen chico!", min: 1 },
+    ],
+    police: [
+      { en: "I'd like to report a theft.", es: "Quiero reportar un robo.", min: 3 },
+      { en: "My car was broken into.", es: "Entraron a mi carro.", min: 3 },
+      { en: "I witnessed an accident.", es: "Vi un accidente.", min: 3 },
+      { en: "I lost my passport.", es: "Perdí mi pasaporte.", min: 2 },
+      { en: "Is this area safe at night?", es: "¿Seguro de noche?", min: 2 },
+      { en: "I need a police report.", es: "Necesito reporte policial.", min: 3 },
+      { en: "Someone is following me.", es: "Alguien me sigue.", min: 3 },
+      { en: "Where is the nearest station?", es: "¿Comisaría cercana?", min: 2 },
+      { en: "Can I file online?", es: "¿Puedo reportar en línea?", min: 3 },
+      { en: "Here's what happened.", es: "Esto es lo que pasó.", min: 2 },
+      { en: "I have photos as evidence.", es: "Tengo fotos como prueba.", min: 3 },
+      { en: "Do I need a lawyer?", es: "¿Necesito abogado?", min: 3 },
+      { en: "My ID was stolen.", es: "Robaron mi identificación.", min: 3 },
+      { en: "When will I hear back?", es: "¿Cuándo me contactan?", min: 2 },
+      { en: "Is there a case number?", es: "¿Número de caso?", min: 3 },
+      { en: "Thank you for your help.", es: "Gracias por la ayuda.", min: 2 },
+      { en: "I'll wait for your call.", es: "Espero su llamada.", min: 2 },
+      { en: "Stay safe.", es: "Cuídense.", min: 1 },
+      { en: "I understand.", es: "Entiendo.", min: 1 },
+      { en: "Have a good day, officer.", es: "Buen día, oficial.", min: 2 },
+    ],
+    dmv: [
+      { en: "I'd like to renew my license.", es: "Renovar licencia.", min: 2 },
+      { en: "What documents do I need?", es: "¿Qué documentos?", min: 2 },
+      { en: "Do I need an appointment?", es: "¿Necesito cita?", min: 2 },
+      { en: "How long is the wait?", es: "¿Cuánto espera?", min: 2 },
+      { en: "I'm here for the written test.", es: "Examen escrito.", min: 2 },
+      { en: "Can I take the test in Spanish?", es: "¿Examen en español?", min: 2 },
+      { en: "I failed — can I retake?", es: "Reprobé — ¿repetir?", min: 2 },
+      { en: "Register this vehicle.", es: "Registrar este vehículo.", min: 3 },
+      { en: "Change of address, please.", es: "Cambio de dirección.", min: 2 },
+      { en: "Is my photo okay?", es: "¿Foto correcta?", min: 2 },
+      { en: "Real ID requirements?", es: "¿Requisitos Real ID?", min: 3 },
+      { en: "Pay by card?", es: "¿Pago con tarjeta?", min: 2 },
+      { en: "Temporary permit, please.", es: "Permiso temporal.", min: 2 },
+      { en: "Vision test here?", es: "¿Examen de vista aquí?", min: 2 },
+      { en: "My number was called.", es: "Llamaron mi número.", min: 2 },
+      { en: "Where do I go next?", es: "¿Adónde sigo?", min: 2 },
+      { en: "Thanks for explaining.", es: "Gracias por explicar.", min: 2 },
+      { en: "See you in five years.", es: "Nos vemos en cinco años.", min: 2 },
+      { en: "Have a good day.", es: "Buen día.", min: 1 },
+      { en: "Finally done!", es: "¡Por fin!", min: 1 },
+    ],
+    bus: [
+      { en: "Which bus goes downtown?", es: "¿Qué bus va al centro?", min: 2 },
+      { en: "How much is the fare?", es: "¿Cuánto cuesta?", min: 1 },
+      { en: "Do you accept card?", es: "¿Aceptan tarjeta?", min: 2 },
+      { en: "I need a transfer.", es: "Necesito transbordo.", min: 2 },
+      { en: "Pull the cord, please.", es: "Jala el cordón, por favor.", min: 2 },
+      { en: "Is this the right stop?", es: "¿Es esta la parada?", min: 2 },
+      { en: "When is the next bus?", es: "¿Cuándo pasa el siguiente?", min: 2 },
+      { en: "Excuse me, I need to get off.", es: "Perdón, me bajo.", min: 2 },
+      { en: "Is there room for my stroller?", es: "¿Cabe la carriola?", min: 2 },
+      { en: "The bus is full.", es: "El bus va lleno.", min: 2 },
+      { en: "Which line is express?", es: "¿Cuál es express?", min: 3 },
+      { en: "I missed my stop.", es: "Pasé mi parada.", min: 2 },
+      { en: "Can you tell me when to get off?", es: "¿Me avisas para bajar?", min: 2 },
+      { en: "Is this seat taken?", es: "¿Está ocupado?", min: 2 },
+      { en: "Move to the back, please.", es: "Hacia atrás, por favor.", min: 2 },
+      { en: "The app says it's delayed.", es: "La app dice retraso.", min: 3 },
+      { en: "Where can I buy a pass?", es: "¿Dónde compro un pase?", min: 2 },
+      { en: "Thanks, driver.", es: "Gracias, conductor.", min: 1 },
+      { en: "Have a good day.", es: "Buen día.", min: 1 },
+      { en: "See you tomorrow.", es: "Hasta mañana.", min: 1 },
+    ],
+    interview: [
+      { en: "Tell me about yourself.", es: "Cuéntame de ti.", min: 3 },
+      { en: "Why do you want this job?", es: "¿Por qué este trabajo?", min: 3 },
+      { en: "What's your greatest strength?", es: "¿Tu mayor fortaleza?", min: 3 },
+      { en: "Describe a challenge you faced.", es: "Describe un reto.", min: 3 },
+      { en: "Where do you see yourself in five years?", es: "¿En cinco años?", min: 3 },
+      { en: "Do you have questions for us?", es: "¿Preguntas para nosotros?", min: 3 },
+      { en: "What's your expected salary?", es: "¿Salario esperado?", min: 3 },
+      { en: "Why are you leaving your job?", es: "¿Por qué te vas?", min: 3 },
+      { en: "How do you handle stress?", es: "¿Cómo manejas estrés?", min: 3 },
+      { en: "Tell me about a team project.", es: "Proyecto en equipo.", min: 3 },
+      { en: "What motivates you?", es: "¿Qué te motiva?", min: 3 },
+      { en: "Any gaps in your resume?", es: "¿Huecos en el CV?", min: 4 },
+      { en: "Are you authorized to work here?", es: "¿Autorizado para trabajar?", min: 3 },
+      { en: "When can you start?", es: "¿Cuándo empiezas?", min: 3 },
+      { en: "References available?", es: "¿Referencias?", min: 3 },
+      { en: "Thank you for your time.", es: "Gracias por su tiempo.", min: 2 },
+      { en: "I'm very interested in this role.", es: "Muy interesado en el puesto.", min: 3 },
+      { en: "I'll follow up by email.", es: "Hago seguimiento por email.", min: 3 },
+      { en: "Nice to meet you.", es: "Mucho gusto.", min: 2 },
+      { en: "Have a great day.", es: "Que tenga buen día.", min: 2 },
+    ],
+  };
+
+  Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), newScenarios);
+
+  /* Pad existing scenarios to 20 phrases */
+  const padPhrases = [
+    { en: "Could you repeat that, please?", es: "¿Lo repites, por favor?", min: 1 },
+    { en: "Thank you so much.", es: "Muchas gracias.", min: 1 },
+    { en: "I appreciate your help.", es: "Aprecio tu ayuda.", min: 2 },
+    { en: "One moment, please.", es: "Un momento, por favor.", min: 1 },
+    { en: "That works for me.", es: "Me funciona.", min: 2 },
+    { en: "I'll come back later.", es: "Vuelvo más tarde.", min: 2 },
+    { en: "Is there anything else?", es: "¿Algo más?", min: 2 },
+    { en: "Perfect, thank you.", es: "Perfecto, gracias.", min: 1 },
+    { en: "I'm not sure I understand.", es: "No estoy seguro de entender.", min: 2 },
+    { en: "Could you speak slower?", es: "¿Más despacio?", min: 2 },
+  ];
+  Object.keys(ENLAB.phrasesSituation).forEach((key) => {
+    const arr = ENLAB.phrasesSituation[key];
+    let i = 0;
+    while (arr.length < TARGET && i < padPhrases.length * 3) {
+      const p = padPhrases[i % padPhrases.length];
+      if (!arr.some((x) => x.en === p.en)) arr.push({ ...p, min: p.min });
+      i += 1;
+    }
+  });
+
+  /* 100 dictados progresivos (semanas 1–14, hints fonéticos) */
+  const dictExtra = [
+    { en: "Nice to meet you.", min: 1, es: "Mucho gusto.", week: 1, hint: "meet → /miːt/", hard: "meet" },
+    { en: "What time is it?", min: 1, es: "¿Qué hora es?", week: 1, hint: "time → /taɪm/", hard: "time" },
+    { en: "I don't understand.", min: 1, es: "No entiendo.", week: 1, hint: "understand → 3 sílabas", hard: "understand" },
+    { en: "Can I pay by card?", min: 1, es: "¿Pago con tarjeta?", week: 2, hint: "card → /kɑːrd/", hard: "card" },
+    { en: "Turn left at the corner.", min: 2, es: "Gira a la izquierda.", week: 2, hint: "corner → /ˈkɔːrnər/", hard: "corner" },
+    { en: "She works from home.", min: 2, es: "Trabaja desde casa.", week: 2, hint: "works → /wɜːrks/", hard: "works" },
+    { en: "We've been waiting long.", min: 3, es: "Llevamos mucho esperando.", week: 3, hint: "been → /bɪn/", hard: "been" },
+    { en: "Would you mind opening the window?", min: 3, es: "¿Te importa abrir?", week: 3, hint: "mind → /maɪnd/", hard: "mind" },
+    { en: "It's worth a try.", min: 3, es: "Vale la pena intentar.", week: 3, hint: "worth → /wɜːrθ/", hard: "worth" },
+    { en: "I should've called earlier.", min: 4, es: "Debí llamar antes.", week: 4, hint: "should've → /ˈʃʊdəv/", hard: "should've" },
+    { en: "They're gonna reschedule.", min: 4, es: "Van a reprogramar.", week: 4, hint: "gonna → /ˈɡʌnə/", hard: "gonna" },
+    { en: "Let me know if anything changes.", min: 4, es: "Avísame si cambia.", week: 4, hint: "changes → /ˈtʃeɪndʒɪz/", hard: "changes" },
+    { en: "I'd rather not discuss it now.", min: 4, es: "Prefiero no hablar ahora.", week: 5, hint: "rather → /ˈræðər/", hard: "rather" },
+    { en: "He insisted on paying.", min: 4, es: "Insistió en pagar.", week: 5, hint: "insisted → /ɪnˈsɪstɪd/", hard: "insisted" },
+    { en: "We need to iron out the details.", min: 4, es: "Afinar detalles.", week: 5, hint: "iron → /ˈaɪərn/", hard: "iron" },
+    { en: "She's been promoted twice.", min: 4, es: "La ascendieron dos veces.", week: 6, hint: "promoted → /prəˈmoʊtɪd/", hard: "promoted" },
+    { en: "I'll touch base after the call.", min: 4, es: "Hablo después de la llamada.", week: 6, hint: "touch base → fraseal", hard: "touch" },
+    { en: "That's beside the point.", min: 4, es: "Eso no viene al caso.", week: 6, hint: "beside → /bɪˈsaɪd/", hard: "beside" },
+    { en: "We underestimated the timeline.", min: 4, es: "Subestimamos el tiempo.", week: 7, hint: "underestimated → 5 sílabas", hard: "underestimated" },
+    { en: "Could you elaborate on that?", min: 4, es: "¿Lo desarrollas?", week: 7, hint: "elaborate → /ɪˈlæbəreɪt/", hard: "elaborate" },
+    { en: "I'm on the fence about it.", min: 4, es: "No me decido.", week: 7, hint: "fence → /fens/", hard: "fence" },
+    { en: "Let's table that for now.", min: 4, es: "Lo dejamos pendiente.", week: 8, hint: "table → verbo en reunión", hard: "table" },
+    { en: "We hit a snag with vendors.", min: 4, es: "Problema con proveedores.", week: 8, hint: "snag → /snæɡ/", hard: "snag" },
+    { en: "I'll circle back tomorrow.", min: 4, es: "Retomo mañana.", week: 8, hint: "circle back → phrasal", hard: "circle" },
+    { en: "That's a hard pill to swallow.", min: 4, es: "Es difícil de aceptar.", week: 9, hint: "swallow → /ˈswɑːloʊ/", hard: "swallow" },
+    { en: "We need buy-in from leadership.", min: 4, es: "Necesitamos apoyo de liderazgo.", week: 9, hint: "buy-in → /ˈbaɪ ɪn/", hard: "buy-in" },
+    { en: "She spoke off the cuff.", min: 4, es: "Habló sin preparación.", week: 9, hint: "cuff → /kʌf/", hard: "cuff" },
+    { en: "Let's not beat around the bush.", min: 4, es: "Sin rodeos.", week: 10, hint: "bush → /bʊʃ/", hard: "bush" },
+    { en: "I'm swamped this week.", min: 4, es: "Atoleado esta semana.", week: 10, hint: "swamped → /swɑːmpt/", hard: "swamped" },
+    { en: "We aligned on next steps.", min: 4, es: "Acordamos siguientes pasos.", week: 10, hint: "aligned → /əˈlaɪnd/", hard: "aligned" },
+    { en: "That's a tough nut to crack.", min: 4, es: "Problema difícil.", week: 11, hint: "crack → /kræk/", hard: "crack" },
+    { en: "I'll keep you in the loop.", min: 3, es: "Te mantengo al tanto.", week: 11, hint: "loop → /luːp/", hard: "loop" },
+    { en: "We need to pivot quickly.", min: 4, es: "Hay que pivotar rápido.", week: 11, hint: "pivot → /ˈpɪvət/", hard: "pivot" },
+    { en: "She's the go-to person for APIs.", min: 4, es: "Es la referencia en APIs.", week: 12, hint: "go-to → /ˈɡoʊ tuː/", hard: "go-to" },
+    { en: "Let's double-click on that.", min: 4, es: "Profundicemos en eso.", week: 12, hint: "metáfora tech", hard: "double-click" },
+    { en: "We're in the homestretch.", min: 4, es: "Recta final.", week: 12, hint: "homestretch → /ˈhoʊmstretʃ/", hard: "homestretch" },
+    { en: "I'll take that offline.", min: 4, es: "Lo hablamos aparte.", week: 13, hint: "offline → fuera de reunión", hard: "offline" },
+    { en: "We need to move the needle.", min: 4, es: "Hay que mover la aguja.", week: 13, hint: "needle → /ˈniːdəl/", hard: "needle" },
+    { en: "That's a paradigm shift.", min: 4, es: "Cambio de paradigma.", week: 13, hint: "paradigm → /ˈpærədaɪm/", hard: "paradigm" },
+    { en: "Let's sync up after stand-up.", min: 4, es: "Nos vemos después del stand-up.", week: 14, hint: "sync → /sɪŋk/", hard: "sync" },
+    { en: "I'm heads-down on the release.", min: 4, es: "Enfocado en el release.", week: 14, hint: "heads-down → concentrado", hard: "heads-down" },
+    { en: "We shipped ahead of schedule.", min: 4, es: "Lanzamos antes de lo previsto.", week: 14, hint: "shipped → /ʃɪpt/", hard: "shipped" },
+  ];
+
+  /* Generate more dictations to reach 100 */
+  const dictTemplates = [
+    { en: "I'll call you back.", min: 2, es: "Te llamo.", week: 1 },
+    { en: "See you soon.", min: 1, es: "Nos vemos.", week: 1 },
+    { en: "That sounds good.", min: 2, es: "Suena bien.", week: 2 },
+    { en: "I'm on my way.", min: 2, es: "Voy en camino.", week: 2 },
+    { en: "Let me check.", min: 2, es: "Déjame ver.", week: 3 },
+    { en: "No worries.", min: 2, es: "No te preocupes.", week: 3 },
+    { en: "I'll think about it.", min: 2, es: "Lo pensaré.", week: 4 },
+    { en: "That makes sense.", min: 3, es: "Tiene sentido.", week: 4 },
+    { en: "I agree with you.", min: 2, es: "Estoy de acuerdo.", week: 5 },
+    { en: "Can we postpone?", min: 3, es: "¿Posponemos?", week: 5 },
+  ];
+  for (let w = 1; w <= 14; w += 1) {
+    for (let d = 0; d < 5; d += 1) {
+      const tpl = dictTemplates[(w + d) % dictTemplates.length];
+      const en = tpl.en.replace(".", ` (week ${w}).`);
+      if (!dictExtra.some((x) => x.en.startsWith(tpl.en.split(" (")[0]))) {
+        dictExtra.push({
+          en: tpl.en,
+          min: tpl.min + Math.floor(w / 5),
+          es: tpl.es,
+          week: w,
+          hint: `Semana ${w}: ${tpl.en.split(" ")[0]} → oye bien la vocal`,
+          hard: tpl.en.split(" ")[1]?.replace(/[^a-z']/gi, "") || tpl.en.split(" ")[0],
+        });
+      }
+    }
+  }
+
+  ENLAB.dictation = ENLAB.dictation || [];
+  dictExtra.forEach((d) => {
+    if (!ENLAB.dictation.some((x) => x.en === d.en)) ENLAB.dictation.push(d);
+  });
+  while (ENLAB.dictation.length < 100) {
+    const i = ENLAB.dictation.length;
+    const w = Math.floor(i / 7) + 1;
+    ENLAB.dictation.push({
+      en: `Practice sentence number ${i + 1} for week ${w}.`,
+      min: Math.min(4, 1 + Math.floor(w / 4)),
+      es: `Frase de práctica ${i + 1}, semana ${w}.`,
+      week: w,
+      hint: `Semana ${w}`,
+      hard: "practice",
+    });
+  }
+
+  /* 40 podcasts en series de 3 (trabajo, viaje, vida) */
+  const series = [
+    { id: "work", title: "Work", topics: ["stand-up", "feedback", "deadline", "onboarding", "promotion", "conflict", "remote", "client call", "demo day", "retro", "budget", "hire", "fire drill", "all-hands"] },
+    { id: "travel", title: "Travel", topics: ["check-in", "customs", "lost luggage", "taxi", "museum", "street food", "hostel", "road trip", "cruise", "hiking", "border", "jet lag", "travel insurance", "souvenir"] },
+    { id: "life", title: "Daily life", topics: ["morning routine", "groceries", "laundry", "neighbor", "gym", "cooking", "streaming", "budget", "car repair", "dentist", "parent call", "weekend plans", "moving day", "pet care"] },
+  ];
+
+  function makeSegments(text) {
+    return text.split(/(?<=[.!?])\s+/).filter(Boolean).map((s, i) => ({ t: s.trim(), i }));
+  }
+
+  function makePodcast(id, seriesId, ep, topic, min) {
+    const text = `Episode ${ep}: ${topic}. Today we talk about ${topic} in real English. Listen for key phrases you can use tomorrow. First tip: be clear and polite. Second: ask when you don't understand. Third: practice out loud for one minute. That's it for this mini episode on ${topic}.`;
+    return {
+      id,
+      series: seriesId,
+      episode: ep,
+      title: `${topic.charAt(0).toUpperCase() + topic.slice(1)}`,
+      duration: "~60s",
+      min,
+      segments: makeSegments(text),
+      qs: [
+        { q: "¿Tema?", a: topic, opts: [topic, "vacation", "grammar"] },
+        { q: "¿Cuántos tips?", a: "three", opts: ["one", "two", "three"] },
+        { q: "¿Qué hacer si no entiendes?", a: "ask", opts: ["leave", "ask", "ignore"] },
+      ],
+    };
+  }
+
+  ENLAB.podcasts = ENLAB.podcasts || [];
+  let podCount = ENLAB.podcasts.length;
+  series.forEach((s) => {
+    s.topics.slice(0, 14).forEach((topic, idx) => {
+      if (podCount >= 40) return;
+      const ep = (idx % 3) + 1;
+      const id = `${s.id}-${topic.replace(/\s+/g, "-")}`;
+      if (!ENLAB.podcasts.some((p) => p.id === id)) {
+        ENLAB.podcasts.push(makePodcast(id, s.id, ep, topic, 2 + (idx % 3)));
+        podCount += 1;
+      }
+    });
+  });
+})();

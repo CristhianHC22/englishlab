@@ -1,4 +1,4 @@
-const CACHE = "enlab-v19";
+const CACHE = "enlab-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,11 +13,23 @@ const ASSETS = [
   "./pack-n.js",
   "./pack-o.js",
   "./pack-q.js",
+  "./pack-s.js",
+  "./pack-u.js",
+  "./pack-v.js",
+  "./pack-bulk.js",
   "./features-nr.js",
+  "./features-sv.js",
+  "./loader.js",
   "./manifest.webmanifest",
   "./icon.svg",
 ];
 const REMIND_URL = "./enlab-remind.json";
+const TAB_ASSETS = {
+  vocales: ["./pack-s.js", "./pack-n.js", "./pack-bulk.js"],
+  hablar: ["./pack-o.js", "./pack-v.js", "./pack-u.js"],
+  quiz: ["./pack.js", "./pack-m.js"],
+  hoy: ["./pack-q.js", "./pack-bulk.js"],
+};
 
 function todayKeySW() {
   const d = new Date();
@@ -44,11 +56,23 @@ async function maybeRemind() {
   if (!data || !data.on) return;
   const today = todayKeySW();
   if (data.complete === today) return;
+  const due = typeof data.dueCount === "number" ? data.dueCount : 0;
+  const body = due > 0
+    ? `Tienes ${due} ítems de repaso pendientes. ¿15 minutos hoy?`
+    : "¿Ya hiciste tus 15 minutos?";
   await self.registration.showNotification("English Lab", {
-    body: "¿Ya hiciste tus 15 minutos?",
+    body,
     icon: "./icon.svg",
     tag: "enlab-daily",
+    data: { url: "./index.html#hoy" },
   });
+}
+
+async function precacheTabAssets(tab) {
+  const files = TAB_ASSETS[tab] || [];
+  if (!files.length) return;
+  const cache = await caches.open(CACHE);
+  await Promise.all(files.map((f) => cache.add(f).catch(() => {})));
 }
 
 self.addEventListener("install", (event) => {
@@ -87,6 +111,9 @@ self.addEventListener("message", (event) => {
   if (msg && msg.type === "enlab-remind") {
     event.waitUntil(saveRemind(msg.payload));
   }
+  if (msg && msg.type === "enlab-precache-tab") {
+    event.waitUntil(precacheTabAssets(msg.tab));
+  }
 });
 
 self.addEventListener("periodicsync", (event) => {
@@ -95,11 +122,12 @@ self.addEventListener("periodicsync", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const url = event.notification.data?.url || "./";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       const hit = list.find((c) => c.url && "focus" in c);
       if (hit) return hit.focus();
-      if (self.clients.openWindow) return self.clients.openWindow("./");
+      if (self.clients.openWindow) return self.clients.openWindow(url);
       return undefined;
     })
   );

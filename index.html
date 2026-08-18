@@ -9,6 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="English Lab" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
@@ -76,6 +77,7 @@
         <div id="travel-map" class="card travel-map" hidden></div>
         <div id="situations-panel" class="card situations-panel" hidden></div>
         <div id="podcast-today" class="card" hidden></div>
+        <div id="class-task-banner" class="class-task-banner" hidden></div>
         <div id="hoy-game" class="hoy-game" hidden></div>
         <p class="muted" id="hoy-hint">La rutina cambia con el nivel.</p>
         <div id="hoy-path" class="hoy-path">
@@ -311,11 +313,13 @@
         <div id="tips-list"></div>
       </div>
       <div id="podcast-block" class="card" style="margin-top:16px">
-        <h3 id="oido-podcasts">Mini-podcasts (~60 s)</h3>
+        <h3 id="oido-podcasts" data-i18n="podcast">Mini-podcasts (~60 s)</h3>
         <p class="muted">Transcripción segmentada. Oyes frase a frase — ideal para shadowing.</p>
         <div id="podcast-list" class="grid grid-2"></div>
         <div id="podcast-player" hidden></div>
       </div>
+      <div id="pron-panel" class="card" style="margin-top:16px"></div>
+      <div id="stories-panel" class="card" style="margin-top:16px"></div>
     </section>
 
     <section id="verbos" class="panel">
@@ -484,11 +488,12 @@
         <div id="chat-work-list" class="grid" style="margin-top:12px"></div>
       </div>
       <div class="card" id="duo-card">
-        <h3>Duo · 2 jugadores</h3>
+        <h3 data-i18n="duo">Duo · 2 jugadores</h3>
         <p class="muted">Mismo dispositivo. Turnos alternos A/B en role-plays o diálogos.</p>
         <p class="duo-score muted" id="duo-score">A: 0 · B: 0</p>
         <div id="duo-now"></div>
       </div>
+      <div id="writing-panel" class="card"></div>
     </section>
 
     <section id="ia" class="panel">
@@ -502,6 +507,8 @@
         <ol id="plan-list"></ol>
       </div>
       <div id="lab-audit" class="card audit-panel" style="margin-top:16px"></div>
+      <div id="class-pro-panel" class="card" style="margin-top:16px"></div>
+      <div id="a11y-bar" class="card a11y-bar" style="margin-top:16px"></div>
     </section>
 
     <footer>
@@ -519,5 +526,7 @@
   <script src="pack-q.js"></script>
   <script src="app.js"></script>
   <script src="features-nr.js"></script>
+  <script src="features-sv.js"></script>
+  <script src="loader.js"></script>
 </body>
 </html>

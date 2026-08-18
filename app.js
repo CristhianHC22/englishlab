@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone", "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3", "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast", "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
@@ -724,7 +724,10 @@ function situationLabels() {
   return {
     airport: "Aeropuerto", doctor: "Médico", workChat: "Trabajo", restaurant: "Restaurante",
     hotel: "Hotel", bank: "Banco", grocery: "Super", apartment: "Depto", uber: "Uber/taxi",
-    pharmacy: "Farmacia", school: "Escuela",
+    pharmacy: "Farmacia", school: "Escuela", gym: "Gimnasio", dentist: "Dentista",
+    postoffice: "Correos", library: "Biblioteca", train: "Tren", coworking: "Coworking",
+    emergency: "Emergencia", landlord: "Arrendador", cinema: "Cine", vet: "Veterinario",
+    police: "Policía", dmv: "DMV", interview: "Entrevista", bus: "Autobús",
   };
 }
 
@@ -3234,11 +3237,13 @@ function isStandalone() {
 
 function syncRemindToSw() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  const dueCount = typeof srsDueList === "function" ? srsDueList(99).length : 0;
   const payload = {
     on: remindOn(),
     time: remindTime(),
     complete: sessionCompleteToday() ? todayKey() : "",
     today: todayKey(),
+    dueCount,
   };
   navigator.serviceWorker.ready.then((reg) => {
     reg.active?.postMessage({ type: "enlab-remind", payload });
@@ -4031,7 +4036,7 @@ function init() {
   syncQuizModePicks();
   setupRemind();
   const welcome = $("#welcome");
-  if (welcome && localStorage.getItem("enlab-welcome-v2") !== "1") welcome.hidden = false;
+  if (welcome && localStorage.getItem("enlab-onboard-v3") !== "1" && localStorage.getItem("enlab-welcome-v2") !== "1") welcome.hidden = false;
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
   }

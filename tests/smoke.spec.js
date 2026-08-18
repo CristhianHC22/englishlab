@@ -2,8 +2,12 @@ const { test, expect } = require("@playwright/test");
 
 async function boot(page) {
   await page.goto("/");
-  await page.evaluate(() => localStorage.setItem("enlab-welcome-v2", "1"));
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-welcome-v2", "1");
+    localStorage.setItem("enlab-onboard-v3", "1");
+  });
   await page.reload();
+  await page.waitForFunction(() => (window.ENLAB?.podcasts || []).length >= 40);
 }
 
 test("loads Hoy path and tabs", async ({ page }) => {
@@ -36,14 +40,18 @@ test("packs A–R content is wired", async ({ page }) => {
     listen: (window.ENLAB.listenPassages || []).length >= 25,
     role: (window.ENLAB.roleplays || []).length >= 12,
     email: (window.ENLAB.emailSpeak || []).length >= 10,
-    situations: Object.keys(window.ENLAB.phrasesSituation || {}).length >= 11,
+    situations: Object.keys(window.ENLAB.phrasesSituation || {}).length >= 25,
     restaurant: !!window.ENLAB.phrasesSituation?.restaurant?.length,
-    podcasts: (window.ENLAB.podcasts || []).length >= 10,
+    podcasts: (window.ENLAB.podcasts || []).length >= 40,
     chat: (window.ENLAB.chatWork || []).length >= 48,
     travel: Object.keys(window.ENLAB.travelMaps || {}).length >= 5,
     cond: (window.ENLAB.condQuiz || []).length >= 10,
     dialogsA2: (window.ENLAB.dialogsA2Tense || []).length >= 8,
     nr: typeof window.NR?.startCertExam === "function",
+    sv: typeof window.SV?.scorePronunciation === "function",
+    stories: (window.ENLAB.branchStories || []).length >= 20,
+    dict100: (window.ENLAB.dictation || []).length >= 100,
+    minimal: (window.ENLAB.minimalPairs || []).length >= 25,
   }));
   expect(ok.listen).toBe(true);
   expect(ok.role).toBe(true);
@@ -56,6 +64,10 @@ test("packs A–R content is wired", async ({ page }) => {
   expect(ok.cond).toBe(true);
   expect(ok.dialogsA2).toBe(true);
   expect(ok.nr).toBe(true);
+  expect(ok.sv).toBe(true);
+  expect(ok.stories).toBe(true);
+  expect(ok.dict100).toBe(true);
+  expect(ok.minimal).toBe(true);
 });
 
 test("situations panel on Hoy", async ({ page }) => {
@@ -128,7 +140,7 @@ test("podcasts in Oír tab", async ({ page }) => {
 test("lab audit A–R in Ayuda", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="ia"]').click();
-  await expect(page.locator(".audit-table tbody tr")).toHaveCount(18);
+  await expect(page.locator(".audit-table tbody tr")).toHaveCount(26);
 });
 
 test("kids mode sets slow voice", async ({ page }) => {

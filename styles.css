@@ -836,3 +836,38 @@ body.kids-mode #lab-audit { display: none; }
 .email-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .email-pick summary { cursor: pointer; }
 
+/* Lotes S–V + UX */
+.pron-pair .pron-score.ok { color: var(--ok); font-weight: 700; }
+.writing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .writing-grid { grid-template-columns: 1fr; } }
+.writing-rubric { list-style: none; padding: 0; margin: 8px 0; }
+.writing-rubric li { padding: 6px 0; border-bottom: 1px dashed var(--line); display: flex; justify-content: space-between; }
+.rubric-ok { font-weight: 800; }
+.story-now { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.story-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; align-items: flex-start; }
+.class-roster-table th, .class-roster-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.class-task-banner { margin: 10px 0; padding: 8px 12px; border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.offline-badge { font-size: 13px; margin-top: 8px; }
+.offline-badge.offline-on { color: var(--accent-2); font-weight: 700; }
+.offline-badge.offline-ready { color: var(--ok); }
+.onboard-steps .row { flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.a11y-bar .row { flex-wrap: wrap; gap: 8px; align-items: center; }
+body.a11y-contrast {
+  --bg: #000;
+  --fg: #fff;
+  --muted: #ddd;
+  --line: #666;
+  --accent: #00e5cc;
+  --accent-soft: #003830;
+}
+body.a11y-contrast .chip, body.a11y-contrast .btn { border-width: 2px; }
+body.reduced-motion *, body.a11y-motion.reduced-motion * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.skip:focus { position: static; width: auto; height: auto; clip: auto; padding: 8px 16px; background: var(--accent); color: #fff; z-index: 999; }
+
