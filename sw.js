@@ -1,4 +1,4 @@
-const CACHE = "enlab-v13";
+const CACHE = "enlab-v14";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const ASSETS = [
   "./data.js",
   "./guide.js",
   "./levels.js",
+  "./extras.js",
   "./manifest.webmanifest",
   "./icon.svg",
 ];

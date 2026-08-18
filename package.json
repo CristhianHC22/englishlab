@@ -1,0 +1,11 @@
+{
+  "name": "englishlab",
+  "private": true,
+  "scripts": {
+    "check": "node --check app.js && node --check extras.js && node --check sw.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

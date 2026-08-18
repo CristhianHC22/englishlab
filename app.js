@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
 let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar" };
@@ -208,6 +208,7 @@ function markSession(kind, id) {
   saveSession(s);
   renderHoyCheck();
   upsertLog();
+  maybeAutoAdvancePath();
 }
 
 function renderHoyCheck() {
@@ -229,6 +230,7 @@ function renderHoyCheck() {
     <div class="session-bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
     ${done === 4 ? `<p class="session-done">¡Listo! Sesión del día guardada.</p>` : ""}
   `;
+  if (done === 4) clearRepasoMode();
   if (done === 4 && sessionStorage.getItem("enlab-celeb") !== todayKey()) {
     sessionStorage.setItem("enlab-celeb", todayKey());
     buzz(true);
@@ -382,9 +384,14 @@ function paintTab(id) {
     renderVerbs();
     dirty.verbs = false;
   }
-  if (id === "hablar" && dirty.speak) {
-    renderSpeak();
-    dirty.speak = false;
+  if (id === "hablar") {
+    if (dirty.speak) {
+      renderSpeak();
+      dirty.speak = false;
+    }
+    renderInterviewSim();
+    renderPhrasalsWork();
+    renderVoiceHistory();
   }
   if (id === "ia" && dirty.ai) {
     renderAI();
@@ -424,20 +431,25 @@ function ygHref(word) {
   return `https://youglish.com/pronounce/${encodeURIComponent(one)}/english`;
 }
 
-function ygLink(word, label = "gente real") {
-  return `<a class="yg" href="${ygHref(word)}" target="_blank" rel="noreferrer" title="YouGlish: oír esta palabra dicha por nativos">${esc(label)}</a>`;
+function ygLink(word, label) {
+  const lab = label || (typeof t === "function" ? t("real") : "gente real");
+  return `<a class="yg" href="${ygHref(word)}" target="_blank" rel="noreferrer" title="YouGlish: oír esta palabra dicha por nativos">${esc(lab)}</a>`;
 }
 
 function pairRow(p) {
+  const robot = typeof t === "function" ? t("robot") : "Robot";
+  const real = typeof t === "function" ? t("real") : "Gente real";
   return `
     <div class="card" data-track="pair" data-pair="${esc(p.short)}|${esc(p.long)}">
       <div class="muted">${esc(p.why)}</div>
-      <div class="row" style="margin-top:8px">
+      <div class="row pair-contrast" style="margin-top:8px">
+        <span class="voice-tag robot">${esc(robot)}</span>
         <button class="say" data-say="${esc(p.short)}">${esc(p.short)} [${esc(p.shortPron)}]</button>
-        ${ygLink(p.short)}
+        ${ygLink(p.short, real)}
         <span>vs</span>
+        <span class="voice-tag robot">${esc(robot)}</span>
         <button class="say" data-say="${esc(p.long)}">${esc(p.long)} [${esc(p.longPron)}]</button>
-        ${ygLink(p.long)}
+        ${ygLink(p.long, real)}
       </div>
     </div>`;
 }
@@ -485,6 +497,11 @@ function todaysDeck() {
   ];
   const seen = new Set();
   const out = [];
+  for (const v of planEdVerbs()) {
+    if (!v || seen.has(v.inf)) continue;
+    seen.add(v.inf);
+    out.push(v);
+  }
   for (const v of mixed) {
     if (!v || seen.has(v.inf)) continue;
     seen.add(v.inf);
@@ -670,6 +687,15 @@ function setCefr(id) {
   applyLevel();
 }
 
+function situationPhrases() {
+  const sit = ENLAB.phrasesSituation || {};
+  const keys = Object.keys(sit);
+  if (!keys.length) return [];
+  const [Y, M, D] = todayKey().split("-").map(Number);
+  const pick = keys[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % keys.length];
+  return (sit[pick] || []).filter((p) => (p.min || 1) <= lvlNum());
+}
+
 function phraseBank() {
   const n = lvlNum();
   const a1 = ENLAB.phrasesA1 || [];
@@ -677,10 +703,13 @@ function phraseBank() {
   const b1 = ENLAB.phrasesB1 || [];
   const b2 = ENLAB.phrasesB2 || [];
   const work = ENLAB.interview || [];
-  if (n <= 1) return a1;
-  if (n === 2) return a2.length ? a2 : [...a1, ...b1.slice(0, 5)];
-  if (n === 3) return [...b1, ...work];
-  return [...b1, ...b2, ...work];
+  const sit = situationPhrases();
+  let base;
+  if (n <= 1) base = a1;
+  else if (n === 2) base = a2.length ? a2 : [...a1, ...b1.slice(0, 5)];
+  else if (n === 3) base = [...b1, ...work];
+  else base = [...b1, ...b2, ...work];
+  return [...base, ...sit];
 }
 
 function dialogsForLevel() {
@@ -689,8 +718,9 @@ function dialogsForLevel() {
   const a2 = ENLAB.dialogsA2 || [];
   const b1 = ENLAB.dialogsB1 || [];
   const b2 = ENLAB.dialogsB2 || [];
+  const tense = ENLAB.dialogsA2Tense || [];
   if (n <= 1) return a1;
-  if (n === 2) return [...a2, ...a1.slice(0, 3)];
+  if (n === 2) return [...tense, ...a2, ...a1.slice(0, 3)];
   if (n === 3) return [...b1, ...a2.slice(0, 2)];
   return [...b2, ...b1];
 }
@@ -720,6 +750,9 @@ function renderHome() {
   renderDailyTip();
   renderEarMisses();
   renderHoyReview();
+  renderPlanEdFocus();
+  renderStreakChart();
+  renderTransferCode();
   upsertLog();
   renderClock();
   hoyPairI = 0;
@@ -767,6 +800,10 @@ function hoyPath() {
   if (lvlNum() >= 2) steps.push({ id: "role", sel: "#block-daily-role", label: "Palabra camaleón" });
   steps.push({ id: "verbs", sel: "#hoy-step-3", label: "10 verbos del día" });
   steps.push({ id: "dialog", sel: "#hoy-step-4", label: "Di este diálogo" });
+  const planI = dayTheme().i - 1;
+  if (planI >= 17 && planI <= 20 && lvlNum() >= 2) {
+    steps.push({ id: "flap", sel: "#block-rhythm", label: "Flap T / gonna" });
+  }
   steps.push({ id: "cierre", sel: "#hoy-step-cierre", label: "3 preguntas" });
   return steps;
 }
@@ -1304,6 +1341,11 @@ function earBank() {
     seen.add(k);
     out.push(p);
   }
+  const tag = ENLAB.earLevelTags?.[lvlNum()];
+  if (tag) {
+    const tagged = out.filter((p) => tag.test(`${p.a} ${p.b} ${p.why}`));
+    if (tagged.length >= 4) return tagged;
+  }
   if (lvlNum() <= 1) {
     return out.filter((p) => /E muda|i corta vs ii|i vs ii|ä vs ei/i.test(p.why));
   }
@@ -1730,12 +1772,14 @@ function speakPool() {
   const extra = phraseBank();
   const dialogs = dialogsForLevel();
   const n = lvlNum();
+  const phrasals = (ENLAB.phrasalsWork || []).filter((p) => (p.min || 3) <= n);
   const contractions = (ENLAB.contractions || []).filter((c) => {
     if (n <= 1) return ["I'm", "don't", "can't"].includes(c.en);
     return true;
   });
   return [
     ...extra.map((s) => ({ target: s.en, helpHtml: `<span class="es-line">${esc(s.es)}</span>` })),
+    ...phrasals.map((p) => ({ target: p.say, helpHtml: `<span class="es-line">${esc(p.es)}</span> · phrasal` })),
     ...dialogs.flatMap((d) => [
       { target: d.a.en, helpHtml: `A · <span class="es-line">${esc(d.a.es)}</span>` },
       { target: d.b.en, helpHtml: `Tú · <span class="es-line">${esc(d.b.es)}</span>` },
@@ -1866,6 +1910,15 @@ function recEls() {
       player: $("#hoy-speak-playback"),
     };
   }
+  if (String(recState.surface || "").startsWith("interview-")) {
+    const i = recState.surface.split("-")[1];
+    return {
+      btn: null,
+      idle: "Grabar respuesta",
+      status: $(`#interview-status-${i}`),
+      player: null,
+    };
+  }
   return {
     btn: $("#speak-rec"),
     idle: "Grabarme",
@@ -1964,6 +2017,9 @@ async function toggleRecording(surface) {
     }
     if (!recState.chunks.length) {
       applySpeakVerdict(recState.said);
+      saveVoiceClip(recState.said, null);
+      bump("spoke");
+      if (window._speakTarget) markSession("phrases", window._speakTarget.target);
       return;
     }
     const blob = new Blob(recState.chunks, { type: recState.rec.mimeType || "audio/webm" });
@@ -1977,6 +2033,7 @@ async function toggleRecording(surface) {
     applySpeakVerdict(recState.said);
     bump("spoke");
     if (window._speakTarget) markSession("phrases", window._speakTarget.target);
+    saveVoiceClip(recState.said, blob);
   };
   startSpeakListen();
   recState.rec.start();
@@ -2226,6 +2283,17 @@ document.addEventListener("click", (e) => {
     toggleRecording("hoy");
   }
 
+  const ivRec = e.target.closest("[data-interview-rec]");
+  if (ivRec) {
+    const i = Number(ivRec.dataset.interviewRec);
+    const it = (ENLAB.interviewSim || [])[i];
+    if (it) {
+      window._speakTarget = { target: it.q, help: it.hint };
+      recState.surface = `interview-${i}`;
+      toggleRecording(`interview-${i}`);
+    }
+  }
+
   const nudgeTo = e.target.closest("[data-nudge-to]");
   if (nudgeTo) setCefr(nudgeTo.dataset.nudgeTo);
 
@@ -2282,6 +2350,7 @@ document.addEventListener("click", (e) => {
     if (box?.dataset.track === "pair") markSession("pairs", box.dataset.pair);
     if (box?.dataset.track === "verb") markSession("verbs", box.dataset.verb);
     if (box?.dataset.track === "phrase") markSession("phrases", box.dataset.phrase);
+    if (say.closest("#block-rhythm")) sessionStorage.setItem(`enlab-flap-${todayKey()}`, "1");
   }
 
   const themeBtn = e.target.closest("[data-theme-set]");
@@ -2760,6 +2829,367 @@ function setupRemind() {
   tickRemind();
 }
 
+/* ——— Lotes A–F: i18n, niño, repaso, voz, shadowing, racha, transfer, entrevista ——— */
+
+function uiLang() {
+  return localStorage.getItem("enlab-ui-lang") === "en" ? "en" : "es";
+}
+
+function t(key) {
+  const lang = uiLang();
+  return ENLAB.ui?.[lang]?.[key] ?? ENLAB.ui?.es?.[key] ?? key;
+}
+
+function kidsOn() {
+  return localStorage.getItem("enlab-kids") === "1";
+}
+
+function autoPathOn() {
+  return localStorage.getItem("enlab-auto-path") !== "0";
+}
+
+function applyKidsMode() {
+  document.body.classList.toggle("kids-mode", kidsOn());
+  const btn = $("#kids-toggle");
+  if (btn) btn.setAttribute("aria-pressed", kidsOn() ? "true" : "false");
+}
+
+function applyUiLang() {
+  const lang = uiLang();
+  document.documentElement.lang = lang === "en" ? "en" : "es";
+  $$("[data-i18n]").forEach((el) => {
+    const val = ENLAB.ui?.[lang]?.[el.dataset.i18n] ?? ENLAB.ui?.es?.[el.dataset.i18n];
+    if (val) el.textContent = val;
+  });
+  $$("[data-tab]").forEach((tab) => {
+    const label = ENLAB.ui?.[lang]?.tabs?.[tab.dataset.tab];
+    if (label) tab.textContent = label;
+  });
+  const uiBtn = $("#ui-lang-toggle");
+  if (uiBtn) uiBtn.textContent = t("uiLang");
+  const kidsBtn = $("#kids-toggle");
+  if (kidsBtn) kidsBtn.textContent = t("kids");
+  const repasoBtn = $("#repaso-btn");
+  if (repasoBtn) repasoBtn.textContent = t("repaso");
+  const shadowBtn = $("#speak-shadow");
+  if (shadowBtn) shadowBtn.textContent = t("shadow");
+}
+
+function dateKey(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function planEdVerbs() {
+  const plan = ENLAB.planEdFocus || [];
+  const i = (dayTheme().i - 1) % Math.max(1, plan.length);
+  const infs = plan[i] || [];
+  return infs.map((inf) => ENLAB.verbs.find((v) => v.inf === inf)).filter(Boolean);
+}
+
+function renderPlanEdFocus() {
+  let el = $("#plan-ed-focus");
+  if (!el) {
+    const anchor = $("#day-theme");
+    if (!anchor?.parentNode) return;
+    el = document.createElement("p");
+    el.id = "plan-ed-focus";
+    el.className = "muted plan-ed-focus";
+    anchor.insertAdjacentElement("afterend", el);
+  }
+  const verbs = planEdVerbs();
+  if (!verbs.length) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `-ed del plan hoy: ${verbs.map((v) => `<button type="button" class="say chip" data-say="${esc(simplePastOf(v))}">${esc(v.inf)}</button>`).join(" ")}`;
+}
+
+function maybeAutoAdvancePath() {
+  if (!autoPathOn() || currentTab !== "hoy") return;
+  if (localStorage.getItem("enlab-repaso") === "1") return;
+  ensureHoyPathDay();
+  const path = hoyPath();
+  if (hoyPathI < 0 || hoyPathI >= path.length) return;
+  const step = path[hoyPathI];
+  const s = sessionData();
+  let done = false;
+  if (step.id === "pairs" && s.pairs.length >= 4) done = true;
+  if (step.id === "verbs" && s.verbs.length >= 5) done = true;
+  if (step.id === "dialog" && s.phrases.length >= 1) done = true;
+  if (step.id === "cierre" && s.quizDone) done = true;
+  if (step.id === "flap" && sessionStorage.getItem(`enlab-flap-${todayKey()}`) === "1") done = true;
+  if (step.id === "role" && s.pairs.length >= 1) done = true;
+  if (done) setTimeout(() => advanceHoyPath(), 700);
+}
+
+function startRepasoMode() {
+  localStorage.setItem("enlab-repaso", "1");
+  showTab("hoy");
+  const path = $("#hoy-path");
+  if (path) path.hidden = true;
+  renderHoyReview();
+  const box = $("#hoy-review");
+  if (box) box.hidden = false;
+  persistTimer({ running: true, remaining: 10 * 60, until: Date.now() + 10 * 60 * 1000 });
+  startTimerLoop();
+  requestWake();
+  renderClock();
+  buzz(true);
+}
+
+function clearRepasoMode() {
+  if (localStorage.getItem("enlab-repaso") !== "1") return;
+  localStorage.removeItem("enlab-repaso");
+  const path = $("#hoy-path");
+  if (path) path.hidden = false;
+}
+
+function loadVoiceLog() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-voice-log") || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveVoiceClip(said, blob) {
+  const target = window._speakTarget?.target || "";
+  if (!target && !said) return;
+  const ok = said ? speakHeardOk(said, target) : false;
+  const entry = {
+    date: todayKey(),
+    t: Date.now(),
+    target,
+    said,
+    ok,
+    audio: blob && blob.size < 80000 ? null : "",
+  };
+  if (blob && blob.size < 80000) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      entry.audio = String(reader.result || "");
+      pushVoiceLogEntry(entry);
+    };
+    reader.readAsDataURL(blob);
+    return;
+  }
+  pushVoiceLogEntry(entry);
+}
+
+function pushVoiceLogEntry(entry) {
+  const log = loadVoiceLog().filter((x) => x.date === todayKey());
+  log.unshift(entry);
+  const all = [...log.slice(0, 5), ...loadVoiceLog().filter((x) => x.date !== todayKey())];
+  localStorage.setItem("enlab-voice-log", JSON.stringify(all.slice(0, 20)));
+  renderVoiceHistory();
+}
+
+function renderVoiceHistory() {
+  const box = $("#voice-history");
+  if (!box) return;
+  const log = loadVoiceLog().filter((x) => x.date === todayKey()).slice(0, 5);
+  if (!log.length) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `
+    <p class="kicker">${esc(t("voiceHist"))}</p>
+    ${log.map((row, i) => `
+      <div class="voice-row">
+        <span class="pill ${row.ok ? "ok" : "warn"}">${row.ok ? "✓" : "·"}</span>
+        <span>${esc(row.target)}</span>
+        ${row.said ? `<span class="muted">→ ${esc(row.said)}</span>` : ""}
+        ${row.audio ? `<audio controls src="${esc(row.audio)}" style="max-width:100%;margin-top:4px"></audio>` : ""}
+      </div>`).join("")}`;
+}
+
+let shadowTick = null;
+
+function openShadowBox() {
+  const box = $("#shadow-box");
+  if (box) {
+    box.hidden = false;
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+function runShadowing() {
+  const target = window._speakTarget?.target;
+  if (!target) {
+    setRecStatus("Elige una frase primero.", "bad");
+    return;
+  }
+  clearInterval(shadowTick);
+  let left = 30;
+  const timerEl = $("#shadow-timer");
+  if (timerEl) timerEl.textContent = String(left);
+  speak(target, true);
+  shadowTick = setInterval(() => {
+    left -= 1;
+    if (timerEl) timerEl.textContent = String(Math.max(0, left));
+    if (left <= 0) clearInterval(shadowTick);
+  }, 1000);
+}
+
+function renderStreakChart() {
+  const el = $("#hoy-streak-chart");
+  if (!el) return;
+  const st = stats();
+  const days = [];
+  for (let i = 29; i >= 0; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = dateKey(d);
+    const day = st.days[key] || {};
+    const score = (day.heard || 0) + (day.quiz || 0) + (day.spoke || 0);
+    days.push({ key, score, hot: score > 0 });
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("streak"))}</p>
+    <div class="streak-bars" role="img" aria-label="Actividad 30 días">
+      ${days.map((d) => `<span class="streak-day ${d.hot ? "hot" : ""}" title="${esc(d.key)}"></span>`).join("")}
+    </div>`;
+}
+
+function buildTransferPayload() {
+  const payload = { v: 2, savedAt: new Date().toISOString() };
+  PROG_KEYS.forEach((k) => { payload[k] = localStorage.getItem(k); });
+  return payload;
+}
+
+function transferEncode(payload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+function transferDecode(str) {
+  return JSON.parse(decodeURIComponent(escape(atob(String(str || "").trim()))));
+}
+
+function applyTransferPayload(data) {
+  if (!data || typeof data !== "object") throw new Error("bad");
+  PROG_KEYS.forEach((k) => {
+    if (data[k] == null) localStorage.removeItem(k);
+    else localStorage.setItem(k, data[k]);
+  });
+}
+
+function drawTransferQr(text) {
+  const canvas = $("#transfer-qr");
+  if (!canvas?.getContext) return;
+  const ctx = canvas.getContext("2d");
+  const n = 21;
+  const cell = Math.floor(canvas.width / n);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#0d3b36";
+  let h = 0;
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  for (let y = 0; y < n; y += 1) {
+    for (let x = 0; x < n; x += 1) {
+      const bit = (h >> ((x + y * 3) % 30)) & 1;
+      if ((x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4) || bit) {
+        ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+      }
+    }
+  }
+}
+
+function renderTransferCode() {
+  const ta = $("#transfer-code");
+  if (!ta) return;
+  try {
+    const code = transferEncode(buildTransferPayload());
+    ta.value = code;
+    drawTransferQr(code.slice(0, 400));
+  } catch {
+    ta.value = "";
+  }
+}
+
+function importTransferCode(raw) {
+  try {
+    applyTransferPayload(transferDecode(raw));
+    applyLevel();
+    renderRemind();
+    renderTransferCode();
+    alert(uiLang() === "en" ? "Progress imported." : "Progreso importado.");
+  } catch {
+    alert(uiLang() === "en" ? "Invalid code." : "Código inválido.");
+  }
+}
+
+function printWeakList() {
+  const area = $("#weak-print-area");
+  if (!area) return;
+  const weak = [...weakSet()];
+  const ear = [...earWeakSet()];
+  const speak = [...speakWeakSet()];
+  area.hidden = false;
+  area.innerHTML = `
+    <h1>English Lab — débiles</h1>
+    <p>${todayKey()} · ${level().toUpperCase()}</p>
+    ${weak.length ? `<h2>Verbos</h2><ul>${weak.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
+    ${ear.length ? `<h2>Oído</h2><ul>${ear.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
+    ${speak.length ? `<h2>Hablar</h2><ul>${speak.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}`;
+  window.print();
+  area.hidden = true;
+}
+
+function renderInterviewSim() {
+  const box = $("#interview-sim-list");
+  if (!box) return;
+  const items = (ENLAB.interviewSim || []).filter((x) => (x.min || 1) <= lvlNum());
+  if (!items.length) {
+    box.innerHTML = `<p class="muted">${uiLang() === "en" ? "Available from B1." : "Disponible desde B1."}</p>`;
+    return;
+  }
+  box.innerHTML = items.map((it, i) => `
+    <div class="card interview-row">
+      <p><strong>${esc(it.q)}</strong></p>
+      <p class="muted es-line">${esc(it.es)}</p>
+      <p class="muted">${esc(it.hint)}</p>
+      <div class="row">
+        <button type="button" class="say" data-say="${esc(it.q)}">Oír pregunta</button>
+        <button type="button" class="btn sm" data-interview-rec="${i}">Grabar respuesta</button>
+      </div>
+      <p class="status" id="interview-status-${i}"></p>
+    </div>`).join("");
+}
+
+function renderPhrasalsWork() {
+  let card = $("#phrasals-work-card");
+  if (!card) {
+    const host = $("#interview-sim-card");
+    if (!host) return;
+    card = document.createElement("div");
+    card.className = "card";
+    card.id = "phrasals-work-card";
+    card.innerHTML = `<h3>Phrasals de trabajo</h3><div id="phrasals-work-list"></div>`;
+    host.insertAdjacentElement("afterend", card);
+  }
+  const list = $("#phrasals-work-list");
+  const items = (ENLAB.phrasalsWork || []).filter((p) => (p.min || 3) <= lvlNum());
+  if (!items.length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  list.innerHTML = items.map((p) => `
+    <div class="card" data-track="phrase" data-phrase="${esc(p.en)}">
+      <p>${esc(p.en)}</p>
+      <p class="muted es-line">${esc(p.es)}</p>
+      <div class="row">
+        <button class="say" data-say="${esc(p.say)}">Oír</button>
+        ${ygLink(p.en.split(" ")[0], t("real"))}
+      </div>
+    </div>`).join("");
+}
+
 function exportProgress() {
   const payload = { v: 1, savedAt: new Date().toISOString() };
   PROG_KEYS.forEach((k) => { payload[k] = localStorage.getItem(k); });
@@ -2796,6 +3226,8 @@ function applyLevel() {
   renderRateBar();
   applyTheme();
   applyHideEs();
+  applyKidsMode();
+  applyUiLang();
   const n = lvlNum();
   const vis = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; };
   vis("block-daily-role", n >= 2);
@@ -2819,6 +3251,8 @@ function applyLevel() {
 function init() {
   applyTheme();
   applyHideEs();
+  applyKidsMode();
+  applyUiLang();
   applyLevel();
   const allowed = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
   const fromHash = (location.hash || "").replace("#", "");
@@ -2838,6 +3272,9 @@ function init() {
     navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
   }
   setupPwaInstall();
+  renderInterviewSim();
+  renderPhrasalsWork();
+  renderVoiceHistory();
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -2875,5 +3312,33 @@ $("#welcome-go")?.addEventListener("click", () => {
   const el = $("#welcome");
   if (el) el.hidden = true;
 });
+
+$("#kids-toggle")?.addEventListener("click", () => {
+  localStorage.setItem("enlab-kids", kidsOn() ? "0" : "1");
+  applyKidsMode();
+});
+
+$("#ui-lang-toggle")?.addEventListener("click", () => {
+  localStorage.setItem("enlab-ui-lang", uiLang() === "en" ? "es" : "en");
+  applyUiLang();
+  renderHome();
+});
+
+$("#repaso-btn")?.addEventListener("click", () => startRepasoMode());
+
+$("#speak-shadow")?.addEventListener("click", () => openShadowBox());
+
+$("#shadow-go")?.addEventListener("click", () => runShadowing());
+
+$("#transfer-copy")?.addEventListener("click", () => {
+  const code = $("#transfer-code")?.value || "";
+  if (code) navigator.clipboard.writeText(code).catch(() => {});
+});
+
+$("#transfer-import")?.addEventListener("click", () => {
+  importTransferCode($("#transfer-paste")?.value || $("#transfer-code")?.value || "");
+});
+
+$("#weak-print")?.addEventListener("click", () => printWeakList());
 
 init();

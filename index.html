@@ -49,6 +49,8 @@
           <button type="button" class="chip" data-theme-set="light">Claro</button>
           <button type="button" class="chip" data-theme-set="dark">Oscuro</button>
           <button type="button" class="chip" data-hide-es aria-pressed="false" title="Oculta las traducciones">Reto: sin español</button>
+          <button type="button" class="chip" id="kids-toggle" aria-pressed="false">Modo niño</button>
+          <button type="button" class="chip" id="ui-lang-toggle" aria-pressed="false">English UI</button>
           <button type="button" class="chip" data-pwa-install hidden>Instalar app</button>
         </div>
       </div>
@@ -73,8 +75,12 @@
         <p class="muted" id="hoy-hint">La rutina cambia con el nivel.</p>
         <div id="hoy-path" class="hoy-path">
           <p id="hoy-path-copy" class="muted">Un botón te lleva por la sesión en orden.</p>
-          <button type="button" class="btn hoy-next">Empezar el camino</button>
+          <div class="row hoy-path-actions">
+            <button type="button" class="btn hoy-next">Empezar el camino</button>
+            <button type="button" class="btn ghost sm" id="repaso-btn">Solo repaso (10 min)</button>
+          </div>
         </div>
+        <div id="hoy-streak-chart" class="streak-chart" hidden></div>
         <div id="week-strip" class="week-strip"></div>
         <div class="session-head">
           <div>
@@ -96,6 +102,22 @@
         </div>
         <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd>–<kbd>5</kbd> saltan al paso del camino. En las 3 preguntas, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen.</p>
         <div id="hoy-review" class="hoy-review" hidden></div>
+        <details class="fold" id="transfer-box">
+          <summary data-i18n="transfer">Código para otro PC</summary>
+          <p class="muted">Copia el código o escanea el QR. Pégalo en Importar en el otro aparato.</p>
+          <textarea id="transfer-code" class="transfer-code" rows="4" readonly></textarea>
+          <div class="row">
+            <button type="button" class="btn ghost sm" id="transfer-copy">Copiar código</button>
+            <canvas id="transfer-qr" width="160" height="160" aria-label="QR del progreso"></canvas>
+          </div>
+          <label class="muted">Pegar en otro PC</label>
+          <textarea id="transfer-paste" class="transfer-code" rows="2" placeholder="Pega el código aquí"></textarea>
+          <button type="button" class="btn ghost sm" id="transfer-import">Importar código</button>
+        </details>
+        <p class="row no-print">
+          <button type="button" class="btn ghost sm" id="weak-print" data-i18n="weakPrint">Imprimir débiles</button>
+        </p>
+        <div id="weak-print-area" class="print-only" hidden></div>
         <details class="fold session-log-box">
           <summary>Sesiones guardadas</summary>
           <div id="session-log"></div>
@@ -147,10 +169,11 @@
           <span class="step-n" aria-hidden="true">1</span>
           <div>
             <h3>Oye estas parejas</h3>
-            <p class="muted">Pulsa. El triángulo es robot; <em>gente real</em> es YouGlish (nativos).</p>
+            <p class="muted">Pulsa el triángulo (robot). <em>Gente real</em> abre YouGlish. Oye las dos antes de elegir.</p>
           </div>
           <button type="button" class="btn ghost sm" id="play-daily-pairs">Oír las 4</button>
         </div>
+        <p class="muted shadow-hint">Tip: después de oír robot, abre <em>gente real</em> en un par difícil.</p>
         <div id="daily-pairs" class="grid grid-2"></div>
       </article>
       <article class="step-card" id="block-daily-role" data-hoy-step="2">
@@ -342,10 +365,21 @@
         <div class="row">
           <button class="btn ghost" id="speak-listen">Oír modelo</button>
           <button type="button" class="btn" id="speak-rec">Grabarme</button>
+          <button type="button" class="btn ghost" id="speak-shadow">Shadowing</button>
           <button class="btn ghost" id="speak-next">Otra frase</button>
         </div>
+        <div id="shadow-box" class="shadow-box" hidden>
+          <p class="muted">Oye → pausa → repite en voz alta. <span id="shadow-timer">30</span> s</p>
+          <button type="button" class="btn sm" id="shadow-go">Empezar shadowing</button>
+        </div>
         <audio id="speak-playback" controls hidden style="width:100%;margin-top:12px"></audio>
+        <div id="voice-history" class="voice-history" hidden></div>
         <p class="status" id="speak-status"></p>
+      </div>
+      <div class="card" id="interview-sim-card">
+        <h3>Simulacro entrevista</h3>
+        <p class="muted">Oye la pregunta. Graba tu respuesta (30–60 s). No hace falta perfecto: fluidez.</p>
+        <div id="interview-sim-list"></div>
       </div>
     </section>
 
@@ -368,6 +402,7 @@
   <script src="data.js"></script>
   <script src="guide.js"></script>
   <script src="levels.js"></script>
+  <script src="extras.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
