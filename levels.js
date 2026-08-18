@@ -662,3 +662,24 @@ ENLAB.familyNames.reg = "Regulares (-ed)";
   if (!ENLAB.verbs.some((x) => x.inf === v.inf)) ENLAB.verbs.push(v);
 });
 
+(function patchStress() {
+  const extra = {
+    record: { exA: "This is a record of the meeting.", exB: "Please record this call." },
+    project: { exA: "This is a big project.", exB: "Don't project your voice." },
+    contract: { exA: "I signed the contract.", exB: "Muscles contract when it's cold." },
+    present: { exA: "I got a present.", exB: "Let me present the idea." },
+    object: { exA: "What's that object?", exB: "I object to that." },
+    develop: { exA: "I develop software.", exB: "This is a new development." },
+    interview: { exA: "I have an interview.", exB: "The interviewee was nervous." },
+    computer: { exA: "I need a computer.", exB: "She is an engineer." },
+  };
+  (ENLAB.stress || []).forEach((s) => {
+    const k = String(s.sayA || s.a || "").toLowerCase().replace(/[^a-z]/g, "");
+    const hit = extra[k];
+    if (hit) {
+      s.exA = hit.exA;
+      s.exB = hit.exB;
+    }
+  });
+})();
+

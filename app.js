@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
 let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar" };
@@ -215,10 +215,10 @@ function renderHoyCheck() {
   if (!el) return;
   const s = sessionData();
   const items = [
-    { ok: s.pairs.length >= 4, label: `Oír los 4 pares (${Math.min(s.pairs.length, 4)}/4)` },
-    { ok: s.verbs.length >= 5, label: `Escuchar 5 verbos del día (${Math.min(s.verbs.length, 10)}/5)` },
-    { ok: s.phrases.length >= 2, label: `Decir o oír 2 frases (${Math.min(s.phrases.length, 2)}/2)` },
-    { ok: s.quizDone, label: "Terminar un quiz (verbos u oído)" },
+    { ok: s.pairs.length >= 4, label: `1. Oír los 4 pares (${Math.min(s.pairs.length, 4)}/4)` },
+    { ok: s.verbs.length >= 5, label: `2. Oír 5 verbos (${Math.min(s.verbs.length, 10)}/5)` },
+    { ok: s.phrases.length >= 1, label: `3. Grabar o oír el diálogo (${Math.min(s.phrases.length, 2)}/1)` },
+    { ok: s.quizDone, label: "4. Cerrar con 3 preguntas" },
   ];
   const done = items.filter((x) => x.ok).length;
   const pct = (done / items.length) * 100;
@@ -249,7 +249,7 @@ function sessionTaskCount(s) {
   return [
     s.pairs.length >= 4,
     s.verbs.length >= 5,
-    s.phrases.length >= 2,
+    s.phrases.length >= 1,
     s.quizDone,
   ].filter(Boolean).length;
 }
@@ -424,7 +424,7 @@ function ygHref(word) {
   return `https://youglish.com/pronounce/${encodeURIComponent(one)}/english`;
 }
 
-function ygLink(word, label = "nativos") {
+function ygLink(word, label = "gente real") {
   return `<a class="yg" href="${ygHref(word)}" target="_blank" rel="noreferrer" title="YouGlish: oír esta palabra dicha por nativos">${esc(label)}</a>`;
 }
 
@@ -713,11 +713,13 @@ function renderHome() {
     const roles = rolesForLevel();
     dailyRole.innerHTML = roles.length ? roleCard(seededShuffle(roles)[0]) : "";
   }
+  renderDailyStress();
   renderHomeStats();
   renderHoyCheck();
   renderWeekStrip();
   renderDailyTip();
   renderEarMisses();
+  renderHoyReview();
   upsertLog();
   renderClock();
   hoyPairI = 0;
@@ -743,10 +745,21 @@ function renderHoyGame() {
 
 function ensureHoyPathDay() {
   const t = todayKey();
-  if (hoyPathDay !== t) {
-    hoyPathDay = t;
-    hoyPathI = -1;
-  }
+  if (hoyPathDay === t) return;
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-hoy-path") || "null");
+    if (raw && raw.day === t && typeof raw.i === "number") {
+      hoyPathDay = t;
+      hoyPathI = raw.i;
+      return;
+    }
+  } catch { /* ignore */ }
+  hoyPathDay = t;
+  hoyPathI = -1;
+}
+
+function persistHoyPath() {
+  sessionStorage.setItem("enlab-hoy-path", JSON.stringify({ day: todayKey(), i: hoyPathI }));
 }
 
 function hoyPath() {
@@ -754,7 +767,17 @@ function hoyPath() {
   if (lvlNum() >= 2) steps.push({ id: "role", sel: "#block-daily-role", label: "Palabra camaleón" });
   steps.push({ id: "verbs", sel: "#hoy-step-3", label: "10 verbos del día" });
   steps.push({ id: "dialog", sel: "#hoy-step-4", label: "Di este diálogo" });
+  steps.push({ id: "cierre", sel: "#hoy-step-cierre", label: "3 preguntas" });
   return steps;
+}
+
+function pathHint(step) {
+  const s = sessionData();
+  if (step.id === "pairs" && s.pairs.length < 4) return "Oye las 4 parejas (o pulsa Oír las 4).";
+  if (step.id === "verbs" && s.verbs.length < 5) return "Pulsa Presente o 3 formas en 5 verbos.";
+  if (step.id === "dialog" && s.phrases.length < 1) return "Oye A y graba B aquí mismo.";
+  if (step.id === "cierre" && !s.quizDone) return "Las 3 preguntas marcan la sesión.";
+  return "";
 }
 
 function renderHoyPath() {
@@ -764,16 +787,17 @@ function renderHoyPath() {
   const i = hoyPathI;
   const last = path.length - 1;
   const g = todayGame();
-  let text = "Un botón te lleva por la sesión en orden: pares, verbos, diálogo.";
+  let text = "Un botón te lleva: pares, verbos, diálogo, 3 preguntas.";
   let label = "Empezar el camino";
   if (i >= 0 && i <= last) {
-    text = `Paso ${i + 1} de ${path.length}: ${path[i].label}`;
+    const extra = pathHint(path[i]);
+    text = `Paso ${i + 1} de ${path.length}: ${path[i].label}${extra ? ` · ${extra}` : ""}`;
     if (i < last) label = `Siguiente: ${path[i + 1].label}`;
     else if (g.game) label = g.label;
     else label = "Listo";
   } else if (i > last) {
     text = g.game
-      ? "Camino del día hecho. Puedes repetirlo o ir al juego."
+      ? "Camino del día hecho. Puedes repetirlo o ir al juego extra."
       : "Camino del día hecho. Puedes repetirlo o seguir explorando.";
     label = "Repetir el camino";
   }
@@ -784,7 +808,9 @@ function renderHoyPath() {
 function goHoyStep(i) {
   const path = hoyPath();
   if (i < 0 || i >= path.length) return;
+  if (recState.rec && recState.rec.state === "recording") stopRecording(false);
   hoyPathI = i;
+  persistHoyPath();
   $$(".step-card").forEach((c) => c.classList.remove("path-now", "flash"));
   const el = $(path[i].sel);
   if (el && el.style.display !== "none") {
@@ -792,6 +818,7 @@ function goHoyStep(i) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => el.classList.remove("flash"), 1200);
   }
+  if (path[i].id === "cierre") startCierreQuiz();
   renderHoyPath();
 }
 
@@ -800,6 +827,7 @@ function startHoyGame() {
   if (!g.game) return false;
   if (recState.rec && recState.rec.state === "recording") stopRecording(false);
   hoyPathI = hoyPath().length;
+  persistHoyPath();
   renderHoyPath();
   const sel = $("#quiz-mode");
   if (sel && (g.game === "ed" || g.game === "uso")) sel.value = g.game;
@@ -822,8 +850,13 @@ function advanceHoyPath() {
     return;
   }
   if (hoyPathI === path.length - 1) {
+    if (quiz.mode === "cierre" && quiz.items.length && quiz.i < quiz.items.length) {
+      quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     if (startHoyGame()) return;
     hoyPathI = path.length;
+    persistHoyPath();
     $$(".step-card").forEach((c) => c.classList.remove("path-now"));
     renderHoyPath();
     return;
@@ -878,6 +911,40 @@ function rolesForLevel() {
   return (ENLAB.wordRoles || []).filter((w) => (w.min || 2) <= lvlNum());
 }
 
+function renderDailyStress() {
+  const el = $("#daily-stress");
+  if (!el) return;
+  if (lvlNum() < 3) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const bank = ENLAB.stress || [];
+  if (!bank.length) {
+    el.hidden = true;
+    return;
+  }
+  const s = seededShuffle(bank)[0];
+  el.hidden = false;
+  el.innerHTML = `<p class="kicker">Acento de hoy</p>${stressCard(s)}`;
+}
+
+function stressCard(s) {
+  const a = s.exA || s.a;
+  const b = s.exB || s.b;
+  return `
+    <div class="card">
+      <p class="muted">${esc(s.note || "El golpe de la palabra cambia el significado.")}</p>
+      <div class="row" style="margin-top:8px">
+        <button type="button" class="say" data-say="${esc(a)}" data-slow="1">${esc(s.a)}</button>
+        ${ygLink(s.sayA || s.a)}
+        <span>vs</span>
+        <button type="button" class="say" data-say="${esc(b)}" data-slow="1">${esc(s.b)}</button>
+        ${ygLink(s.sayB || s.b)}
+      </div>
+    </div>`;
+}
+
 function roleCard(item) {
   return `
     <div class="card role-word">
@@ -891,7 +958,7 @@ function roleCard(item) {
             <p class="muted es-line">${esc(r.es)}</p>
             <div class="row">
               <button class="say" data-say="${esc(r.en)}" data-slow="1">Oír frase</button>
-              ${ygLink(r.en, "nativos")}
+              ${ygLink(r.en, "gente real")}
             </div>
           </div>`).join("")}
       </div>
@@ -967,7 +1034,7 @@ function renderVowels() {
       <p class="muted">${esc(t.tip)}</p>
     </div>`).join("");
 
-  $("#stress-list").innerHTML = "";
+  $("#stress-list").innerHTML = (ENLAB.stress || []).map(stressCard).join("");
 
   const rolesBox = $("#roles-list");
   if (rolesBox) rolesBox.innerHTML = rolesForLevel().map((w) => roleCard(w)).join("");
@@ -1091,6 +1158,7 @@ function bumpSpeakWeak(phrase, ok) {
   else w.add(phrase);
   saveSet("enlab-speak-weak", w);
   renderSpeakWeakHint();
+  renderHoyReview();
 }
 
 function renderSpeakWeakHint() {
@@ -1099,7 +1167,7 @@ function renderSpeakWeakHint() {
   const n = speakWeakSet().size;
   el.hidden = n === 0;
   el.textContent = n
-    ? `${n} frase(s) que no te entendió. Salen primero al pulsar Otra frase.`
+    ? `${n} frase(s) que no te entendió.${speakOnlyWeakOn() ? " Filtro: solo esas." : " Salen primero al pulsar Otra frase."}`
     : "";
 }
 
@@ -1110,6 +1178,7 @@ function bumpPickWeak(mode, key, ok) {
   if (ok) w.delete(key);
   else w.add(key);
   saveSet(store, w);
+  renderHoyReview();
 }
 
 function earStats() {
@@ -1169,12 +1238,55 @@ function renderEarMisses() {
         </li>`;
       }).join("")}
     </ul>` : "";
-  ["ear-misses", "hoy-misses"].forEach((id) => {
+  ["ear-misses"].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.hidden = !rows.length;
     el.innerHTML = html;
   });
+}
+
+function spacedPreview(limit = 6) {
+  const bits = [];
+  for (const inf of [...weakSet()].slice(0, 2)) bits.push(inf);
+  for (const k of [...earWeakSet()].slice(0, 2)) bits.push(k.replace("|", " / "));
+  for (const k of [...usoWeakSet()].slice(0, 1)) bits.push(k);
+  for (const k of [...edWeakSet()].slice(0, 1)) bits.push(k);
+  for (const k of [...speakWeakSet()].slice(0, 1)) bits.push(`“${k}”`);
+  return bits.slice(0, limit);
+}
+
+function renderHoyReview() {
+  const el = $("#hoy-review");
+  if (!el) return;
+  const ears = worstEarPairs(4);
+  const verbs = [...weakSet()].slice(0, 4);
+  const uso = [...usoWeakSet()].slice(0, 3);
+  const ed = [...edWeakSet()].slice(0, 3);
+  const speak = [...speakWeakSet()].slice(0, 3);
+  const preview = spacedPreview();
+  const total = ears.length + verbs.length + uso.length + ed.length + speak.length;
+  if (!total && !preview.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const chip = (text, say) => say
+    ? `<button type="button" class="chip say" data-say="${esc(say)}">${esc(text)}</button>`
+    : `<span class="chip">${esc(text)}</span>`;
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">Repasar</p>
+    ${preview.length ? `<p>Mañana salen primero: ${esc(preview.join(" · "))}</p>` : ""}
+    ${ears.length ? `<p class="muted">Oído</p><div class="review-chips">${ears.map((r) => {
+      const [a, b] = r.k.split("|");
+      return `${chip(a, a)}<span class="muted">vs</span>${chip(b, b)}`;
+    }).join(" ")}</div>` : ""}
+    ${verbs.length ? `<p class="muted">Verbos débiles</p><div class="review-chips">${verbs.map((v) => chip(v, v)).join("")}</div>` : ""}
+    ${uso.length ? `<p class="muted">Uso</p><div class="review-chips">${uso.map((x) => chip(x, x)).join("")}</div>` : ""}
+    ${ed.length ? `<p class="muted">-ed</p><div class="review-chips">${ed.map((x) => chip(x, x)).join("")}</div>` : ""}
+    ${speak.length ? `<p class="muted">Frases que no te entendió</p><div class="review-chips">${speak.map((x) => chip(x, x)).join("")}</div>` : ""}
+    <p class="muted" style="margin-top:10px">Pulsa para oír. En Juego y Hablar salen primero.</p>`;
 }
 
 function earBank() {
@@ -1397,13 +1509,26 @@ function answersMatch(user, correct) {
   return parts.some((p) => norm(p) === u);
 }
 
+function quizBox() {
+  return $(quiz.host || "#quiz-box");
+}
+
 function renderQuiz() {
   clearEarTimers();
-  const box = $("#quiz-box");
+  const box = quizBox();
+  if (!box) return;
   if (quiz.i >= quiz.items.length) {
+    const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
     const pick = quiz.mode === "uso" || quiz.mode === "ed";
-    if (!ear && !pick && quiz.fails.length) {
+    if (cierre) {
+      const w = weakSet();
+      quiz.items.forEach((it) => {
+        if (!quiz.fails.includes(it.inf)) return;
+        if (it.type === "choice" || it.type === "type") w.add(it.inf);
+      });
+      saveSet("enlab-weak", w);
+    } else if (!ear && !pick && quiz.fails.length) {
       const w = weakSet();
       quiz.fails.forEach((inf) => w.add(inf));
       saveSet("enlab-weak", w);
@@ -1417,26 +1542,39 @@ function renderQuiz() {
       quiz.fails.forEach((k) => bumpPickWeak(quiz.mode, k, false));
     }
     if (!quiz.fails.length) buzz(true);
+    const g = todayGame();
+    const extraGame = cierre && g.game
+      ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
+      : "";
     box.innerHTML = `<div class="card">
-      <h3>Terminado</h3>
+      <h3>${cierre ? "Sesión cerrada" : "Terminado"}</h3>
       <p class="score">${quiz.score} / ${quiz.items.length}</p>
       <p class="muted">${quiz.fails.length
         ? (ear
           ? `Repite estos pares: ${quiz.fails.map((k) => k.replace("|", " / ")).join(", ")}`
-          : pick
+          : pick || cierre
             ? `Repasa: ${quiz.fails.join(" · ")}`
             : `Se marcaron como débiles: ${quiz.fails.join(", ")}`)
         : "Sin fallos. Bien."}</p>
       ${ear ? `<p class="muted">Tip: oye gente real en <a href="https://youglish.com/pronounce/sheep/english" target="_blank" rel="noreferrer">YouGlish</a> (ship vs sheep).</p>` : ""}
       ${quiz.mode === "uso" ? `<p class="muted">Tip: en Oído, <a href="#oido-chunks" data-jump="oido-chunks">Calcos y pares</a> explica make/do, say/tell y Did you…?</p>` : ""}
       ${quiz.mode === "ed" ? `<p class="muted">Regla: sordo → [t] liked; sonoro → [d] played; T/D → [id] wanted. Oye cada una.</p>` : ""}
-      <button class="btn" id="quiz-again">Otro round</button>
+      ${cierre ? `<p class="muted">Esto cuenta como el quiz del día. El resto de Juego es extra.</p>` : ""}
+      ${extraGame}
+      <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : "Otro round"}</button>
     </div>`;
     markSession("quizDone");
-    $("#quiz-again")?.addEventListener("click", startQuiz);
+    syncRemindToSw();
+    $("#quiz-again")?.addEventListener("click", cierre ? startCierreQuiz : startQuiz);
     renderVerbs();
-    renderHome();
-    renderEarMisses();
+    if (cierre) {
+      renderHoyCheck();
+      renderHoyReview();
+      renderHoyPath();
+    } else {
+      renderHome();
+      renderEarMisses();
+    }
     return;
   }
   const it = quiz.items[quiz.i];
@@ -1484,14 +1622,14 @@ function renderQuiz() {
   }
   if (it.type === "ear") {
     const exam = quiz.mode === "exam" || it.exam;
-    const warm = !exam && earWarmupOn();
+    const warm = !exam && quiz.mode !== "cierre" && earWarmupOn();
     const label = (o, i) => exam ? `${i + 1}. ${esc(o)}` : `${i + 1}. ${esc(it.labels[o] || o)}`;
     box.innerHTML = `<div class="card">
       <div class="muted">${exam ? "Examen" : "Oído"} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}${exam ? "" : ` · ${esc(it.why)}`}</div>
       <div class="quiz-q">${exam
         ? "Oye primero. Las dos palabras aparecen al terminar."
         : (warm ? "Primero oyes las dos. Después UNA. Elige esa." : "Oye UNA. Luego elige. (1 / 2 en el teclado)")}</div>
-      ${exam ? "" : `<label class="muted"><input type="checkbox" id="ear-warmup" ${warm ? "checked" : ""}> Calentamiento: oír las dos y después la pregunta</label>`}
+      ${exam || quiz.mode === "cierre" ? "" : `<label class="muted"><input type="checkbox" id="ear-warmup" ${warm ? "checked" : ""}> Calentamiento: oír las dos y después la pregunta</label>`}
       <div class="row" style="margin-top:10px">
         ${exam ? "" : `<button type="button" class="btn ghost" id="ear-both">Oír las dos</button>`}
         <button type="button" class="btn" id="ear-one">${exam ? "Oír otra vez" : "Oír la pregunta"}</button>
@@ -1540,10 +1678,50 @@ function renderQuiz() {
 
 function startQuiz() {
   const mode = $("#quiz-mode")?.value || "choice";
-  quiz = { i: 0, score: 0, items: [], fails: [], mode };
+  quiz = { i: 0, score: 0, items: [], fails: [], mode, host: "#quiz-box" };
   quiz.items = makeQuizItems();
   renderQuiz();
-  $("#quiz-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function makeCierreItems() {
+  const items = [];
+  const ear = makeEarItems(false);
+  if (ear[0]) items.push(ear[0]);
+  const source = verbSource();
+  const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
+  const deck = typeof todaysDeck === "function" ? todaysDeck() : [];
+  const v = weak[0] || shuffle(deck)[0] || shuffle(source)[0];
+  if (v) {
+    items.push({
+      type: "choice",
+      q: `Pasado de “${v.inf}”`,
+      esHint: v.es,
+      a: v.past.split(" / ")[0],
+      opts: uniqueOpts(v.past.split(" / ")[0], source.map((x) => x.past.split(" / ")[0])),
+      say: v.inf,
+      inf: v.inf,
+    });
+  }
+  const g = todayGame();
+  if (g.game === "ed") {
+    const ed = makeEdItems();
+    if (ed[0]) items.push(ed[0]);
+  } else {
+    const uso = makeUsoItems();
+    if (uso[0]) items.push(uso[0]);
+  }
+  return items.slice(0, 3);
+}
+
+function startCierreQuiz() {
+  if (quiz.mode === "cierre" && quiz.i < (quiz.items || []).length && quiz.items.length) {
+    quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  quiz = { i: 0, score: 0, items: makeCierreItems(), fails: [], mode: "cierre", host: "#hoy-cierre-box" };
+  renderQuiz();
+  quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function speakPool() {
@@ -1598,8 +1776,14 @@ function openSpeakWith(item) {
 }
 
 function renderSpeak() {
+  const box = $("#speak-only-weak");
+  if (box) box.checked = speakOnlyWeakOn();
   window._speakPool = speakPool();
   pickSpeak();
+}
+
+function speakOnlyWeakOn() {
+  return localStorage.getItem("enlab-speak-only-weak") === "1";
 }
 
 function pickSpeak() {
@@ -1613,7 +1797,17 @@ function pickSpeak() {
     target: t,
     help: "Te trabaste. Repítela despacio.",
   }));
-  const item = forced || hard[0] || leftover[0] || shuffle(pool)[0];
+  const only = speakOnlyWeakOn();
+  let item = forced;
+  if (!item && only) {
+    item = hard[0] || leftover[0];
+    if (!item) {
+      setSpeakTarget({ target: "I'm fine, thanks.", help: "No hay fallos guardados. Quita “Solo lo que no me entendió” o graba una frase." });
+      renderSpeakWeakHint();
+      return;
+    }
+  }
+  if (!item) item = hard[0] || leftover[0] || shuffle(pool)[0];
   setSpeakTarget(item);
   renderSpeakWeakHint();
 }
@@ -1930,7 +2124,7 @@ function dialogCard(d) {
           <p class="muted es-line">${esc(d.b.es)}</p>
           <div class="row">
             <button type="button" class="say" data-say="${esc(d.b.en)}">Oír B</button>
-            ${ygLink(d.b.en, "nativos")}
+            ${ygLink(d.b.en, "gente real")}
             <button type="button" class="btn sm" id="hoy-speak-rec">Grabar B</button>
           </div>
           <audio id="hoy-speak-playback" controls hidden style="width:100%;margin-top:10px"></audio>
@@ -1958,7 +2152,7 @@ function renderInterview() {
       <p class="muted es-line">${esc(s.es)}</p>
       <div class="row">
         <button class="say" data-say="${esc(s.en)}">Escuchar</button>
-        ${ygLink(s.en, "nativos")}
+        ${ygLink(s.en, "gente real")}
       </div>
     </div>`).join("");
 }
@@ -2142,6 +2336,7 @@ document.addEventListener("click", (e) => {
     if (it.type === "ear") {
       bumpEar(it.inf, val === it.a);
       renderEarMisses();
+      renderHoyReview();
     }
     bump("quiz");
     setTimeout(() => { quiz.i += 1; renderQuiz(); }, it.type === "ear" ? 1300 : ((it.type === "uso" || it.type === "ed") ? 2000 : 700));
@@ -2213,6 +2408,10 @@ $("#verb-search")?.addEventListener("input", (e) => {
 $("#quiz-start")?.addEventListener("click", startQuiz);
 $("#speak-rec")?.addEventListener("click", () => toggleRecording("hablar"));
 $("#speak-starter")?.addEventListener("change", () => renderSpeak());
+$("#speak-only-weak")?.addEventListener("change", (e) => {
+  localStorage.setItem("enlab-speak-only-weak", e.target.checked ? "1" : "0");
+  pickSpeak();
+});
 $("#speak-next")?.addEventListener("click", pickSpeak);
 $("#speak-hoy")?.addEventListener("click", () => {
   const item = dialogSpeakItem("b");
@@ -2235,22 +2434,22 @@ $("#prog-file")?.addEventListener("change", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
-  const onEar = currentTab === "quiz" && quiz.items[quiz.i]?.type === "ear";
-  const onPick = currentTab === "quiz" && (quiz.items[quiz.i]?.type === "uso" || quiz.items[quiz.i]?.type === "ed");
-  if (onEar) {
+  const live = quiz.items[quiz.i] && (currentTab === "quiz" || (quiz.mode === "cierre" && currentTab === "hoy"));
+  const it = live ? quiz.items[quiz.i] : null;
+  const host = quiz.host || "#quiz-box";
+  if (it?.type === "ear") {
     if (e.key === " " || e.code === "Space") {
       e.preventDefault();
-      playEarSequence(quiz.items[quiz.i], false);
+      playEarSequence(it, false);
       return;
     }
     const idx = e.key === "1" ? 0 : e.key === "2" ? 1 : -1;
     if (idx < 0) return;
-    const btn = $$(".choices.ear button")[idx];
+    const btn = $$(`${host} .choices.ear button`)[idx] || $$(`${host} .choices button`)[idx];
     if (btn && !btn.disabled) btn.click();
     return;
   }
-  if (onPick) {
-    const it = quiz.items[quiz.i];
+  if (it && (it.type === "uso" || it.type === "ed" || it.type === "choice")) {
     if (e.key === " " || e.code === "Space") {
       e.preventDefault();
       if (it.say) speak(it.say, true);
@@ -2259,7 +2458,7 @@ document.addEventListener("keydown", (e) => {
     const idx = Number(e.key) - 1;
     if (idx < 0 || idx > 8 || Number.isNaN(idx)) return;
     e.preventDefault();
-    const btn = $$("#quiz-box .choices button")[idx];
+    const btn = $$(`${host} .choices button`)[idx];
     if (btn && !btn.disabled) btn.click();
     return;
   }
@@ -2269,9 +2468,12 @@ document.addEventListener("keydown", (e) => {
     playNextHoyPair();
     return;
   }
-  if (e.key >= "1" && e.key <= "4") {
-    e.preventDefault();
-    jumpHoyStep(Number(e.key));
+  if (e.key >= "1" && e.key <= "9") {
+    const idx = Number(e.key) - 1;
+    if (idx < hoyPath().length) {
+      e.preventDefault();
+      goHoyStep(idx);
+    }
   }
 });
 
@@ -2288,6 +2490,7 @@ function renderOidoToc() {
     { id: "oido-contra", label: "Contracciones", min: 2 },
     { id: "oido-endings", label: "-tion / golpe", min: 2 },
     { id: "oido-roles", label: "Verbo / nombre", min: 2 },
+    { id: "oido-acento", label: "Acento", min: 3 },
     { id: "oido-ough", label: "ough", min: 3 },
     { id: "oido-ritmo", label: "Ritmo", min: 3 },
     { id: "oido-chunks", label: "Calcos / pares", min: 1 },
@@ -2325,13 +2528,21 @@ function playNextHoyPair() {
 }
 
 function jumpHoyStep(n) {
+  const path = hoyPath();
   const map = {
     1: "#hoy-step-1",
     2: lvlNum() >= 2 ? "#block-daily-role" : "#hoy-step-3",
     3: "#hoy-step-3",
     4: "#hoy-step-4",
+    5: "#hoy-step-cierre",
   };
-  const el = $(map[n] || "");
+  const sel = map[n];
+  const idx = path.findIndex((s) => s.sel === sel);
+  if (idx >= 0) {
+    goHoyStep(idx);
+    return;
+  }
+  const el = $(sel || "");
   if (!el || el.style.display === "none") return;
   $$(".step-card").forEach((c) => c.classList.remove("flash"));
   el.classList.add("flash");
@@ -2440,14 +2651,19 @@ function renderRemind() {
     return;
   }
   if (on && Notification.permission === "granted") {
-    st.textContent = `Te aviso a las ${remindTime()} en este Chrome. No hay servidor: si cierras la pestaña, no llega. Si ya completaste Hoy, no suena.`;
+    const extra = isStandalone()
+      ? " Con la app instalada, Chrome puede recordarte aunque cierres la pestaña (no siempre a la hora exacta)."
+      : " Instala la app para un aviso aunque cierres la pestaña. La hora exacta sigue pidiendo Chrome o la app abierta.";
+    st.textContent = `Te aviso a las ${remindTime()} en este aparato. Si ya completaste Hoy, no suena.${extra}`;
+    syncRemindToSw();
     return;
   }
   if (on && Notification.permission === "denied") {
     st.textContent = "Bloqueaste avisos. Candado de la barra → Notificaciones → Permitir.";
     return;
   }
-  st.textContent = "Elige una hora. El aviso llega si Chrome o la app siguen abiertos.";
+  st.textContent = "Elige una hora. El aviso llega si Chrome o la app siguen abiertos. Instala la app para un recordatorio extra.";
+  syncRemindToSw();
 }
 
 async function toggleRemind() {
@@ -2471,10 +2687,41 @@ async function toggleRemind() {
   localStorage.setItem("enlab-remind-on", "1");
   localStorage.setItem("enlab-remind-time", $("#remind-time")?.value || remindTime());
   renderRemind();
+  paintPwaButtons();
+  syncRemindToSw();
 }
 
 function sessionCompleteToday() {
   return sessionTaskCount(sessionData()) >= 4;
+}
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function syncRemindToSw() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  const payload = {
+    on: remindOn(),
+    time: remindTime(),
+    complete: sessionCompleteToday() ? todayKey() : "",
+    today: todayKey(),
+  };
+  navigator.serviceWorker.ready.then((reg) => {
+    reg.active?.postMessage({ type: "enlab-remind", payload });
+    if (remindOn() && "periodicSync" in reg) {
+      reg.periodicSync.register("enlab-remind", { minInterval: 12 * 60 * 60 * 1000 }).catch(() => {});
+    }
+  }).catch(() => {});
+}
+
+function paintPwaButtons() {
+  const standalone = isStandalone();
+  $$("[data-pwa-install]").forEach((btn) => {
+    if (standalone) btn.hidden = true;
+    else if (window._pwaDeferred) btn.hidden = false;
+  });
 }
 
 function fireRemind() {
@@ -2553,7 +2800,7 @@ function applyLevel() {
   const vis = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; };
   vis("block-daily-role", n >= 2);
   vis("block-roles", n >= 2);
-  vis("block-b1-stress", false);
+  vis("block-b1-stress", n >= 3);
   vis("block-b1-ough", n >= 3);
   vis("block-a2-extra", n >= 2);
   vis("block-endings", n >= 2);
@@ -2586,9 +2833,9 @@ function init() {
   syncQuizModePicks();
   setupRemind();
   const welcome = $("#welcome");
-  if (welcome && localStorage.getItem("enlab-welcome") !== "1") welcome.hidden = false;
+  if (welcome && localStorage.getItem("enlab-welcome-v2") !== "1") welcome.hidden = false;
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
   }
   setupPwaInstall();
 }
@@ -2598,35 +2845,33 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function setupPwaInstall() {
-  const btn = $("#pwa-install");
-  if (!btn) return;
-  const standalone = window.matchMedia("(display-mode: standalone)").matches
-    || window.navigator.standalone === true;
+  const standalone = isStandalone();
   if (standalone) {
-    btn.hidden = true;
+    $$("[data-pwa-install]").forEach((b) => { b.hidden = true; });
     return;
   }
-  let deferred = null;
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
-    deferred = e;
-    btn.hidden = false;
+    window._pwaDeferred = e;
+    paintPwaButtons();
   });
   window.addEventListener("appinstalled", () => {
-    deferred = null;
-    btn.hidden = true;
+    window._pwaDeferred = null;
+    $$("[data-pwa-install]").forEach((b) => { b.hidden = true; });
   });
-  btn.addEventListener("click", async () => {
-    if (!deferred) return;
-    deferred.prompt();
-    await deferred.userChoice.catch(() => {});
-    deferred = null;
-    btn.hidden = true;
+  $$("[data-pwa-install]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!window._pwaDeferred) return;
+      window._pwaDeferred.prompt();
+      await window._pwaDeferred.userChoice.catch(() => {});
+      window._pwaDeferred = null;
+      $$("[data-pwa-install]").forEach((b) => { b.hidden = true; });
+    });
   });
 }
 
 $("#welcome-go")?.addEventListener("click", () => {
-  localStorage.setItem("enlab-welcome", "1");
+  localStorage.setItem("enlab-welcome-v2", "1");
   const el = $("#welcome");
   if (el) el.hidden = true;
 });

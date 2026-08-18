@@ -509,8 +509,27 @@ select {
   border-radius: 16px;
   background: var(--accent-soft);
 }
-.hoy-game .kicker { margin: 0 0 6px; }
-.hoy-game p { margin: 0 0 6px; }
+.hoy-review {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+.hoy-review .kicker { margin: 0 0 6px; }
+.hoy-review p { margin: 0 0 8px; }
+.review-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.review-chips .chip, .review-chips button {
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+}
+.pwa-nudge {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
 .hoy-path {
   margin: 12px 0 0;
   padding: 12px 14px;

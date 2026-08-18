@@ -25,10 +25,10 @@
       <h2>Pulsa, oye, repite</h2>
       <ol>
         <li>Elige un nivel: A1 es fácil, B1 es la meta.</li>
-        <li>Los botones con triángulo <strong>suenan</strong> en inglés.</li>
-        <li>Haz los 4 pasos de Hoy (15 min). El resto es para explorar.</li>
+        <li>El triángulo es robot. <strong>gente real</strong> abre YouGlish (nativos).</li>
+        <li>Pulsa <strong>Empezar el camino</strong>: pares → verbos → diálogo (Grabar B aquí) → 3 preguntas.</li>
       </ol>
-      <p class="muted">Sirve para chicos desde ~10 años y para adultos. Chrome o Edge. Nada se sube a internet.</p>
+      <p class="muted">Chrome o Edge. 15 minutos. Nada se sube a internet. Instala la app si quieres avisos más fiables.</p>
       <p><button type="button" class="btn" id="welcome-go">Empezar</button></p>
     </div>
   </div>
@@ -49,7 +49,7 @@
           <button type="button" class="chip" data-theme-set="light">Claro</button>
           <button type="button" class="chip" data-theme-set="dark">Oscuro</button>
           <button type="button" class="chip" data-hide-es aria-pressed="false" title="Oculta las traducciones">Reto: sin español</button>
-          <button type="button" class="chip" id="pwa-install" hidden>Instalar app</button>
+          <button type="button" class="chip" data-pwa-install hidden>Instalar app</button>
         </div>
       </div>
     </header>
@@ -78,7 +78,7 @@
         <div id="week-strip" class="week-strip"></div>
         <div class="session-head">
           <div>
-            <p class="muted" style="margin:12px 0 6px">Se marca solo: oye, pulsa, habla, termina un juego.</p>
+            <p class="muted" style="margin:12px 0 6px">Se marca solo, en el orden del camino: oír pares, oír verbos, grabar el diálogo, 3 preguntas.</p>
             <div id="hoy-check"></div>
           </div>
           <div class="timer-box">
@@ -91,10 +91,11 @@
             <input id="remind-time" type="time" value="18:00" />
           </label>
           <button type="button" class="chip" id="remind-toggle" aria-pressed="false">Activar aviso</button>
+          <button type="button" class="chip" data-pwa-install hidden>Instalar app</button>
           <p class="muted" id="remind-status">Elige una hora. Chrome avisa en este aparato; no hay servidor. La pestaña (o la app) tiene que seguir abierta.</p>
         </div>
-        <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> saltan a cada paso. O usa <strong>Siguiente</strong>.</p>
-        <div id="hoy-misses" class="ear-misses" hidden></div>
+        <p class="muted keys-hint">Teclado en Hoy: <kbd>espacio</kbd> oye el siguiente par. <kbd>1</kbd>–<kbd>5</kbd> saltan al paso del camino. En las 3 preguntas, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen.</p>
+        <div id="hoy-review" class="hoy-review" hidden></div>
         <details class="fold session-log-box">
           <summary>Sesiones guardadas</summary>
           <div id="session-log"></div>
@@ -146,7 +147,7 @@
           <span class="step-n" aria-hidden="true">1</span>
           <div>
             <h3>Oye estas parejas</h3>
-            <p class="muted">Pulsa. Son dos palabras que se parecen. El truco está en la diferencia.</p>
+            <p class="muted">Pulsa. El triángulo es robot; <em>gente real</em> es YouGlish (nativos).</p>
           </div>
           <button type="button" class="btn ghost sm" id="play-daily-pairs">Oír las 4</button>
         </div>
@@ -157,10 +158,11 @@
           <span class="step-n" aria-hidden="true">2</span>
           <div>
             <h3>Palabra camaleón</h3>
-            <p class="muted">Misma escritura, otro trabajo. Oye la frase, no la palabra suelta.</p>
+            <p class="muted">Misma escritura, otro trabajo. Oye la frase, no la palabra suelta. En B1+ también sale un acento (REcord / reCORD).</p>
           </div>
         </div>
         <div id="daily-role"></div>
+        <div id="daily-stress" hidden></div>
       </article>
       <article class="step-card" id="hoy-step-3">
         <div class="step-head">
@@ -182,6 +184,16 @@
         </div>
         <div id="daily-dialog"></div>
         <div id="interview-list" class="grid"></div>
+      </article>
+      <article class="step-card" id="hoy-step-cierre">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">5</span>
+          <div>
+            <h3>Cierra con 3 preguntas</h3>
+            <p class="muted">Oído + un verbo débil + uso o -ed. Marca la sesión del día.</p>
+          </div>
+        </div>
+        <div id="hoy-cierre-box"></div>
       </article>
       <p class="hoy-path-foot">
         <button type="button" class="btn hoy-next">Siguiente</button>
@@ -218,6 +230,7 @@
       </div>
       <div id="block-b1-stress" hidden>
       <h3 id="oido-acento">Acento tónico de palabra</h3>
+      <p class="muted">Oye la <em>oración</em>. El sintetizador no distingue bien REcord / reCORD sueltos. <em>gente real</em> = YouGlish.</p>
       <div id="stress-list" class="grid grid-2"></div>
       </div>
       <div id="block-b1-ough">
@@ -322,6 +335,7 @@
           <span>3 Escúchate</span>
         </div>
         <label class="muted"><input type="checkbox" id="speak-starter" checked> Solo frases de mi nivel</label>
+        <label class="muted"><input type="checkbox" id="speak-only-weak"> Solo lo que no me entendió</label>
         <p class="quiz-q" id="speak-target"></p>
         <p class="muted" id="speak-help"></p>
         <p><button type="button" class="chip" id="speak-hoy" hidden>Usar el diálogo de Hoy</button></p>
