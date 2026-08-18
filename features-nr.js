@@ -239,17 +239,17 @@
     let done = [];
     try { done = (JSON.parse(localStorage.getItem("enlab-travel-done") || "{}")[key]) || []; } catch { done = []; }
     mapEl.innerHTML = `
-      <p class="kicker">${esc(map.emoji || "🧳")} Modo viaje · ${esc(map.title)} ${on ? '<span class="pill ok">ON</span>' : '<span class="muted">(pulsa Modo viaje arriba)</span>'}</p>
-      <p class="muted">${esc(map.intro)} · ${done.length}/${map.steps.length} pasos</p>
+      <p class="kicker">${esc(map.emoji || "")} ${esc(t("travelModeOn"))} · ${esc(map.title)} ${on ? '<span class="pill ok">ON</span>' : `<span class="muted">${esc(t("travelTapHint"))}</span>`}</p>
+      <p class="muted">${esc(map.intro)} · ${esc(t("travelSteps", { done: done.length, total: map.steps.length }))}</p>
       <ol class="travel-steps">${map.steps.map((s, i) => `
         <li class="travel-step ${done.includes(s.id) ? "done" : ""}" data-travel-id="${esc(s.id)}">
           <strong>${i + 1}. ${esc(s.label)}</strong>
           <button type="button" class="say chip" data-say="${esc(s.en)}">${esc(s.en)}</button>
-          <button type="button" class="chip" data-travel-mark="${esc(s.id)}">${done.includes(s.id) ? "Hecho ✓" : "Marcar"}</button>
+          <button type="button" class="chip" data-travel-mark="${esc(s.id)}">${done.includes(s.id) ? esc(t("travelDone")) : esc(t("travelMark"))}</button>
           <span class="es-line">${esc(s.es)}</span>
           <span class="muted travel-tip">${esc(s.tip)}</span>
         </li>`).join("")}</ol>
-      <p class="muted">Extras:</p>
+      <p class="muted">${esc(t("travelExtras"))}</p>
       <div class="review-chips">${(ENLAB.travelExtras || []).filter((x) => (x.min || 1) <= lvlNum()).map((x) =>
         `<button type="button" class="chip say" data-say="${esc(x.en)}">${esc(x.en)}</button>`).join("")}</div>`;
   }
@@ -281,16 +281,22 @@
         <div class="podcast-transcript">${pod.segments.map((s, i) =>
           `<p class="pod-seg ${i === segI ? "on" : ""}"><span class="en">${esc(s.en)}</span><span class="es-line">${esc(s.es)}</span></p>`).join("")}</div>
         <div class="row">
-          <button type="button" class="btn sm" id="pod-stop">Parar</button>
-          <button type="button" class="btn ghost sm" id="pod-replay">Repetir</button>
+          <button type="button" class="btn sm" id="pod-stop">${esc(t("podStop"))}</button>
+          <button type="button" class="btn ghost sm" id="pod-replay">${esc(t("podReplay"))}</button>
+          <button type="button" class="btn ghost sm" id="pod-shadow">${esc(t("podShadow"))}</button>
         </div>`;
       document.querySelector("#pod-stop")?.addEventListener("click", stopPodcast);
       document.querySelector("#pod-replay")?.addEventListener("click", () => playPodcast(id));
+      document.querySelector("#pod-shadow")?.addEventListener("click", () => {
+        const line = pod.segments[segI]?.en;
+        if (line && window.PLUS?.runPhraseShadow) window.PLUS.runPhraseShadow(line);
+        else if (line && typeof speak === "function") speak(line, true);
+      });
     };
     const next = () => {
       if (segI >= pod.segments.length) {
-        box.innerHTML += `<p class="muted">Fin del podcast.</p>
-          ${pod.qs?.length ? `<button type="button" class="btn sm" id="podcast-quiz-go">3 preguntas del podcast</button>` : ""}`;
+        box.innerHTML += `<p class="muted">${esc(t("podEnd"))}</p>
+          ${pod.qs?.length ? `<button type="button" class="btn sm" id="podcast-quiz-go">${esc(t("podQuiz"))}</button>` : ""}`;
         document.querySelector("#podcast-quiz-go")?.addEventListener("click", () => startPodcastQuiz(pod));
         try {
           const log = JSON.parse(localStorage.getItem("enlab-podcast-log") || "[]");
@@ -370,15 +376,15 @@
     const view = showAll ? items : seededShuffle(items).slice(0, 18);
     el.innerHTML = view.map((m, i) => `
       <div class="card chat-msg ${esc(m.tone)}">
-        <span class="pill ${m.tone === "formal" ? "formal" : "informal"}">${m.tone === "formal" ? "Formal / Teams" : "Informal / Slack"}</span>
+        <span class="pill ${m.tone === "formal" ? "formal" : "informal"}">${m.tone === "formal" ? esc(t("chatFormal")) : esc(t("chatInformal"))}</span>
         <p class="quiz-q">${esc(m.en)}</p>
         <p class="muted">${esc(m.es)}</p>
-        <p class="muted">Respuesta modelo: <em>${esc(m.reply)}</em></p>
+        <p class="muted">${esc(t("chatReplyModel"))} <em>${esc(m.reply)}</em></p>
         <div class="row">
-          <button type="button" class="btn ghost sm" data-chat-hear="${i}">Oír</button>
-          <button type="button" class="btn sm" data-chat-reply="${i}">Grabar respuesta</button>
+          <button type="button" class="btn ghost sm" data-chat-hear="${i}">${esc(t("chatHear"))}</button>
+          <button type="button" class="btn sm" data-chat-reply="${i}">${esc(t("chatReplyRec"))}</button>
         </div>
-      </div>`).join("") + (showAll || items.length <= 18 ? "" : `<p><button type="button" class="btn ghost sm" id="chat-show-all">Ver todos (${items.length})</button></p>`);
+      </div>`).join("") + (showAll || items.length <= 18 ? "" : `<p><button type="button" class="btn ghost sm" id="chat-show-all">${esc(t("chatShowAll", { n: items.length }))}</button></p>`);
     window._chatWorkSlice = view;
   }
 
@@ -408,8 +414,8 @@
     if (!el) return;
     if (scoreEl) scoreEl.textContent = `A: ${duoState.scoreA} · B: ${duoState.scoreB}`;
     if (!duoState.active || !duoState.scene) {
-      el.innerHTML = `<p class="muted">Dos personas, un teléfono. Turnos alternos: uno oye A, el otro dice B.</p>
-        <button type="button" class="btn" id="duo-start">Empezar duo</button>`;
+      el.innerHTML = `<p class="muted">${esc(t("duoIdle"))}</p>
+        <button type="button" class="btn" id="duo-start">${esc(t("duoStart"))}</button>`;
       el.className = "";
       return;
     }
@@ -424,14 +430,14 @@
       target = duoState.player === 1 ? duoLineText(t.b) : duoLineText(t.a);
     }
     el.innerHTML = `
-      <p class="kicker">Jugador ${duoState.player} · Turno ${duoState.turn + 1}</p>
+      <p class="kicker">${esc(t("duoPlayerTurn", { n: duoState.player, turn: duoState.turn + 1 }))}</p>
       <p class="quiz-q">${esc(line || "—")}</p>
-      <p class="muted">Tu turno: di <strong>${esc(target)}</strong></p>
+      <p class="muted">${esc(t("duoYourTurn"))} <strong>${esc(target)}</strong></p>
       <div class="row">
-        <button type="button" class="btn ghost sm" id="duo-hear">Oír modelo</button>
-        <button type="button" class="btn sm" id="duo-record">Grabar</button>
-        <button type="button" class="btn ghost sm" id="duo-skip">Pasar (sin punto)</button>
-        <button type="button" class="btn ghost sm" id="duo-end">Terminar</button>
+        <button type="button" class="btn ghost sm" id="duo-hear">${esc(t("duoHear"))}</button>
+        <button type="button" class="btn sm" id="duo-record">${esc(t("duoRecord"))}</button>
+        <button type="button" class="btn ghost sm" id="duo-skip">${esc(t("duoSkip"))}</button>
+        <button type="button" class="btn ghost sm" id="duo-end">${esc(t("duoEnd"))}</button>
       </div>`;
     document.querySelector("#duo-hear")?.addEventListener("click", () => speak(target, true));
   }

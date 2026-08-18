@@ -29,6 +29,16 @@
       said: String(entry.said || "").slice(0, 160),
       why: String(entry.why || "").slice(0, 220),
     };
+    if (entry.f1) {
+      row.f1 = entry.f1;
+      row.f2 = entry.f2;
+    } else {
+      const form = window._lastPron?.formants;
+      if (form?.f1 && entry.mode === "speak") {
+        row.f1 = form.f1;
+        row.f2 = form.f2;
+      }
+    }
     const all = [row, ...loadErrors()].slice(0, 80);
     localStorage.setItem(ERR_KEY, JSON.stringify(all));
     if (window.ENLAB_IDB?.mirror) window.ENLAB_IDB.mirror(ERR_KEY, JSON.stringify(all));
@@ -92,6 +102,7 @@
             <p><strong>${esc(r.expected || r.prompt)}</strong></p>
             ${r.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(r.said)}</p>` : ""}
             <p class="muted">${esc(r.why || whyFor(r.expected))}</p>
+            ${r.f1 ? `<p class="muted">${esc(tt("journalFormants", { f1: r.f1, f2: r.f2 || "?" }))}</p>` : ""}
             ${r.expected ? `<button type="button" class="chip say" data-say="${esc(r.expected)}">▶</button>` : ""}
           </div>`).join("")
         : `<p class="muted">${esc(tt("journalEmpty"))}</p>`}`;
@@ -156,11 +167,24 @@
   }
 
   function printStudentPdf() {
+    if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
     const name = localStorage.getItem("enlab-student-name") || tt("classStudentPh");
     const weekly = localStorage.getItem("enlab-weekly-exam");
     const cert = localStorage.getItem("enlab-cert-done") || "—";
     const dueN = typeof srsDueList === "function" ? srsDueList(99).length : 0;
     const lvl = typeof level === "function" ? level().toUpperCase() : "";
+    const weak = typeof weakSet === "function" ? [...weakSet()].slice(0, 12) : [];
+    const errs = loadErrors().length;
+    let hot = 0;
+    if (typeof stats === "function" && typeof dateKey === "function") {
+      const st = stats();
+      for (let i = 0; i < 90; i += 1) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const day = (st.days || {})[dateKey(d)] || {};
+        if ((day.heard || 0) + (day.quiz || 0) + (day.spoke || 0) > 0) hot += 1;
+      }
+    }
     const area = document.querySelector("#weak-print-area");
     if (!area) return;
     area.hidden = false;
@@ -171,6 +195,9 @@
         <li>${esc(tt("classColWeekly"))}: ${esc(weekly || "—")}</li>
         <li>${esc(tt("classColCert"))}: ${esc(cert)}</li>
         <li>${esc(tt("classColDue"))}: ${dueN}</li>
+        <li>${esc(tt("studentReportHot", { n: hot }))}</li>
+        <li>${esc(tt("studentReportWeak", { list: weak.join(", ") || "—" }))}</li>
+        <li>${esc(tt("studentReportErrors", { n: errs }))}</li>
       </ul>
       <p>${esc(tt("studentReportPin"))}</p>`;
     window.print();
@@ -192,7 +219,9 @@
   }
 
   function startWave() {
-    const canvas = document.querySelector("#rec-wave");
+    const canvas = recState?.surface === "hoy"
+      ? document.querySelector("#hoy-rec-wave") || document.querySelector("#rec-wave")
+      : document.querySelector("#rec-wave");
     if (!canvas || !recState?.stream || typeof AnalyserNode === "undefined") return;
     canvas.hidden = false;
     stopWave();
@@ -292,9 +321,24 @@
     window.applySpeakVerdict = function (said) {
       orig(said);
       const target = window._speakTarget?.target || "";
-      if (said && target && typeof speakHeardOk === "function" && !speakHeardOk(said, target)) {
-        logError({ mode: "speak", expected: target, said, prompt: target, why: whyFor(target) });
+      if (!said || !target || typeof speakHeardOk !== "function" || speakHeardOk(said, target)) return;
+      const blob = recState?.lastBlob;
+      const finish = (extra) => logError({
+        mode: "speak",
+        expected: target,
+        said,
+        prompt: target,
+        why: whyFor(target),
+        ...extra,
+      });
+      if (blob && window.SV?.scorePronunciationAsync) {
+        window.SV.scorePronunciationAsync(said, null, target, blob, null).then((r) => {
+          window._lastPron = r;
+          finish(r?.formants?.f1 ? { f1: r.formants.f1, f2: r.formants.f2 } : {});
+        }).catch(() => finish({}));
+        return;
       }
+      finish({});
     };
   }
 
@@ -434,6 +478,7 @@
     printStudentPdf,
     renderErrorJournal,
     renderChart90,
+    runPhraseShadow,
     scoreToCefr,
   };
 

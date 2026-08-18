@@ -1,7 +1,8 @@
-const CACHE = "enlab-v30";
+const CACHE = "enlab-v31";
 const ASSETS = [
   "./",
   "./index.html",
+  "./offline.html",
   "./styles.css",
   "./app.js",
   "./data.js",
@@ -121,6 +122,24 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (event.request.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(event.request);
+        if (res && res.ok) {
+          const cache = await caches.open(CACHE);
+          const url = new URL(event.request.url);
+          if (url.origin === location.origin) cache.put(event.request, res.clone());
+          return res;
+        }
+      } catch { /* offline */ }
+      return (await caches.match("./index.html"))
+        || (await caches.match("./"))
+        || (await caches.match("./offline.html"))
+        || new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    })());
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)

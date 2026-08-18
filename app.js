@@ -1151,13 +1151,13 @@ function renderDailyTip() {
     ...(ENLAB.bTips || []).filter((t) => (t.min || 3) <= lvlNum()),
   ];
   if (tips.length) {
-    const t = seededShuffle(tips)[0];
+    const tip = seededShuffle(tips)[0];
     el.hidden = false;
-    el.innerHTML = `<p class="kicker">Tip del día</p><h3>${esc(t.title)}</h3><p>${esc(t.body)}</p><div class="row">${sayWords(t.listen || [])}${t.yg ? ygLink(t.yg) : ""}</div>`;
+    el.innerHTML = `<p class="kicker">${esc(t("dailyTipKicker"))}</p><h3>${esc(tip.title)}</h3><p>${esc(tip.body)}</p><div class="row">${sayWords(tip.listen || [])}${tip.yg ? ygLink(tip.yg) : ""}</div>`;
     return;
   }
   el.hidden = false;
-  el.innerHTML = `<p class="kicker">Tip del día</p><h3>Pulsa el triángulo</h3><p>Cada botón con ▶ suena en inglés. Empieza oyendo cap y cape: esa diferencia es el primer gran paso.</p>`;
+  el.innerHTML = `<p class="kicker">${esc(t("dailyTipKicker"))}</p><h3>${esc(t("dailyTipFallbackTitle"))}</h3><p>${esc(t("dailyTipFallbackBody"))}</p>`;
 }
 
 function posClass(pos) {
@@ -1185,7 +1185,7 @@ function renderDailyStress() {
   }
   const s = seededShuffle(bank)[0];
   el.hidden = false;
-  el.innerHTML = `<p class="kicker">Acento de hoy</p>${stressCard(s)}`;
+  el.innerHTML = `<p class="kicker">${esc(t("dailyStressKicker"))}</p>${stressCard(s)}`;
 }
 
 function stressCard(s) {
@@ -1193,7 +1193,7 @@ function stressCard(s) {
   const b = s.exB || s.b;
   return `
     <div class="card">
-      <p class="muted">${esc(s.note || "El golpe de la palabra cambia el significado.")}</p>
+      <p class="muted">${esc(s.note || t("stressNote"))}</p>
       <div class="row" style="margin-top:8px">
         <button type="button" class="say" data-say="${esc(a)}" data-slow="1">${esc(s.a)}</button>
         ${ygLink(s.sayA || s.a)}
@@ -1216,8 +1216,8 @@ function roleCard(item) {
             <p>${esc(r.en)}</p>
             <p class="muted es-line">${esc(r.es)}</p>
             <div class="row">
-              <button class="say" data-say="${esc(r.en)}" data-slow="1">Oír frase</button>
-              ${ygLink(r.en, "gente real")}
+              <button class="say" data-say="${esc(r.en)}" data-slow="1">${esc(t("hearPhrase"))}</button>
+              ${ygLink(r.en, t("real"))}
             </div>
           </div>`).join("")}
       </div>
@@ -2832,7 +2832,7 @@ function dialogCard(d) {
         <div>
           <p>${esc(d.a.en)}</p>
           <p class="muted es-line">${esc(d.a.es)}</p>
-          <button type="button" class="say" data-say="${esc(d.a.en)}">Oír A</button>
+          <button type="button" class="say" data-say="${esc(d.a.en)}">${esc(t("dialogHearA"))}</button>
         </div>
       </div>
       <div class="dialog-turn you">
@@ -2841,15 +2841,16 @@ function dialogCard(d) {
           <p>${esc(d.b.en)}</p>
           <p class="muted es-line">${esc(d.b.es)}</p>
           <div class="row">
-            <button type="button" class="say" data-say="${esc(d.b.en)}">Oír B</button>
-            ${ygLink(d.b.en, "gente real")}
-            <button type="button" class="btn sm" id="hoy-speak-rec">Grabar B</button>
+            <button type="button" class="say" data-say="${esc(d.b.en)}">${esc(t("dialogHearB"))}</button>
+            ${ygLink(d.b.en, t("real"))}
+            <button type="button" class="btn sm" id="hoy-speak-rec">${esc(t("hoySpeakRec"))}</button>
           </div>
+          <canvas id="hoy-rec-wave" class="rec-wave" width="320" height="64" hidden aria-hidden="true"></canvas>
           <audio id="hoy-speak-playback" controls hidden style="width:100%;margin-top:10px"></audio>
           <p class="status" id="hoy-speak-status"></p>
         </div>
       </div>
-      <p><button type="button" class="btn ghost sm" data-dialog-play>Oír A y luego B</button></p>
+      <p><button type="button" class="btn ghost sm" data-dialog-play>${esc(t("dialogPlayBoth"))}</button></p>
     </div>`;
 }
 
@@ -4347,8 +4348,8 @@ function renderWeekReport() {
   const done = weeklyExamDone();
   const wscore = weeklyScoreText();
   const weeklyBtn = done
-    ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
-    : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
+    ? `<span class="pill ok">${esc(t("weeklyExamDone", { score: wscore || t("sessionComplete") }))}</span>`
+    : `<button type="button" class="btn sm" id="weekly-exam-btn">${esc(t("weeklyExamBtn"))}</button>`;
   el.innerHTML = `<p class="muted">${esc(t("weeklyReport", {
     week: t("week"),
     days,
@@ -4363,17 +4364,17 @@ function classroomPin() {
   return localStorage.getItem("enlab-class-pin") || "";
 }
 
-function classroomAllowsChange() {
+function classroomAllowsChange(failKey) {
   const pin = classroomPin();
   if (!pin) return true;
   if (sessionStorage.getItem("enlab-class-ok") === "1") return true;
-  const typed = window.prompt(uiLang() === "en" ? "Classroom PIN" : "PIN de aula");
+  const typed = window.prompt(t("classPinPrompt"));
   if (typed === pin) {
     sessionStorage.setItem("enlab-class-ok", "1");
     return true;
   }
   const st = $("#class-pin-status");
-  if (st) st.textContent = t("classPinWrong");
+  if (st) st.textContent = t(failKey || "classPinWrong");
   return false;
 }
 
@@ -4403,18 +4404,19 @@ function clearClassPin() {
 }
 
 function printClassSheet() {
+  if (!classroomAllowsChange("classPinExport")) return;
   const area = $("#weak-print-area");
   if (!area) return;
   const due = srsDueList(12);
   const verbs = [...weakSet()].slice(0, 10);
   area.hidden = false;
   area.innerHTML = `
-    <h1>English Lab — hoja de clase</h1>
+    <h1>${esc(t("classSheetTitle"))}</h1>
     <p>${todayKey()} · ${level().toUpperCase()}</p>
-    ${due.length ? `<h2>Vence hoy</h2><ul>${due.map((x) => `<li>${esc(x.label)}</li>`).join("")}</ul>` : ""}
-    ${verbs.length ? `<h2>Verbos débiles</h2><ul>${verbs.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
-    <h2>Hoy</h2>
-    <p>Pares → verbos → diálogo → 3 preguntas. Dictado o role-play si hay tiempo.</p>`;
+    ${due.length ? `<h2>${esc(t("classSheetDue"))}</h2><ul>${due.map((x) => `<li>${esc(x.label)}</li>`).join("")}</ul>` : ""}
+    ${verbs.length ? `<h2>${esc(t("classSheetWeak"))}</h2><ul>${verbs.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
+    <h2>${esc(t("classSheetHoy"))}</h2>
+    <p>${esc(t("classSheetHoyBody"))}</p>`;
   window.print();
   area.hidden = true;
 }
@@ -4424,15 +4426,15 @@ function renderStarBox() {
   if (!el) return;
   const bits = ENLAB.starScaffold || [];
   el.innerHTML = `
-    <p class="muted"><strong>STAR</strong> para “describe a challenge”:</p>
+    <p class="muted"><strong>STAR</strong> ${esc(t("starIntro"))}</p>
     <ol class="star-list">${bits.map((s) => `<li><strong>${esc(s.part)} · ${esc(s.en)}</strong> — <span class="es-line">${esc(s.es)}</span></li>`).join("")}</ol>
     <details class="star-draft">
-      <summary>Borrador STAR (30–60 s)</summary>
-      <label class="muted">S — Situación<textarea id="star-s" rows="2" placeholder="Context: when, where…"></textarea></label>
-      <label class="muted">T — Tarea<textarea id="star-t" rows="2" placeholder="What you had to do…"></textarea></label>
-      <label class="muted">A — Acción<textarea id="star-a" rows="2" placeholder="What you did…"></textarea></label>
-      <label class="muted">R — Resultado<textarea id="star-r" rows="2" placeholder="Outcome, numbers if possible…"></textarea></label>
-      <button type="button" class="btn sm" id="star-speak">Oír mi borrador en inglés</button>
+      <summary>${esc(t("starDraft"))}</summary>
+      <label class="muted">${esc(t("starS"))}<textarea id="star-s" rows="2" placeholder="${esc(t("starPhS"))}"></textarea></label>
+      <label class="muted">${esc(t("starT"))}<textarea id="star-t" rows="2" placeholder="${esc(t("starPhT"))}"></textarea></label>
+      <label class="muted">${esc(t("starA"))}<textarea id="star-a" rows="2" placeholder="${esc(t("starPhA"))}"></textarea></label>
+      <label class="muted">${esc(t("starR"))}<textarea id="star-r" rows="2" placeholder="${esc(t("starPhR"))}"></textarea></label>
+      <button type="button" class="btn sm" id="star-speak">${esc(t("starSpeak"))}</button>
     </details>`;
   $("#star-speak")?.addEventListener("click", () => {
     const text = ["star-s", "star-t", "star-a", "star-r"].map((id) => $(`#${id}`)?.value?.trim()).filter(Boolean).join(". ");
@@ -4569,6 +4571,7 @@ function renderPhrasalsWork() {
 }
 
 function exportProgress() {
+  if (!classroomAllowsChange("classPinExport")) return;
   const payload = { v: 1, savedAt: new Date().toISOString() };
   PROG_KEYS.forEach((k) => { payload[k] = localStorage.getItem(k); });
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -4727,6 +4730,7 @@ $("#speak-shadow")?.addEventListener("click", () => {
 $("#shadow-go")?.addEventListener("click", () => runShadowing());
 
 $("#transfer-copy")?.addEventListener("click", () => {
+  if (!classroomAllowsChange("classPinExport")) return;
   const code = $("#transfer-code")?.value || "";
   if (code) navigator.clipboard.writeText(code).catch(() => {});
 });

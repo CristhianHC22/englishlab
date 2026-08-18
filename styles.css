@@ -12,7 +12,7 @@
   --shadow: 0 12px 28px rgba(23, 50, 46, 0.08);
   --tap: 44px;
   --radius: 20px;
-  font-family: "Nunito", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }

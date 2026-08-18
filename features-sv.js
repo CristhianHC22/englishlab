@@ -56,7 +56,7 @@
         : formantResult.pct;
       const fNote = `F1 ${formants.f1} · F2 ${formants.f2} Hz`;
       const note = `${formantResult.note} · ${fNote}`;
-      return {
+      const out = {
         score: pct,
         pct,
         note,
@@ -67,9 +67,11 @@
         formantResult,
         method: "lpc+text",
       };
+      window._lastPron = out;
+      return out;
     }
 
-    return {
+    const out = {
       score: text.pct,
       pct: text.pct,
       note: text.note,
@@ -77,6 +79,8 @@
       textPct: text.pct,
       method: "ipa",
     };
+    window._lastPron = out;
+    return out;
   }
 
   async function scorePronunciationAsync(said, targetIpa, targetText, blob, pair) {
@@ -503,6 +507,38 @@
     if (typeof drawTransferQr === "function") drawTransferQr(document.querySelector("#student-qr-canvas"), code);
   }
 
+  function countHotDays(statsRaw, windowDays) {
+    let days = {};
+    try {
+      const st = typeof statsRaw === "string" ? JSON.parse(statsRaw || "{}") : (statsRaw || {});
+      days = st.days || {};
+    } catch { return 0; }
+    let hot = 0;
+    const now = new Date();
+    for (let i = 0; i < windowDays; i += 1) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = typeof dateKey === "function" ? dateKey(d) : d.toISOString().slice(0, 10);
+      const day = days[key] || {};
+      if ((day.heard || 0) + (day.quiz || 0) + (day.spoke || 0) > 0) hot += 1;
+    }
+    return hot;
+  }
+
+  function parseWeakList(raw) {
+    try {
+      const w = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+      return Array.isArray(w) ? w.slice(0, 8).join("|") : "";
+    } catch { return ""; }
+  }
+
+  function parseErrorCount(raw) {
+    try {
+      const log = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+      return Array.isArray(log) ? log.length : 0;
+    } catch { return 0; }
+  }
+
   function importStudentFromCode(code) {
     if (!code) return false;
     try {
@@ -517,6 +553,11 @@
         const today = typeof todayKey === "function" ? todayKey() : "";
         srsDue = Object.values(srs).filter((r) => r?.due && r.due <= today).length;
       } catch { /* ignore */ }
+      const extras = {
+        hot90: countHotDays(payload["enlab-stats"], 90),
+        weak: parseWeakList(payload["enlab-weak"]),
+        errors: parseErrorCount(payload["enlab-error-log"]),
+      };
       const roster = loadRoster();
       const hit = roster.find((s) => s.name === name);
       if (hit) {
@@ -526,26 +567,59 @@
         hit.synced = Date.now();
         hit.stats = payload["enlab-stats"];
         hit.level = payload["enlab-cefr"];
+        Object.assign(hit, extras);
       } else {
-        roster.push({ name, weeklyDone: weekly, certDone, srsDue, synced: Date.now(), stats: payload["enlab-stats"], level: payload["enlab-cefr"] });
+        roster.push({
+          name,
+          weeklyDone: weekly,
+          certDone,
+          srsDue,
+          synced: Date.now(),
+          stats: payload["enlab-stats"],
+          level: payload["enlab-cefr"],
+          ...extras,
+        });
       }
       saveRoster(roster);
       return true;
     } catch { return false; }
   }
 
+  function rosterRowExtras(s) {
+    const mine = localStorage.getItem("enlab-student-name") === s.name;
+    if (mine) {
+      return {
+        hot90: String(countHotDays(localStorage.getItem("enlab-stats"), 90)),
+        weak: parseWeakList(localStorage.getItem("enlab-weak")),
+        errors: String(parseErrorCount(localStorage.getItem("enlab-error-log"))),
+      };
+    }
+    return {
+      hot90: s.hot90 != null ? String(s.hot90) : String(countHotDays(s.stats, 90)),
+      weak: s.weak || "",
+      errors: s.errors != null ? String(s.errors) : "",
+    };
+  }
+
   function exportRosterCsv() {
+    if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
     const roster = loadRoster();
-    const rows = [["name", "weekly_done", "cert_done", "srs_due", "level", "last_sync", "task_today"]];
-    roster.forEach((s) => rows.push([
-      s.name,
-      s.weeklyDone ? "yes" : "no",
-      s.certDone ? "yes" : "no",
-      s.srsDue != null ? String(s.srsDue) : "",
-      s.level || "",
-      s.synced ? new Date(s.synced).toISOString() : "",
-      localStorage.getItem("enlab-class-task") || "",
-    ]));
+    const rows = [["name", "weekly_done", "cert_done", "srs_due", "level", "last_sync", "task_today", "hot90", "weak", "errors"]];
+    roster.forEach((s) => {
+      const extra = rosterRowExtras(s);
+      rows.push([
+        s.name,
+        s.weeklyDone ? "yes" : "no",
+        s.certDone ? "yes" : "no",
+        s.srsDue != null ? String(s.srsDue) : "",
+        s.level || "",
+        s.synced ? new Date(s.synced).toISOString() : "",
+        localStorage.getItem("enlab-class-task") || "",
+        extra.hot90,
+        extra.weak,
+        extra.errors,
+      ]);
+    });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
@@ -664,13 +738,13 @@
             ? (typeof t === "function" ? t("offlinePartial") : "⚠ Carga parcial")
             : (typeof t === "function" ? t("offlineReady") : "✓ Listo sin red"))
           : "…")
-        : (typeof t === "function" ? t("offlineMode") : "Modo sin conexión");
+        : (typeof t === "function" ? t("offlineModeHint") : "Sin red. El Lab cacheado sigue en este aparato.");
       badge.classList.toggle("offline-on", !online);
       badge.classList.toggle("offline-ready", online && ready);
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v30";
+  const SW_CACHE = "enlab-v31";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -878,7 +952,8 @@
         document.querySelector("#class-student-qr-box")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest("#class-import-code")) {
-        const code = window.prompt("Pega código transfer del alumno:");
+        if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
+        const code = window.prompt(typeof t === "function" ? t("classImportPrompt") : "Pega código transfer del alumno:");
         if (code && importStudentFromCode(code.trim())) renderClassPro();
       }
       if (e.target.closest("#class-export-csv")) exportRosterCsv();

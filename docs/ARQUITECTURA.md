@@ -84,13 +84,13 @@ Patrón bueno ya usado: `onTabPaint(fn)` / `onHomePaint(fn)` en vez de reemplaza
 
 ## Deuda conocida (no es olvido al azar)
 
-1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Cert y place ya se despachan con `if` nativo en `startQuiz` (sin envolver la función). Siguen wrappers en `applySpeakVerdict` / `todayGame`.
-2. **i18n dinámico** — TOC de Oír y `todayGame` ya pasan por `t()`. STAR y varios `innerHTML` de NR/SV pueden seguir en español.
+1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Cert y place ya se despachan con `if` nativo en `startQuiz` (sin envolver la función). Siguen wrappers en `applySpeakVerdict` / `toggleRecording`.
+2. **i18n dinámico** — STAR, tips, viaje, chat/duo, podcast y hoja de clase pasan por `t()`. Quedan pocos innerHTML de packs (contenido EN+ES del banco).
 3. **IDB = transfer** — `PROG_KEYS` vive en `idb-backup.js`. `localStorage.setItem` de esas claves se espeja solo.
-4. **Pages más flaco** — el workflow copia a `site/` sin tests, `.github`, scripts ni lockfile.
+4. **Pages más flaco** — el workflow copia a `site/` sin tests, `.github`, scripts ni lockfile. Incluye `offline.html`.
 5. **Panel “Rendimiento”** — cuenta packs diferidos; no es Lighthouse real.
 6. **Tarea de clase** — se **resalta** al abrir Hoy, no se auto-lanza (evita romper tests y secuestrar la sesión).
-7. **Google Fonts** — se piden en `index.html`; visual tests las bloquean. Offline total = fallback del sistema (ok).
+7. **Fuentes** — stack del sistema (`Segoe UI` / `Trebuchet` / `system-ui`). Sin Google Fonts. SW: navegación red-primero, fallback `index.html` → `offline.html`.
 
 ## Cómo añadir algo nuevo
 
