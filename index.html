@@ -45,6 +45,7 @@
           <span class="muted">Voz:</span>
           <button type="button" class="chip" data-rate="slow">Lenta</button>
           <button type="button" class="chip" data-rate="normal">Normal</button>
+          <button type="button" class="chip" data-rate="fast">Rápida</button>
           <span class="muted">Fondo:</span>
           <button type="button" class="chip" data-theme-set="light">Claro</button>
           <button type="button" class="chip" data-theme-set="dark">Oscuro</button>
@@ -81,6 +82,8 @@
           </div>
         </div>
         <div id="hoy-streak-chart" class="streak-chart" hidden></div>
+        <div id="week-report" class="week-report" hidden></div>
+        <div id="due-today" class="due-today" hidden></div>
         <div id="week-strip" class="week-strip"></div>
         <div class="session-head">
           <div>
@@ -113,6 +116,19 @@
           <label class="muted">Pegar en otro PC</label>
           <textarea id="transfer-paste" class="transfer-code" rows="2" placeholder="Pega el código aquí"></textarea>
           <button type="button" class="btn ghost sm" id="transfer-import">Importar código</button>
+        </details>
+        <details class="fold" id="class-box">
+          <summary>Modo aula</summary>
+          <p class="muted">PIN para no cambiar de nivel. Útil en clase o con niños.</p>
+          <div class="row">
+            <input id="class-pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 4–6 dígitos" autocomplete="off" />
+            <button type="button" class="btn ghost sm" id="class-pin-save">Guardar PIN</button>
+            <button type="button" class="btn ghost sm" id="class-pin-clear">Quitar PIN</button>
+          </div>
+          <p class="muted" id="class-pin-status"></p>
+          <p class="row no-print">
+            <button type="button" class="btn ghost sm" id="class-print">Hoja de clase</button>
+          </p>
         </details>
         <p class="row no-print">
           <button type="button" class="btn ghost sm" id="weak-print" data-i18n="weakPrint">Imprimir débiles</button>
@@ -332,6 +348,30 @@
             <strong>Examen</strong>
             <span>Oyes primero. Luego ves las dos.</span>
           </button>
+          <button type="button" class="mode-pick" data-quiz-mode="art">
+            <strong>a / an / the</strong>
+            <span>Artículos</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="prep">
+            <strong>in / on / at</strong>
+            <span>Preposiciones</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="phrasal">
+            <strong>Phrasals</strong>
+            <span>look up, wrap up…</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="cond">
+            <strong>If / said</strong>
+            <span>Condicionales y reported</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="dict">
+            <strong>Dictado</strong>
+            <span>Oyes y escribes</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="listen">
+            <strong>Escucha</strong>
+            <span>Un párrafo y 3 preguntas</span>
+          </button>
         </div>
         <select id="quiz-mode" hidden>
           <option value="choice">Verbos: opción múltiple</option>
@@ -340,6 +380,12 @@
           <option value="ed">-ed: liked, played, wanted</option>
           <option value="ear">Oído: ¿qué palabra oíste?</option>
           <option value="exam">Examen de oído</option>
+          <option value="art">Artículos a/an/the</option>
+          <option value="prep">Preposiciones in/on/at</option>
+          <option value="phrasal">Phrasals</option>
+          <option value="cond">Condicionales</option>
+          <option value="dict">Dictado</option>
+          <option value="listen">Escucha larga</option>
         </select>
         <div><button class="btn" id="quiz-start">¡Jugar!</button></div>
       </div>
@@ -376,9 +422,16 @@
         <div id="voice-history" class="voice-history" hidden></div>
         <p class="status" id="speak-status"></p>
       </div>
+      <div class="card" id="roleplay-card">
+        <h3>Role-play (2 min)</h3>
+        <p class="muted">La app dice A. Tú grabas B. Tres giros. No hace falta perfecto.</p>
+        <div id="roleplay-list"></div>
+        <div id="roleplay-now" class="roleplay-now" hidden></div>
+      </div>
       <div class="card" id="interview-sim-card">
         <h3>Simulacro entrevista</h3>
         <p class="muted">Oye la pregunta. Graba tu respuesta (30–60 s). No hace falta perfecto: fluidez.</p>
+        <div id="star-box" class="star-box"></div>
         <div id="interview-sim-list"></div>
       </div>
     </section>
@@ -403,6 +456,7 @@
   <script src="guide.js"></script>
   <script src="levels.js"></script>
   <script src="extras.js"></script>
+  <script src="pack.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

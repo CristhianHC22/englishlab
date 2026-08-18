@@ -1,7 +1,8 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin"];
+const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
 let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar" };
@@ -44,7 +45,9 @@ function isLevelVerb(v) {
 }
 
 function speakRate() {
-  return localStorage.getItem("enlab-rate") === "slow" ? "slow" : "normal";
+  const r = localStorage.getItem("enlab-rate");
+  if (r === "slow" || r === "fast") return r;
+  return "normal";
 }
 
 function renderRateBar() {
@@ -99,8 +102,8 @@ function speak(text, slow = false, opts = {}) {
   if (opts.cancel !== false) window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
-  const slowVoice = speakRate() === "slow";
-  u.rate = slowVoice ? 0.62 : (slow ? 0.72 : 0.92);
+  const slowVoice = speakRate();
+  u.rate = slowVoice === "slow" ? 0.62 : slowVoice === "fast" ? 1.12 : (slow ? 0.72 : 0.92);
   const voices = speechSynthesis.getVoices();
   const en = voices.find((v) => /en-US/i.test(v.lang) && /Google|Natural|Samantha|Jenny|Aria/i.test(v.name))
     || voices.find((v) => /en-US/i.test(v.lang));
@@ -392,6 +395,8 @@ function paintTab(id) {
     renderInterviewSim();
     renderPhrasalsWork();
     renderVoiceHistory();
+    renderRoleplays();
+    renderStarBox();
   }
   if (id === "ia" && dirty.ai) {
     renderAI();
@@ -526,6 +531,7 @@ function dayTheme() {
 
 function todayGame() {
   const t = dayTheme();
+  const n = lvlNum();
   let game = t.game || "";
   if (!game) {
     if (/-ed|liked\s*\/\s*played/i.test(t.text)) game = "ed";
@@ -537,14 +543,28 @@ function todayGame() {
   if (game === "uso") {
     return { game, label: "Hoy: 5 minutos de make/do", hint: "Calcos, make/do, Did you…?" };
   }
+  const rot = ["art", "prep", "phrasal", "dict", "listen"][t.i % 5];
+  if (n >= 2 && rot === "art") return { game: "art", label: "Hoy: a / an / the", hint: "an hour, a university, the sun" };
+  if (n >= 2 && rot === "prep") return { game: "prep", label: "Hoy: in / on / at", hint: "on Monday · at 3 · in 1999" };
+  if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: "Hoy: phrasals", hint: "look up, wrap up, run out" };
+  if (rot === "dict") return { game: "dict", label: "Hoy: dictado", hint: "Oye una vez y escribe" };
+  if (n >= 2 && rot === "listen") return { game: "listen", label: "Hoy: escucha un párrafo", hint: "Oyes un texto y 3 preguntas" };
   return { game: "", label: "", hint: "" };
 }
 
 function pairsForToday() {
   const n = lvlNum();
-  let pairs = [...(ENLAB.pairs || [])];
-  if (n <= 1) pairs = pairs.filter((p) => /E muda|i corta vs ii|i vs ii/i.test(p.why));
-  else if (n === 2) pairs = pairs.filter((p) => !/now|know|said|walk/i.test(p.short + p.long));
+  const hispano = (ENLAB.earHispano || []).filter((p) => (p.min || 1) <= n).map((p) => ({
+    short: p.a, long: p.b, shortPron: p.pa, longPron: p.pb, why: p.why,
+  }));
+  const connected = n >= 3
+    ? (ENLAB.connectedPairs || []).filter((p) => (p.min || 1) <= n).map((p) => ({
+      short: p.a, long: p.b, shortPron: p.pa, longPron: p.pb, why: p.why,
+    }))
+    : [];
+  let pairs = [...hispano, ...connected, ...(ENLAB.pairs || [])];
+  if (n <= 1) pairs = pairs.filter((p) => /E muda|i corta vs ii|i vs ii|hispano/i.test(p.why));
+  else if (n === 2) pairs = pairs.filter((p) => !/now|know|said|walk|gonna|flap/i.test(`${p.short}${p.long}${p.why}`));
   const focus = dayTheme().pair;
   if (focus) {
     try {
@@ -678,6 +698,7 @@ function renderLevelNudge() {
 
 function setCefr(id) {
   if (!id || !ENLAB.cefr?.[id]) return;
+  if (id !== level() && !classroomAllowsChange()) return;
   const prev = level();
   localStorage.setItem("enlab-cefr", id);
   if (id !== prev) {
@@ -719,10 +740,11 @@ function dialogsForLevel() {
   const b1 = ENLAB.dialogsB1 || [];
   const b2 = ENLAB.dialogsB2 || [];
   const tense = ENLAB.dialogsA2Tense || [];
-  if (n <= 1) return a1;
-  if (n === 2) return [...tense, ...a2, ...a1.slice(0, 3)];
-  if (n === 3) return [...b1, ...a2.slice(0, 2)];
-  return [...b2, ...b1];
+  const life = (ENLAB.dialogsLife || []).filter((d) => (d.min || 1) <= n);
+  if (n <= 1) return [...life.filter((d) => (d.min || 1) <= 1), ...a1];
+  if (n === 2) return [...tense, ...life, ...a2, ...a1.slice(0, 3)];
+  if (n === 3) return [...life, ...b1, ...a2.slice(0, 2)];
+  return [...life, ...b2, ...b1];
 }
 
 function renderHome() {
@@ -752,6 +774,8 @@ function renderHome() {
   renderHoyReview();
   renderPlanEdFocus();
   renderStreakChart();
+  renderWeekReport();
+  renderDueToday();
   renderTransferCode();
   upsertLog();
   renderClock();
@@ -867,7 +891,7 @@ function startHoyGame() {
   persistHoyPath();
   renderHoyPath();
   const sel = $("#quiz-mode");
-  if (sel && (g.game === "ed" || g.game === "uso")) sel.value = g.game;
+  if (sel && g.game) sel.value = g.game;
   syncQuizModePicks();
   showTab("quiz");
   startQuiz();
@@ -1194,6 +1218,7 @@ function bumpSpeakWeak(phrase, ok) {
   if (ok) w.delete(phrase);
   else w.add(phrase);
   saveSet("enlab-speak-weak", w);
+  srsBump("speak", phrase, ok);
   renderSpeakWeakHint();
   renderHoyReview();
 }
@@ -1209,7 +1234,12 @@ function renderSpeakWeakHint() {
 }
 
 function bumpPickWeak(mode, key, ok) {
-  if (!key || (mode !== "uso" && mode !== "ed")) return;
+  if (!key) return;
+  srsBump(mode || "uso", key, ok);
+  if (mode !== "uso" && mode !== "ed") {
+    renderHoyReview();
+    return;
+  }
   const store = mode === "ed" ? "enlab-ed-weak" : "enlab-uso-weak";
   const w = loadSet(store);
   if (ok) w.delete(key);
@@ -1240,6 +1270,7 @@ function bumpEar(key, ok) {
     w.add(key);
     saveSet("enlab-ear-weak", w);
   }
+  srsBump("ear", key, ok);
 }
 
 function worstEarPairs(limit = 8) {
@@ -1330,7 +1361,7 @@ function earBank() {
   const fromData = (ENLAB.pairs || [])
     .filter((p) => p.short.toLowerCase() !== p.long.toLowerCase())
     .map((p) => ({ a: p.short, b: p.long, pa: p.shortPron, pb: p.longPron, why: p.why }));
-  const extra = ENLAB.earPairs || [];
+  const extra = [...(ENLAB.earPairs || []), ...(ENLAB.earHispano || []), ...(ENLAB.connectedPairs || [])];
   const seen = new Set();
   const out = [];
   for (const p of [...extra, ...fromData]) {
@@ -1407,7 +1438,7 @@ function verbSource() {
 }
 
 function makeUsoItems() {
-  const bank = (ENLAB.usoQuiz || []).filter((x) => (x.min || 1) <= lvlNum());
+  const bank = [...(ENLAB.usoQuiz || []), ...(ENLAB.falseFriends || [])].filter((x) => (x.min || 1) <= lvlNum());
   const weak = usoWeakSet();
   const hard = shuffle(bank.filter((x) => weak.has(x.a)));
   const quotas = { calco: 3, pregunta: 3, "make-do": 2, "say-tell": 1, "since-for": 1, "lend-borrow": 1 };
@@ -1482,10 +1513,72 @@ function makeEdItems() {
   }));
 }
 
+function makePickBankItems(bank, type) {
+  const list = (bank || []).filter((x) => (x.min || 1) <= lvlNum());
+  const due = srsDueKeys(type);
+  const hard = shuffle(list.filter((x) => due.has(`${type}:${x.prompt || x.a}`)));
+  const picked = [...hard.slice(0, 4)];
+  const used = new Set(picked);
+  for (const x of shuffle(list)) {
+    if (picked.length >= 10) break;
+    if (used.has(x)) continue;
+    used.add(x);
+    picked.push(x);
+  }
+  return shuffle(picked).slice(0, Math.min(10, picked.length)).map((x) => ({
+    type,
+    q: x.q,
+    prompt: x.prompt || "",
+    a: x.a,
+    opts: shuffle([...(x.opts || [])]),
+    say: x.say || x.a,
+    why: x.why || "",
+    inf: `${type}:${x.prompt || x.a}`,
+  }));
+}
+
+function makeDictItems() {
+  const bank = (ENLAB.dictation || []).filter((x) => (x.min || 1) <= lvlNum());
+  const due = srsDueKeys("dict");
+  const hard = shuffle(bank.filter((x) => due.has(`dict:${x.en}`)));
+  const rest = shuffle(bank.filter((x) => !hard.includes(x)));
+  return [...hard, ...rest].slice(0, 8).map((x) => ({
+    type: "dict",
+    q: "Escribe lo que oíste (contracciones OK)",
+    esHint: hideEsOn() ? "" : x.es,
+    a: x.en,
+    say: x.en,
+    inf: `dict:${x.en}`,
+  }));
+}
+
+function makeListenItems() {
+  const bank = (ENLAB.listenPassages || []).filter((x) => (x.min || 1) <= lvlNum());
+  const p = (seededShuffle(bank)[0]) || bank[0];
+  if (!p) return [];
+  return (p.qs || []).map((q, i) => ({
+    type: "listen",
+    q: q.q,
+    prompt: i === 0 ? p.title : "",
+    a: q.a,
+    opts: shuffle([...(q.opts || [])]),
+    say: p.text,
+    why: p.text,
+    inf: `listen:${p.title}:${q.a}`,
+    passage: p.text,
+  }));
+}
+
 function makeQuizItems() {
   if (quiz.mode === "ear" || quiz.mode === "exam") return makeEarItems(quiz.mode === "exam");
   if (quiz.mode === "uso") return makeUsoItems();
   if (quiz.mode === "ed") return makeEdItems();
+  if (quiz.mode === "art") return makePickBankItems(ENLAB.artQuiz, "art");
+  if (quiz.mode === "prep") return makePickBankItems(ENLAB.prepQuiz, "prep");
+  if (quiz.mode === "phrasal") return makePickBankItems(ENLAB.phrasalQuiz, "phrasal");
+  if (quiz.mode === "cond") return makePickBankItems(ENLAB.condQuiz, "cond");
+  if (quiz.mode === "dict") return makeDictItems();
+  if (quiz.mode === "listen") return makeListenItems();
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -1562,7 +1655,7 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = quiz.mode === "uso" || quiz.mode === "ed";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict";
     if (cierre) {
       const w = weakSet();
       quiz.items.forEach((it) => {
@@ -1600,7 +1693,12 @@ function renderQuiz() {
         : "Sin fallos. Bien."}</p>
       ${ear ? `<p class="muted">Tip: oye gente real en <a href="https://youglish.com/pronounce/sheep/english" target="_blank" rel="noreferrer">YouGlish</a> (ship vs sheep).</p>` : ""}
       ${quiz.mode === "uso" ? `<p class="muted">Tip: en Oído, <a href="#oido-chunks" data-jump="oido-chunks">Calcos y pares</a> explica make/do, say/tell y Did you…?</p>` : ""}
-      ${quiz.mode === "ed" ? `<p class="muted">Regla: sordo → [t] liked; sonoro → [d] played; T/D → [id] wanted. Oye cada una.</p>` : ""}
+      ${quiz.mode === "art" ? `<p class="muted">a + consonante; an + vocal (hour, honest). the = concreto o único.</p>` : ""}
+      ${quiz.mode === "prep" ? `<p class="muted">on Monday · in 1999 · at 3 p.m. · in the kitchen · on the table.</p>` : ""}
+      ${quiz.mode === "phrasal" ? `<p class="muted">El golpe va en UP/OUT/OFF. look it up = buscarlo.</p>` : ""}
+      ${quiz.mode === "cond" ? `<p class="muted">If it rains, I will… / If I were you, I would… / will → would en reported speech.</p>` : ""}
+      ${quiz.mode === "dict" ? `<p class="muted">I'm / I am cuentan. Escucha otra vez si hace falta.</p>` : ""}
+      ${quiz.mode === "listen" ? `<p class="muted">Vuelve a oír el párrafo. Las 3 preguntas son del mismo texto.</p>` : ""}
       ${cierre ? `<p class="muted">Esto cuenta como el quiz del día. El resto de Juego es extra.</p>` : ""}
       ${extraGame}
       <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : "Otro round"}</button>
@@ -1632,11 +1730,12 @@ function renderQuiz() {
     $("#quiz-input").focus();
     const submit = () => {
       const val = $("#quiz-input").value;
-      const ok = answersMatch(val, it.a);
+      const ok = it.type === "dict" ? speakHeardOk(val, it.a) || answersMatch(val, it.a) : answersMatch(val, it.a);
       $("#quiz-typed").textContent = ok ? "Correcto" : `Era: ${it.a}`;
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
       else quiz.fails.push(it.inf);
+      if (it.type === "dict") srsBump("dict", it.inf, ok);
       bump("quiz");
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 900);
     };
@@ -1644,8 +1743,37 @@ function renderQuiz() {
     $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     return;
   }
-  if (it.type === "uso" || it.type === "ed") {
-    const kind = it.type === "ed" ? "-ed" : "Uso";
+  if (it.type === "dict") {
+    box.innerHTML = `<div class="card">
+      <div class="muted">Dictado ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
+      <div class="quiz-q">${quizQ(it)}</div>
+      <div class="row">
+        <button class="btn" data-say="${esc(it.say)}" data-slow="1">Oír una vez</button>
+        <button class="btn ghost" data-say="${esc(it.say)}">Oír otra vez</button>
+      </div>
+      <input id="quiz-input" type="text" autocomplete="off" placeholder="Escribe lo que oíste" />
+      <button class="btn" id="quiz-submit" style="margin-top:8px">Comprobar</button>
+      <p class="status" id="quiz-typed"></p>
+    </div>`;
+    speak(it.say, true);
+    $("#quiz-input").focus();
+    const submit = () => {
+      const val = $("#quiz-input").value;
+      const ok = speakHeardOk(val, it.a) || answersMatch(val, it.a);
+      $("#quiz-typed").textContent = ok ? "Correcto" : `Era: ${it.a}`;
+      $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
+      if (ok) quiz.score += 1;
+      else quiz.fails.push(it.inf);
+      srsBump("dict", it.inf, ok);
+      bump("quiz");
+      setTimeout(() => { quiz.i += 1; renderQuiz(); }, 1100);
+    };
+    $("#quiz-submit").addEventListener("click", submit);
+    $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    return;
+  }
+  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen") {
+    const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? "Escucha" : "Uso";
     box.innerHTML = `<div class="card">
       <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
       <div class="quiz-q">${quizQ(it)}</div>
@@ -1653,13 +1781,13 @@ function renderQuiz() {
       <div class="row">
         <button type="button" class="btn ghost" data-say="${esc(it.say)}">Oír ${it.type === "ed" ? it.say : "el modelo"}</button>
       </div>
-      <p class="muted">Teclas 1 / 2 / 3${it.type === "ed" ? " · espacio = oír otra vez" : ""}</p>
+      <p class="muted">Teclas 1 / 2 / 3${it.type === "ed" || it.type === "listen" ? " · espacio = oír otra vez" : ""}</p>
       <div class="choices" style="margin-top:12px">
         ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}">${i + 1}. ${esc(o)}</button>`).join("")}
       </div>
       ${it.why ? `<p class="muted" id="uso-why" hidden>${esc(it.why)}</p>` : ""}
     </div>`;
-    if (it.type === "ed") speak(it.say, true);
+    if (it.type === "ed" || it.type === "listen") speak(it.say, it.type === "listen");
     return;
   }
   if (it.type === "ear") {
@@ -2294,6 +2422,30 @@ document.addEventListener("click", (e) => {
     }
   }
 
+  const rp = e.target.closest("[data-roleplay]");
+  if (rp) startRoleplay(rp.dataset.roleplay);
+
+  if (e.target.closest("[data-role-play-a]")) {
+    const turn = window._roleplay?.scene?.turns?.[window._roleplay.i];
+    if (turn) speak(turn.a, true);
+  }
+
+  if (e.target.closest("[data-role-rec]")) {
+    const turn = window._roleplay?.scene?.turns?.[window._roleplay.i];
+    if (turn) {
+      window._speakTarget = { target: turn.b, help: "Respuesta B del role-play" };
+      recState.surface = "hablar";
+      toggleRecording("hablar");
+    }
+  }
+
+  if (e.target.closest("[data-role-next]")) {
+    if (window._roleplay) {
+      window._roleplay.i += 1;
+      paintRoleplayTurn();
+    }
+  }
+
   const nudgeTo = e.target.closest("[data-nudge-to]");
   if (nudgeTo) setCefr(nudgeTo.dataset.nudgeTo);
 
@@ -2325,6 +2477,7 @@ document.addEventListener("click", (e) => {
     const k = weakBtn.dataset.weak;
     if (w.has(k)) w.delete(k); else w.add(k);
     saveSet("enlab-weak", w);
+    srsBump("verb", k, !w.has(k));
     renderVerbs();
     renderHome();
   }
@@ -2335,6 +2488,7 @@ document.addEventListener("click", (e) => {
     const k = knownBtn.dataset.known;
     if (s.has(k)) s.delete(k); else s.add(k);
     saveSet("enlab-known", s);
+    if (s.has(k)) srsBump("verb", k, true);
     renderVerbs();
     renderHome();
   }
@@ -2380,7 +2534,8 @@ document.addEventListener("click", (e) => {
   }
 
   const opt = e.target.closest("[data-opt]");
-  if (opt && quiz.items[quiz.i] && (quiz.items[quiz.i].type === "choice" || quiz.items[quiz.i].type === "ear" || quiz.items[quiz.i].type === "uso" || quiz.items[quiz.i].type === "ed")) {
+  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
+  if (opt && quiz.items[quiz.i] && pickTypes.includes(quiz.items[quiz.i].type)) {
     const val = decodeURIComponent(opt.dataset.opt);
     const it = quiz.items[quiz.i];
     $$(".choices button").forEach((b) => { b.disabled = true; });
@@ -2394,13 +2549,13 @@ document.addEventListener("click", (e) => {
         if (decodeURIComponent(b.dataset.opt) === it.a) b.classList.add("ok");
       });
       if (it.type === "ear") speak(it.a, true);
-      if (it.type === "uso" || it.type === "ed") speak(it.say || it.a, true);
+      if (it.type !== "choice" && it.type !== "ear") speak(it.say || it.a, true);
     }
-    if ((it.type === "uso" || it.type === "ed") && val === it.a) speak(it.say || it.a, true);
-    if (it.type === "uso" || it.type === "ed") {
+    if (it.type !== "choice" && it.type !== "ear" && val === it.a) speak(it.say || it.a, it.type === "listen");
+    if (it.type !== "choice" && it.type !== "ear") {
       const why = $("#uso-why");
       if (why) why.hidden = false;
-      bumpPickWeak(it.type, it.inf, val === it.a);
+      bumpPickWeak(it.type === "listen" ? "listen" : it.type, it.inf, val === it.a);
     }
     if (it.type === "ear") {
       bumpEar(it.inf, val === it.a);
@@ -2408,7 +2563,8 @@ document.addEventListener("click", (e) => {
       renderHoyReview();
     }
     bump("quiz");
-    setTimeout(() => { quiz.i += 1; renderQuiz(); }, it.type === "ear" ? 1300 : ((it.type === "uso" || it.type === "ed") ? 2000 : 700));
+    const wait = it.type === "ear" ? 1300 : (it.type === "choice" ? 700 : 2000);
+    setTimeout(() => { quiz.i += 1; renderQuiz(); }, wait);
   }
 
   if (e.target.closest("#start-ear-from-oido")) {
@@ -2518,7 +2674,7 @@ document.addEventListener("keydown", (e) => {
     if (btn && !btn.disabled) btn.click();
     return;
   }
-  if (it && (it.type === "uso" || it.type === "ed" || it.type === "choice")) {
+  if (it && (it.type === "uso" || it.type === "ed" || it.type === "choice" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen")) {
     if (e.key === " " || e.code === "Space") {
       e.preventDefault();
       if (it.say) speak(it.say, true);
@@ -3140,6 +3296,218 @@ function printWeakList() {
   area.hidden = true;
 }
 
+function addDaysKey(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return dateKey(d);
+}
+
+function loadSrs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-srs") || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSrs(map) {
+  localStorage.setItem("enlab-srs", JSON.stringify(map));
+}
+
+function srsBump(kind, key, ok) {
+  if (!key) return;
+  const id = String(key).startsWith(`${kind}:`) ? String(key) : `${kind}:${key}`;
+  const map = loadSrs();
+  const row = map[id] || { box: 0, iv: 1, due: todayKey() };
+  if (ok) {
+    row.box = Math.min(5, (row.box || 0) + 1);
+    row.iv = [1, 1, 2, 4, 7, 14][row.box] || 14;
+    row.due = addDaysKey(row.iv);
+  } else {
+    row.box = 0;
+    row.iv = 1;
+    row.due = addDaysKey(1);
+  }
+  map[id] = row;
+  saveSrs(map);
+}
+
+function srsDueKeys(kind) {
+  const today = todayKey();
+  const out = new Set();
+  Object.entries(loadSrs()).forEach(([id, row]) => {
+    if (!row || !row.due) return;
+    if (kind && !id.startsWith(`${kind}:`)) return;
+    if (row.due <= today) out.add(id);
+  });
+  return out;
+}
+
+function srsDueList(limit = 8) {
+  const today = todayKey();
+  return Object.entries(loadSrs())
+    .filter(([, row]) => row && row.due && row.due <= today)
+    .sort((a, b) => String(a[1].due).localeCompare(String(b[1].due)))
+    .slice(0, limit)
+    .map(([id]) => {
+      const label = id.replace(/^(ear|verb|uso|ed|speak|dict|art|prep|phrasal|cond|listen):/, "").replace("|", " / ");
+      return { id, label };
+    });
+}
+
+function renderDueToday() {
+  const el = $("#due-today");
+  if (!el) return;
+  const due = srsDueList(10);
+  if (!due.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("due"))}</p>
+    <div class="review-chips">${due.map((x) => `<button type="button" class="chip say" data-say="${esc(x.label.split(" / ")[0])}">${esc(x.label)}</button>`).join("")}</div>
+    <p class="muted">Fallaste o toca repasarlo. Sale primero en Juego y Dictado.</p>`;
+}
+
+function renderWeekReport() {
+  const el = $("#week-report");
+  if (!el) return;
+  const st = stats();
+  let heard = 0;
+  let quizN = 0;
+  let spoke = 0;
+  let days = 0;
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const row = st.days[dateKey(d)] || {};
+    const h = row.heard || 0;
+    const q = row.quiz || 0;
+    const s = row.spoke || 0;
+    if (h + q + s) days += 1;
+    heard += h;
+    quizN += q;
+    spoke += s;
+  }
+  el.hidden = false;
+  el.innerHTML = `<p class="muted">${esc(t("week"))}: ${days}/7 días · ${heard} oídas · ${quizN} quiz · ${spoke} voz · ${srsDueList(99).length} vencen hoy</p>`;
+}
+
+function classroomPin() {
+  return localStorage.getItem("enlab-class-pin") || "";
+}
+
+function classroomAllowsChange() {
+  const pin = classroomPin();
+  if (!pin) return true;
+  if (sessionStorage.getItem("enlab-class-ok") === "1") return true;
+  const typed = window.prompt(uiLang() === "en" ? "Classroom PIN" : "PIN de aula");
+  if (typed === pin) {
+    sessionStorage.setItem("enlab-class-ok", "1");
+    return true;
+  }
+  const st = $("#class-pin-status");
+  if (st) st.textContent = "PIN incorrecto. El nivel no cambió.";
+  return false;
+}
+
+function renderClassPin() {
+  const st = $("#class-pin-status");
+  if (!st) return;
+  st.textContent = classroomPin()
+    ? (uiLang() === "en" ? "PIN on. Level changes need the PIN." : "PIN activo. Cambiar nivel pide el PIN.")
+    : (uiLang() === "en" ? "No PIN." : "Sin PIN.");
+}
+
+function saveClassPin() {
+  const raw = ($("#class-pin")?.value || "").replace(/\D/g, "");
+  if (raw.length < 4) {
+    const st = $("#class-pin-status");
+    if (st) st.textContent = "Usa 4 a 6 dígitos.";
+    return;
+  }
+  localStorage.setItem("enlab-class-pin", raw);
+  sessionStorage.removeItem("enlab-class-ok");
+  if ($("#class-pin")) $("#class-pin").value = "";
+  renderClassPin();
+}
+
+function clearClassPin() {
+  localStorage.removeItem("enlab-class-pin");
+  sessionStorage.removeItem("enlab-class-ok");
+  renderClassPin();
+}
+
+function printClassSheet() {
+  const area = $("#weak-print-area");
+  if (!area) return;
+  const due = srsDueList(12);
+  const verbs = [...weakSet()].slice(0, 10);
+  area.hidden = false;
+  area.innerHTML = `
+    <h1>English Lab — hoja de clase</h1>
+    <p>${todayKey()} · ${level().toUpperCase()}</p>
+    ${due.length ? `<h2>Vence hoy</h2><ul>${due.map((x) => `<li>${esc(x.label)}</li>`).join("")}</ul>` : ""}
+    ${verbs.length ? `<h2>Verbos débiles</h2><ul>${verbs.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
+    <h2>Hoy</h2>
+    <p>Pares → verbos → diálogo → 3 preguntas. Dictado o role-play si hay tiempo.</p>`;
+  window.print();
+  area.hidden = true;
+}
+
+function renderStarBox() {
+  const el = $("#star-box");
+  if (!el) return;
+  const bits = ENLAB.starScaffold || [];
+  el.innerHTML = `
+    <p class="muted"><strong>STAR</strong> para “describe a challenge”:</p>
+    <ol class="star-list">${bits.map((s) => `<li><strong>${esc(s.part)} · ${esc(s.en)}</strong> — <span class="es-line">${esc(s.es)}</span></li>`).join("")}</ol>`;
+}
+
+function renderRoleplays() {
+  const box = $("#roleplay-list");
+  if (!box) return;
+  const items = (ENLAB.roleplays || []).filter((x) => (x.min || 1) <= lvlNum());
+  box.innerHTML = items.map((r) => `
+    <button type="button" class="chip" data-roleplay="${esc(r.id)}">${esc(r.title)}</button>
+  `).join(" ");
+}
+
+function startRoleplay(id) {
+  const scene = (ENLAB.roleplays || []).find((x) => x.id === id);
+  const box = $("#roleplay-now");
+  if (!scene || !box) return;
+  window._roleplay = { scene, i: 0 };
+  box.hidden = false;
+  paintRoleplayTurn();
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function paintRoleplayTurn() {
+  const st = window._roleplay;
+  const box = $("#roleplay-now");
+  if (!st || !box) return;
+  const turn = st.scene.turns[st.i];
+  if (!turn) {
+    box.innerHTML = `<p class="session-done">Role-play listo. Puedes repetirlo o elegir otro.</p>`;
+    return;
+  }
+  box.innerHTML = `
+    <p class="kicker">${esc(st.scene.title)} · ${st.i + 1}/${st.scene.turns.length}</p>
+    <p class="muted es-line">${esc(st.scene.es)}</p>
+    <p><strong>A:</strong> ${esc(turn.a)}</p>
+    <p><strong>Tú:</strong> ${esc(turn.b)}</p>
+    <div class="row">
+      <button type="button" class="btn ghost" data-role-play-a>Oír A</button>
+      <button type="button" class="btn" data-role-rec>Grabar B</button>
+      <button type="button" class="btn ghost" data-role-next>Siguiente giro</button>
+    </div>
+    <p class="status" id="role-status"></p>`;
+}
+
 function renderInterviewSim() {
   const box = $("#interview-sim-list");
   if (!box) return;
@@ -3275,6 +3643,9 @@ function init() {
   renderInterviewSim();
   renderPhrasalsWork();
   renderVoiceHistory();
+  renderRoleplays();
+  renderStarBox();
+  renderClassPin();
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -3340,5 +3711,9 @@ $("#transfer-import")?.addEventListener("click", () => {
 });
 
 $("#weak-print")?.addEventListener("click", () => printWeakList());
+
+$("#class-pin-save")?.addEventListener("click", () => saveClassPin());
+$("#class-pin-clear")?.addEventListener("click", () => clearClassPin());
+$("#class-print")?.addEventListener("click", () => printClassSheet());
 
 init();

@@ -1,0 +1,342 @@
+/* Lotes G–L: situaciones, oído hispano, connected speech, gramática, dictado, role-play */
+window.ENLAB = window.ENLAB || {};
+
+Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
+  restaurant: [
+    { en: "A table for two, please.", es: "Una mesa para dos.", min: 1 },
+    { en: "Can I see the menu?", es: "¿Me das el menú?", min: 1 },
+    { en: "I'd like the chicken, please.", es: "Quisiera el pollo.", min: 2 },
+    { en: "Could we have some water?", es: "¿Nos traes agua?", min: 2 },
+    { en: "Is this spicy?", es: "¿Esto pica?", min: 2 },
+    { en: "I'm allergic to nuts.", es: "Soy alérgico a los frutos secos.", min: 3 },
+    { en: "Can we split the bill?", es: "¿Dividimos la cuenta?", min: 3 },
+    { en: "This isn't what I ordered.", es: "Esto no es lo que pedí.", min: 3 },
+    { en: "Could I get this to go?", es: "¿Me lo puedes empacar?", min: 2 },
+    { en: "The check, please.", es: "La cuenta, por favor.", min: 1 },
+    { en: "Keep the change.", es: "Quédate el cambio.", min: 2 },
+    { en: "Does this come with fries?", es: "¿Esto viene con papas?", min: 2 },
+  ],
+  hotel: [
+    { en: "I have a reservation under Lopez.", es: "Tengo reserva a nombre de López.", min: 2 },
+    { en: "Is breakfast included?", es: "¿El desayuno está incluido?", min: 2 },
+    { en: "What time is checkout?", es: "¿A qué hora es el checkout?", min: 2 },
+    { en: "The air conditioning isn't working.", es: "El aire no funciona.", min: 3 },
+    { en: "Could I have a late checkout?", es: "¿Puedo salir más tarde?", min: 3 },
+    { en: "Is there a gym?", es: "¿Hay gimnasio?", min: 1 },
+    { en: "Can I leave my bags here?", es: "¿Puedo dejar las maletas aquí?", min: 2 },
+    { en: "The wifi password, please.", es: "La contraseña del wifi.", min: 2 },
+    { en: "I'd like a quiet room.", es: "Quisiera una habitación silenciosa.", min: 2 },
+    { en: "There's no hot water.", es: "No hay agua caliente.", min: 2 },
+  ],
+  bank: [
+    { en: "I'd like to open an account.", es: "Quisiera abrir una cuenta.", min: 3 },
+    { en: "Can I withdraw cash here?", es: "¿Puedo sacar efectivo aquí?", min: 2 },
+    { en: "I lost my card.", es: "Perdí mi tarjeta.", min: 2 },
+    { en: "What's the exchange rate?", es: "¿Cuál es el tipo de cambio?", min: 3 },
+    { en: "I need to transfer money.", es: "Necesito transferir dinero.", min: 3 },
+    { en: "Is there a fee?", es: "¿Hay comisión?", min: 2 },
+    { en: "Can you check my balance?", es: "¿Me checas el saldo?", min: 2 },
+    { en: "I'd like to deposit this.", es: "Quisiera depositar esto.", min: 3 },
+  ],
+  grocery: [
+    { en: "Where is the milk?", es: "¿Dónde está la leche?", min: 1 },
+    { en: "Is this on sale?", es: "¿Esto está en oferta?", min: 2 },
+    { en: "Do you have bags?", es: "¿Tienen bolsas?", min: 1 },
+    { en: "Can I pay by card?", es: "¿Puedo pagar con tarjeta?", min: 1 },
+    { en: "I need a receipt.", es: "Necesito el ticket.", min: 2 },
+    { en: "It's expired.", es: "Está caducado.", min: 3 },
+    { en: "How much is this?", es: "¿Cuánto cuesta esto?", min: 1 },
+    { en: "I'm looking for pasta.", es: "Busco pasta.", min: 2 },
+    { en: "Paper or plastic?", es: "¿Papel o plástico?", min: 2 },
+  ],
+  apartment: [
+    { en: "I'm here to see the apartment.", es: "Vengo a ver el departamento.", min: 2 },
+    { en: "How much is the rent?", es: "¿Cuánto es la renta?", min: 2 },
+    { en: "Are utilities included?", es: "¿Los servicios están incluidos?", min: 3 },
+    { en: "Is there a laundry room?", es: "¿Hay lavandería?", min: 2 },
+    { en: "When can I move in?", es: "¿Cuándo puedo mudarme?", min: 2 },
+    { en: "The sink is leaking.", es: "El fregadero gotea.", min: 3 },
+    { en: "Can I have a copy of the lease?", es: "¿Me das copia del contrato?", min: 3 },
+    { en: "The neighbors are too loud.", es: "Los vecinos hacen mucho ruido.", min: 3 },
+  ],
+  uber: [
+    { en: "I'm outside the main door.", es: "Estoy afuera de la puerta principal.", min: 2 },
+    { en: "Can you wait two minutes?", es: "¿Puedes esperar dos minutos?", min: 2 },
+    { en: "This is my stop.", es: "Aquí me bajo.", min: 1 },
+    { en: "Could you turn on the AC?", es: "¿Puedes prender el aire?", min: 2 },
+    { en: "I'll add a tip in the app.", es: "Dejo propina en la app.", min: 3 },
+    { en: "That's not the right address.", es: "Esa no es la dirección.", min: 2 },
+  ],
+});
+
+ENLAB.dialogsLife = [
+  { min: 1, a: { en: "Hi. How are you?", es: "Hola. ¿Cómo estás?" }, b: { en: "I'm good, thanks. And you?", es: "Bien, gracias. ¿Y tú?" } },
+  { min: 1, a: { en: "What's your name?", es: "¿Cómo te llamas?" }, b: { en: "My name is Ana.", es: "Me llamo Ana." } },
+  { min: 1, a: { en: "Where are you from?", es: "¿De dónde eres?" }, b: { en: "I'm from Mexico.", es: "Soy de México." } },
+  { min: 1, a: { en: "Do you speak English?", es: "¿Hablas inglés?" }, b: { en: "A little. I'm learning.", es: "Un poco. Estoy aprendiendo." } },
+  { min: 1, a: { en: "Can I help you?", es: "¿Te ayudo?" }, b: { en: "Yes, please. I'm looking for the station.", es: "Sí. Busco la estación." } },
+  { min: 2, a: { en: "Are you ready to order?", es: "¿Listos para pedir?" }, b: { en: "Yes. I'll have the soup and a salad.", es: "Sí. La sopa y una ensalada." } },
+  { min: 2, a: { en: "Would you like anything to drink?", es: "¿Algo de tomar?" }, b: { en: "Just water, please.", es: "Solo agua, por favor." } },
+  { min: 2, a: { en: "How was your weekend?", es: "¿Cómo estuvo el fin?" }, b: { en: "It was good. I stayed home and cooked.", es: "Bien. Me quedé en casa y cociné." } },
+  { min: 2, a: { en: "Did you take the bus?", es: "¿Tomaste el bus?" }, b: { en: "No, I walked. It wasn't far.", es: "No, caminé. No estaba lejos." } },
+  { min: 2, a: { en: "What time does it open?", es: "¿A qué hora abre?" }, b: { en: "It opens at nine.", es: "Abre a las nueve." } },
+  { min: 2, a: { en: "Can I try this on?", es: "¿Me lo puedo probar?" }, b: { en: "Sure. The fitting room is over there.", es: "Claro. El probador está allá." } },
+  { min: 2, a: { en: "Do you have this in a medium?", es: "¿Lo tienen en mediana?" }, b: { en: "Let me check. One second.", es: "Deja checo. Un segundo." } },
+  { min: 3, a: { en: "Sorry I'm late. The train was delayed.", es: "Perdón por la tardanza. El tren se retrasó." }, b: { en: "No worries. We just started.", es: "Tranquilo. Apenas empezamos." } },
+  { min: 3, a: { en: "Could you speak a little slower?", es: "¿Puedes hablar más despacio?" }, b: { en: "Of course. Is this better?", es: "Claro. ¿Así está mejor?" } },
+  { min: 3, a: { en: "I didn't catch that. Could you repeat it?", es: "No alcancé. ¿Lo repites?" }, b: { en: "I said the meeting is at three.", es: "Dije que la junta es a las tres." } },
+  { min: 3, a: { en: "Have you finished the report?", es: "¿Ya terminaste el reporte?" }, b: { en: "Not yet. I'll send it by noon.", es: "Aún no. Lo mando al mediodía." } },
+  { min: 3, a: { en: "Would you mind if I opened the window?", es: "¿Te molesta si abro la ventana?" }, b: { en: "Go ahead. It's a bit warm.", es: "Adelante. Está un poco caliente." } },
+  { min: 3, a: { en: "What do you do?", es: "¿A qué te dedicas?" }, b: { en: "I work in customer support.", es: "Trabajo en soporte al cliente." } },
+  { min: 3, a: { en: "How long have you lived here?", es: "¿Cuánto llevas viviendo aquí?" }, b: { en: "I've lived here for two years.", es: "Llevo dos años." } },
+  { min: 4, a: { en: "If I were you, I'd ask for a raise.", es: "Yo en tu lugar pediría un aumento." }, b: { en: "You're right. I'll talk to my manager.", es: "Tienes razón. Hablo con mi manager." } },
+  { min: 4, a: { en: "They said the launch had been delayed.", es: "Dijeron que el lanzamiento se había retrasado." }, b: { en: "That figures. We should update the client.", es: "Tiene sentido. Hay que avisar al cliente." } },
+  { min: 4, a: { en: "Could you walk me through your thinking?", es: "¿Me explicas tu razonamiento?" }, b: { en: "Sure. First we fixed the bug, then we tested it.", es: "Claro. Primero el bug, luego las pruebas." } },
+];
+
+ENLAB.earHispano = [
+  { a: "ship", b: "sheep", pa: "ship", pb: "shiip", why: "i corta vs ii · hispano", min: 1 },
+  { a: "live", b: "leave", pa: "liv", pb: "liiv", why: "i vs ii · live/leave", min: 2 },
+  { a: "sit", b: "seat", pa: "sit", pb: "siit", why: "i corta vs ii", min: 1 },
+  { a: "fill", b: "feel", pa: "fil", pb: "fiil", why: "i vs ii", min: 2 },
+  { a: "this", b: "these", pa: "this", pb: "thiiz", why: "i vs ii + TH", min: 2 },
+  { a: "think", b: "sink", pa: "think", pb: "sink", why: "TH vs S", min: 3 },
+  { a: "three", b: "tree", pa: "thrii", pb: "trii", why: "TH vs T", min: 3 },
+  { a: "very", b: "berry", pa: "veri", pb: "beri", why: "V vs B", min: 3 },
+  { a: "vest", b: "best", pa: "vest", pb: "best", why: "V vs B", min: 3 },
+  { a: "vote", b: "boat", pa: "vout", pb: "bout", why: "V vs B", min: 3 },
+  { a: "cap", b: "cab", pa: "kap", pb: "kab", why: "P vs B final", min: 2 },
+  { a: "back", b: "bag", pa: "bak", pb: "bag", why: "K vs G final", min: 2 },
+  { a: "price", b: "prize", pa: "prais", pb: "praiz", why: "S vs Z", min: 3 },
+  { a: "peace", b: "peas", pa: "piis", pb: "piiz", why: "S vs Z", min: 3 },
+  { a: "asked", b: "ask", pa: "askt", pb: "ask", why: "cluster final -skt", min: 3 },
+  { a: "helped", b: "help", pa: "helpt", pb: "help", why: "cluster final -lpt", min: 3 },
+  { a: "walked", b: "walk", pa: "wokt", pb: "wok", why: "-ed [t] pegado", min: 2 },
+  { a: "wanted", b: "want", pa: "wontid", pb: "wont", why: "-ed [id] sílaba extra", min: 2 },
+  { a: "hat", b: "hot", pa: "hat", pb: "hat/hot", why: "ä vs o abierta", min: 2 },
+  { a: "cut", b: "cat", pa: "kat", pb: "kat", why: "a corta vs ä", min: 2 },
+  { a: "full", b: "fool", pa: "ful", pb: "fuul", why: "u corta vs uu", min: 3 },
+  { a: "pull", b: "pool", pa: "pul", pb: "puul", why: "u vs uu", min: 3 },
+  { a: "chin", b: "shin", pa: "chin", pb: "shin", why: "CH vs SH", min: 3 },
+  { a: "cheap", b: "sheep", pa: "chiip", pb: "shiip", why: "CH vs SH", min: 3 },
+  { a: "year", b: "ear", pa: "yir", pb: "ir", why: "Y inicial", min: 2 },
+  { a: "joke", b: "yolk", pa: "jouk", pb: "youk", why: "J vs Y", min: 3 },
+  { a: "focus", b: "fox", pa: "foukəs", pb: "faks", why: "schwa vs o", min: 3 },
+  { a: "copy", b: "coffee", pa: "kapi", pb: "kofi", why: "o vs a", min: 2 },
+];
+
+ENLAB.connectedPairs = [
+  { a: "going to", b: "gonna", pa: "going tu", pb: "gonna", why: "gonna = going to (informal)", min: 3 },
+  { a: "want to", b: "wanna", pa: "want tu", pb: "wanna", why: "wanna = want to", min: 3 },
+  { a: "got to", b: "gotta", pa: "got tu", pb: "gotta", why: "gotta = got to / have to", min: 3 },
+  { a: "did you", b: "didja", pa: "did yu", pb: "didja", why: "did you → didja", min: 3 },
+  { a: "would you", b: "wouldja", pa: "wud yu", pb: "wudja", why: "would you → wouldja", min: 4 },
+  { a: "don't you", b: "dontcha", pa: "dont yu", pb: "doncha", why: "don't you → dontcha", min: 4 },
+  { a: "what are you", b: "whatcha", pa: "wat ar yu", pb: "wacha", why: "what are you → whatcha", min: 4 },
+  { a: "turn it off", b: "turnitoff", pa: "turn it of", pb: "tur-ni-tof", why: "linking: turn it off", min: 3 },
+  { a: "pick it up", b: "pickitup", pa: "pik it ap", pb: "pi-ki-tap", why: "linking: pick it up", min: 3 },
+  { a: "an apple", b: "a napple", pa: "an apl", pb: "ə napl", why: "n se pega a apple", min: 2 },
+  { a: "better", b: "bedder", pa: "beter", pb: "beder", why: "flap T (US): better ≈ bedder", min: 4 },
+  { a: "water", b: "wader", pa: "woter", pb: "woder", why: "flap T (US): water ≈ wader", min: 4 },
+  { a: "city", b: "siddy", pa: "siti", pb: "sidi", why: "flap T (US): city ≈ siddy", min: 4 },
+];
+
+ENLAB.artQuiz = [
+  { q: "Elige el artículo", prompt: "I need ___ umbrella.", a: "an", opts: ["a", "an", "the"], say: "I need an umbrella.", why: "umbrella empieza por sonido de vocal → an.", min: 1 },
+  { q: "Elige el artículo", prompt: "She is ___ university student.", a: "a", opts: ["a", "an", "the"], say: "She is a university student.", why: "university suena /yu/ (consonante) → a, no an.", min: 2 },
+  { q: "Elige el artículo", prompt: "Close ___ door, please.", a: "the", opts: ["a", "an", "the"], say: "Close the door, please.", why: "Puerta concreta, los dos la ven → the.", min: 1 },
+  { q: "Elige el artículo", prompt: "I saw ___ movie last night.", a: "a", opts: ["a", "an", "the"], say: "I saw a movie last night.", why: "Primera mención, no es ‘la’ película conocida → a.", min: 2 },
+  { q: "Elige el artículo", prompt: "___ sun is hot today.", a: "The", opts: ["A", "An", "The"], say: "The sun is hot today.", why: "Hay un solo sol → the.", min: 2 },
+  { q: "Elige el artículo", prompt: "He is ___ honest man.", a: "an", opts: ["a", "an", "the"], say: "He is an honest man.", why: "honest empieza por vocal (h muda) → an.", min: 3 },
+  { q: "Elige el artículo", prompt: "I don't like ___ coffee.", a: "(nada)", opts: ["a", "the", "(nada)"], say: "I don't like coffee.", why: "Café en general: sin artículo.", min: 3 },
+  { q: "Elige el artículo", prompt: "She plays ___ piano.", a: "the", opts: ["a", "the", "(nada)"], say: "She plays the piano.", why: "Instrumento que tocas → the piano.", min: 3 },
+  { q: "Elige el artículo", prompt: "I go to ___ school at eight.", a: "(nada)", opts: ["a", "the", "(nada)"], say: "I go to school at eight.", why: "Como alumno: to school, sin the.", min: 3 },
+  { q: "Elige el artículo", prompt: "___ Amazon is a long river.", a: "The", opts: ["A", "The", "(nada)"], say: "The Amazon is a long river.", why: "Ríos llevan the.", min: 3 },
+  { q: "Elige el artículo", prompt: "I had ___ hour to finish.", a: "an", opts: ["a", "an", "the"], say: "I had an hour to finish.", why: "hour suena /auər/ → an.", min: 2 },
+  { q: "Elige el artículo", prompt: "This is ___ best coffee here.", a: "the", opts: ["a", "an", "the"], say: "This is the best coffee here.", why: "Superlativo → the best.", min: 3 },
+];
+
+ENLAB.prepQuiz = [
+  { q: "in / on / at", prompt: "The meeting is ___ Monday.", a: "on", opts: ["in", "on", "at"], say: "The meeting is on Monday.", why: "Días: on Monday.", min: 2 },
+  { q: "in / on / at", prompt: "I was born ___ 1999.", a: "in", opts: ["in", "on", "at"], say: "I was born in 1999.", why: "Años y meses: in.", min: 2 },
+  { q: "in / on / at", prompt: "Let's meet ___ 3 p.m.", a: "at", opts: ["in", "on", "at"], say: "Let's meet at 3 p.m.", why: "Hora puntual: at.", min: 2 },
+  { q: "in / on / at", prompt: "She's ___ the kitchen.", a: "in", opts: ["in", "on", "at"], say: "She's in the kitchen.", why: "Espacio cerrado: in.", min: 2 },
+  { q: "in / on / at", prompt: "The keys are ___ the table.", a: "on", opts: ["in", "on", "at"], say: "The keys are on the table.", why: "Superficie: on.", min: 1 },
+  { q: "in / on / at", prompt: "I'll wait ___ the bus stop.", a: "at", opts: ["in", "on", "at"], say: "I'll wait at the bus stop.", why: "Punto concreto: at the stop.", min: 3 },
+  { q: "in / on / at", prompt: "We arrived ___ night.", a: "at", opts: ["in", "on", "at"], say: "We arrived at night.", why: "at night (pero in the morning).", min: 3 },
+  { q: "in / on / at", prompt: "See you ___ the morning.", a: "in", opts: ["in", "on", "at"], say: "See you in the morning.", why: "in the morning / afternoon / evening.", min: 2 },
+  { q: "in / on / at", prompt: "The photo is ___ page 12.", a: "on", opts: ["in", "on", "at"], say: "The photo is on page 12.", why: "on the page.", min: 3 },
+  { q: "in / on / at", prompt: "He lives ___ Fifth Avenue.", a: "on", opts: ["in", "on", "at"], say: "He lives on Fifth Avenue.", why: "Calles: on. Número: at 12 Main St.", min: 3 },
+  { q: "in / on / at", prompt: "I'm good ___ math.", a: "at", opts: ["in", "on", "at"], say: "I'm good at math.", why: "good at + skill.", min: 3 },
+  { q: "in / on / at", prompt: "Don't look ___ your phone.", a: "at", opts: ["in", "on", "to"], say: "Don't look at your phone.", why: "look at, no look to.", min: 2 },
+];
+
+ENLAB.phrasalQuiz = [
+  { q: "¿Qué significa?", prompt: "I'll look it up.", a: "buscarlo", opts: ["buscarlo", "mirarlo hacia arriba", "cuidarlo"], say: "I'll look it up.", why: "look up = buscar (en Google, diccionario).", min: 3 },
+  { q: "¿Qué significa?", prompt: "We ran out of time.", a: "se nos acabó el tiempo", opts: ["salimos corriendo", "se nos acabó el tiempo", "ganamos tiempo"], say: "We ran out of time.", why: "run out of = quedarse sin.", min: 3 },
+  { q: "¿Qué significa?", prompt: "Can you fill me in?", a: "ponerme al día", opts: ["llenarme", "ponerme al día", "inscribirme"], say: "Can you fill me in?", why: "fill someone in = brief / poner al día.", min: 3 },
+  { q: "¿Qué significa?", prompt: "Let's wrap up.", a: "terminar", opts: ["envolver", "terminar", "abrir"], say: "Let's wrap up.", why: "wrap up = cerrar / terminar.", min: 3 },
+  { q: "¿Qué significa?", prompt: "The server went down.", a: "se cayó", opts: ["bajó al sótano", "se cayó", "se apagó a propósito"], say: "The server went down.", why: "go down = dejar de funcionar.", min: 3 },
+  { q: "Completa", prompt: "I'll get ___ to you tomorrow.", a: "back", opts: ["back", "up", "off"], say: "I'll get back to you tomorrow.", why: "get back to = responder después.", min: 3 },
+  { q: "Completa", prompt: "Please turn it ___.", a: "on", opts: ["in", "on", "over"], say: "Please turn it on.", why: "turn on = encender.", min: 2 },
+  { q: "Completa", prompt: "We need to figure it ___.", a: "out", opts: ["out", "up", "in"], say: "We need to figure it out.", why: "figure out = resolver.", min: 3 },
+  { q: "Completa", prompt: "I'll set ___ a meeting.", a: "up", opts: ["up", "down", "off"], say: "I'll set up a meeting.", why: "set up = agendar / configurar.", min: 3 },
+  { q: "¿Qué significa?", prompt: "I'll follow up with you.", a: "te hago seguimiento", opts: ["te sigo a casa", "te hago seguimiento", "te copio"], say: "I'll follow up with you.", why: "follow up = dar seguimiento.", min: 3 },
+];
+
+ENLAB.condQuiz = [
+  { q: "Elige la forma", prompt: "If it rains, I ___ at home.", a: "will stay", opts: ["will stay", "would stay", "stayed"], say: "If it rains, I will stay at home.", why: "1º: if + present, will.", min: 3 },
+  { q: "Elige la forma", prompt: "If I ___ you, I'd take the job.", a: "were", opts: ["am", "was", "were"], say: "If I were you, I'd take the job.", why: "2º hipotético: If I were you.", min: 4 },
+  { q: "Elige la forma", prompt: "If I had known, I ___ you.", a: "would have called", opts: ["would call", "would have called", "will call"], say: "If I had known, I would have called you.", why: "3º pasado irreal: had + would have.", min: 4 },
+  { q: "Elige la forma", prompt: "If she studies, she ___ the test.", a: "will pass", opts: ["will pass", "would pass", "passed"], say: "If she studies, she will pass the test.", why: "Real futuro: present + will.", min: 3 },
+  { q: "Reported speech", prompt: "She said, “I'm tired.” → She said she ___ tired.", a: "was", opts: ["is", "was", "were"], say: "She said she was tired.", why: "Presente → pasado en reported speech.", min: 4 },
+  { q: "Reported speech", prompt: "He said, “I'll help.” → He said he ___ help.", a: "would", opts: ["will", "would", "can"], say: "He said he would help.", why: "will → would.", min: 4 },
+  { q: "Reported speech", prompt: "They said, “We went home.” → They said they ___ home.", a: "had gone", opts: ["went", "had gone", "have gone"], say: "They said they had gone home.", why: "Pasado → past perfect en reported.", min: 4 },
+  { q: "Elige la forma", prompt: "I wish I ___ more time.", a: "had", opts: ["have", "had", "will have"], say: "I wish I had more time.", why: "wish + pasado para ahora.", min: 4 },
+];
+
+ENLAB.dictation = [
+  { en: "I'm fine, thanks.", min: 1, es: "Estoy bien, gracias." },
+  { en: "Where is the bathroom?", min: 1, es: "¿Dónde está el baño?" },
+  { en: "Can you help me, please?", min: 1, es: "¿Me ayudas, por favor?" },
+  { en: "I'd like a table for two.", min: 2, es: "Quisiera mesa para dos." },
+  { en: "My flight is delayed.", min: 2, es: "Mi vuelo está retrasado." },
+  { en: "I went to the store yesterday.", min: 2, es: "Fui a la tienda ayer." },
+  { en: "Have you ever tried that?", min: 3, es: "¿Alguna vez lo has probado?" },
+  { en: "I'll get back to you tomorrow.", min: 3, es: "Te respondo mañana." },
+  { en: "Could you speak a little slower?", min: 3, es: "¿Puedes hablar un poco más despacio?" },
+  { en: "We ran out of time.", min: 3, es: "Se nos acabó el tiempo." },
+  { en: "If I were you, I'd wait.", min: 4, es: "Yo en tu lugar esperaría." },
+  { en: "Let me walk you through it.", min: 4, es: "Te lo explico paso a paso." },
+  { en: "I'm looking forward to it.", min: 3, es: "Lo espero con ganas." },
+  { en: "That's not what I meant.", min: 3, es: "No era eso lo que quería decir." },
+  { en: "Can we take this offline?", min: 4, es: "¿Lo hablamos fuera de aquí?" },
+];
+
+ENLAB.listenPassages = [
+  {
+    min: 1,
+    title: "En la tienda",
+    text: "Hi. I'm looking for milk. It's next to the eggs, on the left. You can pay by card at the front.",
+    qs: [
+      { q: "¿Qué busca?", a: "milk", opts: ["milk", "eggs", "bread"] },
+      { q: "¿Dónde está?", a: "next to the eggs", opts: ["next to the eggs", "outside", "upstairs"] },
+      { q: "¿Cómo puede pagar?", a: "by card", opts: ["cash only", "by card", "with points"] },
+    ],
+  },
+  {
+    min: 2,
+    title: "El vuelo",
+    text: "Good afternoon. Flight 12 to Miami is delayed. Boarding will start at gate 8 at 4:30. Please keep your passport ready.",
+    qs: [
+      { q: "¿A dónde va el vuelo?", a: "Miami", opts: ["Miami", "Mexico", "Madrid"] },
+      { q: "¿Qué puerta?", a: "gate 8", opts: ["gate 2", "gate 8", "gate 12"] },
+      { q: "¿Qué debes tener listo?", a: "your passport", opts: ["your bag", "your passport", "your ticket only"] },
+    ],
+  },
+  {
+    min: 3,
+    title: "La junta",
+    text: "Quick update. We fixed the login bug this morning. QA is testing it now. I'll send a summary by EOD. If you're blocked, ping me on Slack.",
+    qs: [
+      { q: "¿Qué arreglaron?", a: "the login bug", opts: ["the printer", "the login bug", "the website color"] },
+      { q: "¿Quién prueba ahora?", a: "QA", opts: ["sales", "QA", "the client"] },
+      { q: "¿Cómo avisar si estás bloqueado?", a: "ping on Slack", opts: ["call the CEO", "ping on Slack", "send a letter"] },
+    ],
+  },
+  {
+    min: 4,
+    title: "El cliente",
+    text: "They said the launch had been delayed, so we should update the client today. If I were you, I'd send a short note and offer a call. We can walk them through the new timeline.",
+    qs: [
+      { q: "¿Qué pasó con el launch?", a: "it was delayed", opts: ["it shipped", "it was delayed", "it was canceled"] },
+      { q: "¿Qué recomienda hacer?", a: "send a short note", opts: ["ignore it", "send a short note", "rewrite the product"] },
+      { q: "¿Qué pueden explicar?", a: "the new timeline", opts: ["the new timeline", "the office map", "the lunch menu"] },
+    ],
+  },
+];
+
+ENLAB.roleplays = [
+  {
+    id: "cafe",
+    min: 1,
+    title: "En el café",
+    es: "Tú eres el cliente.",
+    turns: [
+      { a: "Hi! What can I get you?", b: "A coffee, please." },
+      { a: "For here or to go?", b: "To go, please." },
+      { a: "That's three dollars.", b: "Here you go. Thanks." },
+    ],
+  },
+  {
+    id: "store",
+    min: 2,
+    title: "En la tienda",
+    es: "Tú compras una camiseta.",
+    turns: [
+      { a: "Can I help you find something?", b: "Yes. Do you have this in a medium?" },
+      { a: "Let me check. Yes, we do.", b: "Great. Can I try it on?" },
+      { a: "Sure. The fitting room is over there.", b: "Thanks. I'll take it." },
+    ],
+  },
+  {
+    id: "doctor",
+    min: 2,
+    title: "Con el médico",
+    es: "Tú eres el paciente.",
+    turns: [
+      { a: "What brings you in today?", b: "I have a headache and a fever." },
+      { a: "How long have you had it?", b: "Since yesterday." },
+      { a: "Are you allergic to anything?", b: "I'm allergic to penicillin." },
+    ],
+  },
+  {
+    id: "hotel",
+    min: 2,
+    title: "En el hotel",
+    es: "Tú eres el huésped.",
+    turns: [
+      { a: "Good evening. Do you have a reservation?", b: "Yes. It's under Lopez." },
+      { a: "Two nights, right?", b: "Yes. Is breakfast included?" },
+      { a: "It is. Checkout is at eleven.", b: "Could I have a late checkout?" },
+    ],
+  },
+  {
+    id: "standup",
+    min: 3,
+    title: "Standup de trabajo",
+    es: "Tú das tu update.",
+    turns: [
+      { a: "What did you work on yesterday?", b: "I finished the report and fixed a small bug." },
+      { a: "What are you doing today?", b: "I'll follow up with the client and test the login." },
+      { a: "Any blockers?", b: "We're blocked on the API. I'll ping QA." },
+    ],
+  },
+  {
+    id: "interview",
+    min: 3,
+    title: "Mini entrevista",
+    es: "Tú eres el candidato. Usa STAR si puedes.",
+    turns: [
+      { a: "Tell me about yourself.", b: "I'm a support specialist. I help customers and I like solving problems." },
+      { a: "Describe a challenge you solved.", b: "A client was blocked. I found the bug, we fixed it, and they stayed." },
+      { a: "Do you have any questions for us?", b: "What does a typical day look like on the team?" },
+    ],
+  },
+];
+
+ENLAB.starScaffold = [
+  { part: "S", en: "Situation", es: "Contexto en una frase. Dónde y cuándo." },
+  { part: "T", en: "Task", es: "Qué tenías que lograr tú." },
+  { part: "A", en: "Action", es: "Qué hiciste. Verbos: I checked, I asked, I fixed." },
+  { part: "R", en: "Result", es: "Qué pasó. Número o resultado claro." },
+];
+
+ENLAB.falseFriends = [
+  { q: "Falso amigo", prompt: "“I'm actually tired” NO significa “estoy actualmente cansado”. ¿Qué sí?", a: "en realidad / de hecho", opts: ["actualmente", "en realidad / de hecho", "actuar"], say: "I'm actually tired.", why: "actually = en realidad. currently = actualmente.", min: 3 },
+  { q: "Falso amigo", prompt: "embarrassed", a: "avergonzado", opts: ["embarazada", "avergonzado", "ocupado"], say: "I was embarrassed.", why: "embarrassed ≠ embarazada (pregnant).", min: 3 },
+  { q: "Falso amigo", prompt: "success / succeed", a: "éxito / tener éxito", opts: ["suceso", "éxito / tener éxito", "suceder"], say: "I hope you succeed.", why: "success = éxito. suceso = event.", min: 3 },
+  { q: "Falso amigo", prompt: "realize", a: "darse cuenta", opts: ["realizar (hacer)", "darse cuenta", "realizar un sueño solo"], say: "I didn't realize.", why: "realize = darse cuenta. make / carry out = realizar.", min: 3 },
+  { q: "Falso amigo", prompt: "library", a: "biblioteca", opts: ["librería", "biblioteca", "archivo"], say: "I'll meet you at the library.", why: "library = biblioteca. bookstore = librería.", min: 2 },
+  { q: "Falso amigo", prompt: "college", a: "universidad (US)", opts: ["colegio (niños)", "universidad (US)", "oficina"], say: "She's in college.", why: "US college ≈ universidad. school for kids = school.", min: 3 },
+];
