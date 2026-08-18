@@ -721,16 +721,16 @@
       const n = lvlNum();
       const rot = ["podcast", "travel", "chat", "cert"][t.i % 4];
       if (rot === "podcast" && (ENLAB.podcasts || []).length) {
-        return { game: "podcast", label: "Hoy: mini-podcast", hint: "Oír con transcripción en pestaña Oír" };
+        return { game: "podcast", label: typeof t === "function" ? t("hoyGamePodcast") : "Hoy: mini-podcast", hint: typeof t === "function" ? t("hoyGamePodcastHint") : "Oír con transcripción en pestaña Oír" };
       }
       if (rot === "travel" && ENLAB.travelMaps) {
-        return { game: "travel", label: `Hoy: mapa ${travelMapToday()?.title || "viaje"}`, hint: "Modo viaje — sigue los pasos del mapa" };
+        return { game: "travel", label: typeof t === "function" ? t("hoyGameTravel") : "Hoy: mapa de viaje", hint: typeof t === "function" ? t("hoyGameTravelHint") : "Aeropuerto, hotel, ciudad" };
       }
       if (rot === "chat" && n >= 2 && (ENLAB.chatWork || []).length) {
-        return { game: "chat", label: "Hoy: Slack/Teams", hint: "Mensajes formales e informales en Hablar" };
+        return { game: "chat", label: typeof t === "function" ? t("hoyGameWork") : "Hoy: chat de trabajo", hint: typeof t === "function" ? t("hoyGameWorkHint") : "Mensajes formales e informales en Hablar" };
       }
       if (rot === "cert" && n >= 3) {
-        return { game: "cert", label: "Examen certificado (30 min)", hint: "Simulacro B1/B2 — puedes repetir en Juego" };
+        return { game: "cert", label: typeof t === "function" ? t("hoyGameCert") : "Examen certificado (30 min)", hint: typeof t === "function" ? t("hoyGameCertHint") : "Simulacro B1/B2 — puedes repetir en Juego" };
       }
       return base;
     };
@@ -772,13 +772,11 @@
   }
 
   function patchStartQuiz() {
-    if (typeof startQuiz !== "function") return;
-    const orig = startQuiz;
-    window.startQuiz = function () {
-      const mode = document.querySelector("#quiz-mode")?.value || "choice";
-      if (mode === "cert") return startCertExam();
-      return orig();
-    };
+    /* cert se despacha en startQuiz de app.js. */
+  }
+
+  function patchMakeQuizItems() {
+    /* cert items se piden a NR.makeCertExamItems desde app.js. */
   }
 
   function patchPaintTab() {
@@ -791,16 +789,6 @@
         if (id === "ia") renderLabAudit();
       });
     }
-  }
-
-  /* ── Patch makeQuizItems ── */
-  function patchMakeQuizItems() {
-    if (typeof makeQuizItems !== "function") return;
-    const orig = makeQuizItems;
-    window.makeQuizItems = function () {
-      if (quiz.mode === "cert") return makeCertExamItems();
-      return orig();
-    };
   }
 
   /* ── Events ── */

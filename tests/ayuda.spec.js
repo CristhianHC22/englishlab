@@ -41,6 +41,7 @@ test("Ayuda: English UI full keys", async ({ page }) => {
   await expect(page.locator('[data-i18n="hoyTitle"]')).toHaveText(/15 minutes/i);
   await page.locator('[data-tab="vocales"]').click();
   await expect(page.locator('[data-i18n="oidoTitle"]')).toHaveText(/Listen/i);
+  await expect(page.locator("#oido-toc")).toContainText(/Rules/i);
   await page.locator('[data-tab="verbos"]').click();
   await expect(page.locator('[data-i18n="verbosTitle"]')).toHaveText(/Verbs/i);
   await page.locator('[data-tab="quiz"]').click();

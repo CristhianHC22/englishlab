@@ -4,24 +4,31 @@
 
   const DB_NAME = "englishlab-backup";
   const STORE = "kv";
-  const KEYS = [
-    "enlab-srs",
-    "enlab-story-progress",
-    "enlab-weak",
-    "enlab-known",
-    "enlab-ear-weak",
-    "enlab-speak-weak",
-    "enlab-stats",
-    "enlab-log",
-    "enlab-pron-log",
-    "enlab-writing-done",
-    "enlab-push-sub",
-    "enlab-error-log",
+
+  /* Fuente única: transfer (app.js) y espejo IDB usan la misma lista. */
+  const PROG_KEYS = [
+    "enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats",
+    "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak",
+    "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup",
+    "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es",
+    "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang",
+    "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs",
+    "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel",
+    "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score",
+    "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone",
+    "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3",
+    "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast",
+    "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal", "enlab-error-log",
     "enlab-place-result",
   ];
+  const KEYS = PROG_KEYS.concat(["enlab-push-sub"]);
+
+  let dbp = null;
+  let writeQ = Promise.resolve();
 
   function openDb() {
-    return new Promise((resolve, reject) => {
+    if (dbp) return dbp;
+    dbp = new Promise((resolve, reject) => {
       if (!("indexedDB" in window)) { reject(new Error("no idb")); return; }
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = () => {
@@ -29,22 +36,29 @@
         if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => {
+        dbp = null;
+        reject(req.error);
+      };
     });
+    return dbp;
   }
 
-  async function mirror(key, value) {
+  function mirror(key, value) {
     if (!KEYS.includes(key) || value == null) return;
-    try {
-      const db = await openDb();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, "readwrite");
-        tx.objectStore(STORE).put(String(value), key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-      db.close();
-    } catch { /* ignore */ }
+    writeQ = writeQ.then(async () => {
+      try {
+        const db = await openDb();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(String(value), key);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch {
+        dbp = null;
+      }
+    });
   }
 
   async function restoreMissing() {
@@ -60,14 +74,20 @@
           req.onerror = () => reject(req.error);
         });
         if (val) {
-          localStorage.setItem(key, String(val));
+          origSet(key, String(val));
           changed = true;
         }
       }
-      db.close();
     } catch { /* ignore */ }
     return changed;
   }
 
-  window.ENLAB_IDB = { KEYS, mirror, restoreMissing };
+  const origSet = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function (key, value) {
+    origSet(key, value);
+    if (KEYS.includes(String(key))) mirror(String(key), value);
+  };
+
+  window.ENLAB_PROG_KEYS = PROG_KEYS;
+  window.ENLAB_IDB = { KEYS, PROG_KEYS, mirror, restoreMissing };
 })();

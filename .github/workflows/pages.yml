@@ -23,9 +23,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Stage public site
+        run: |
+          mkdir -p site
+          rsync -a \
+            --exclude site \
+            --exclude .git \
+            --exclude .github \
+            --exclude .cursor \
+            --exclude node_modules \
+            --exclude tests \
+            --exclude test-results \
+            --exclude playwright-report \
+            --exclude playwright.config.js \
+            --exclude package.json \
+            --exclude package-lock.json \
+            --exclude scripts \
+            --exclude vapid-private.json \
+            --exclude vapid-private.example.json \
+            --exclude push-sub.json \
+            ./ site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: site
       - id: deploy
         uses: actions/deploy-pages@v4

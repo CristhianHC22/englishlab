@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone", "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3", "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast", "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal", "enlab-error-log", "enlab-place-result"];
+const PROG_KEYS = window.ENLAB_PROG_KEYS || ["enlab-stats", "enlab-weak", "enlab-known", "enlab-cefr"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
@@ -572,37 +572,37 @@ function dayTheme() {
 }
 
 function todayGame() {
-  const t = dayTheme();
+  const theme = dayTheme();
   const n = lvlNum();
-  let game = t.game || "";
+  let game = theme.game || "";
   if (!game) {
-    if (/-ed|liked\s*\/\s*played/i.test(t.text)) game = "ed";
-    else if (/make\/do/i.test(t.text)) game = "uso";
+    if (/-ed|liked\s*\/\s*played/i.test(theme.text)) game = "ed";
+    else if (/make\/do/i.test(theme.text)) game = "uso";
   }
   if (game === "ed") {
-    return { game, label: "Hoy: 5 minutos de -ed", hint: "liked [t] · played [d] · wanted [id]" };
+    return { game, label: t("hoyGameEd"), hint: t("hoyGameEdHint") };
   }
   if (game === "uso") {
-    return { game, label: "Hoy: 5 minutos de make/do", hint: "Calcos, make/do, Did you…?" };
+    return { game, label: t("hoyGameUso"), hint: t("hoyGameUsoHint") };
   }
-  const rot = ["art", "prep", "phrasal", "cond", "dict", "listen", "weekly"][t.i % 7];
+  const rot = ["art", "prep", "phrasal", "cond", "dict", "listen", "weekly"][theme.i % 7];
   const goal = localStorage.getItem("enlab-onboard-goal") || "";
-  if (!game && goal === "travel" && n >= 2 && t.i % 4 === 0) {
-    return { game: "travel", label: typeof t === "function" ? t("hoyGameTravel") : "Hoy: mapa de viaje", hint: typeof t === "function" ? t("hoyGameTravelHint") : "Aeropuerto, hotel, ciudad" };
+  if (!game && goal === "travel" && n >= 2 && theme.i % 4 === 0) {
+    return { game: "travel", label: t("hoyGameTravel"), hint: t("hoyGameTravelHint") };
   }
-  if (!game && goal === "work" && n >= 2 && t.i % 4 === 1) {
-    return { game: "chat", label: typeof t === "function" ? t("hoyGameWork") : "Hoy: chat de trabajo", hint: typeof t === "function" ? t("hoyGameWorkHint") : "Slack/Teams formal e informal" };
+  if (!game && goal === "work" && n >= 2 && theme.i % 4 === 1) {
+    return { game: "chat", label: t("hoyGameWork"), hint: t("hoyGameWorkHint") };
   }
-  if (!game && goal === "exam" && n >= 2 && t.i % 4 === 2) {
-    return { game: "weekly", label: typeof t === "function" ? t("hoyGameExam") : "Examen semanal (12)", hint: typeof t === "function" ? t("hoyGameExamHint") : "Mezcla oído, verbos, gramática y email" };
+  if (!game && goal === "exam" && n >= 2 && theme.i % 4 === 2) {
+    return { game: "weekly", label: t("hoyGameExam"), hint: t("hoyGameExamHint") };
   }
-  if (n >= 2 && rot === "art") return { game: "art", label: "Hoy: a / an / the", hint: "an hour, a university, the sun" };
-  if (n >= 2 && rot === "prep") return { game: "prep", label: "Hoy: in / on / at", hint: "on Monday · at 3 · in 1999" };
-  if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: "Hoy: phrasals", hint: "look up, wrap up, run out" };
-  if (n >= 3 && rot === "cond") return { game: "cond", label: "Hoy: if / said", hint: "Condicionales y reported speech" };
-  if (rot === "dict") return { game: "dict", label: "Hoy: dictado", hint: "Oye una vez y escribe" };
-  if (n >= 2 && rot === "listen") return { game: "listen", label: "Hoy: escucha un párrafo", hint: "Oyes un texto y 3 preguntas" };
-  if (n >= 2 && rot === "weekly") return { game: "weekly", label: "Examen semanal (12)", hint: "Mezcla oído, verbos, gramática y email" };
+  if (n >= 2 && rot === "art") return { game: "art", label: t("hoyGameArt"), hint: t("hoyGameArtHint") };
+  if (n >= 2 && rot === "prep") return { game: "prep", label: t("hoyGamePrep"), hint: t("hoyGamePrepHint") };
+  if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: t("hoyGamePhrasal"), hint: t("hoyGamePhrasalHint") };
+  if (n >= 3 && rot === "cond") return { game: "cond", label: t("hoyGameCond"), hint: t("hoyGameCondHint") };
+  if (rot === "dict") return { game: "dict", label: t("hoyGameDict"), hint: t("hoyGameDictHint") };
+  if (n >= 2 && rot === "listen") return { game: "listen", label: t("hoyGameListen"), hint: t("hoyGameListenHint") };
+  if (n >= 2 && rot === "weekly") return { game: "weekly", label: t("hoyGameExam"), hint: t("hoyGameExamHint") };
   return { game: "", label: "", hint: "" };
 }
 
@@ -2036,6 +2036,7 @@ function makeQuizItems() {
   if (quiz.mode === "story") return makeStoryItems();
   if (quiz.mode === "emailtone") return makeEmailToneItems();
   if (quiz.mode === "place") return window.PLUS?.makePlacementItems?.() || [];
+  if (quiz.mode === "cert") return window.NR?.makeCertExamItems?.() || [];
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -2188,6 +2189,15 @@ function renderQuiz() {
     } else {
       renderHome();
       renderEarMisses();
+    }
+    if (quiz.mode === "place" && window.PLUS?.scoreToCefr && !box.querySelector("#place-apply")) {
+      const sug = window.PLUS.scoreToCefr(quiz.score, quiz.items.length);
+      localStorage.setItem("enlab-place-result", JSON.stringify({
+        score: quiz.score, n: quiz.items.length, cefr: sug, at: Date.now(),
+      }));
+      box.querySelector(".card")?.insertAdjacentHTML("beforeend", `<p class="row" style="margin-top:10px">
+        <button type="button" class="btn" id="place-apply" data-cefr="${esc(sug)}">${esc(t("placeApply", { level: sug.toUpperCase() }))}</button>
+      </p>`);
     }
     return;
   }
@@ -2342,6 +2352,8 @@ function renderQuiz() {
 
 function startQuiz() {
   const mode = $("#quiz-mode")?.value || "choice";
+  if (mode === "cert" && window.NR?.startCertExam) return window.NR.startCertExam();
+  if (mode === "place" && window.PLUS?.startPlacement) return window.PLUS.startPlacement();
   quiz = { i: 0, score: 0, items: [], fails: [], mode, host: "#quiz-box" };
   quiz.items = makeQuizItems();
   renderQuiz();
@@ -3358,25 +3370,25 @@ document.addEventListener("keydown", (e) => {
 function renderOidoToc() {
   const n = lvlNum();
   const items = [
-    { id: "oido-decidir", label: "Decidir", min: 1 },
-    { id: "oido-reglas", label: "Reglas", min: 1 },
-    { id: "oido-clave", label: "Clave", min: 1 },
-    { id: "oido-mapa", label: "Mapa A–U", min: 1 },
-    { id: "oido-contrastes", label: "Contrastes", min: 1 },
-    { id: "oido-trampas", label: "Trampas", min: 1 },
-    { id: "oido-mudas", label: "Mudas / se comen", min: 2 },
-    { id: "oido-contra", label: "Contracciones", min: 2 },
-    { id: "oido-endings", label: "-tion / golpe", min: 2 },
-    { id: "oido-roles", label: "Verbo / nombre", min: 2 },
-    { id: "oido-acento", label: "Acento", min: 3 },
-    { id: "oido-ough", label: "ough", min: 3 },
-    { id: "oido-ritmo", label: "Ritmo", min: 3 },
-    { id: "oido-chunks", label: "Calcos / pares", min: 1 },
-    { id: "oido-tips", label: "Tips B1/B2", min: 3 },
+    { id: "oido-decidir", key: "oidoTocDecidir", min: 1 },
+    { id: "oido-reglas", key: "oidoTocReglas", min: 1 },
+    { id: "oido-clave", key: "oidoTocClave", min: 1 },
+    { id: "oido-mapa", key: "oidoTocMapa", min: 1 },
+    { id: "oido-contrastes", key: "oidoTocContrastes", min: 1 },
+    { id: "oido-trampas", key: "oidoTocTrampas", min: 1 },
+    { id: "oido-mudas", key: "oidoTocMudas", min: 2 },
+    { id: "oido-contra", key: "oidoTocContra", min: 2 },
+    { id: "oido-endings", key: "oidoTocEndings", min: 2 },
+    { id: "oido-roles", key: "oidoTocRoles", min: 2 },
+    { id: "oido-acento", key: "oidoTocAcento", min: 3 },
+    { id: "oido-ough", key: "oidoTocOugh", min: 3 },
+    { id: "oido-ritmo", key: "oidoTocRitmo", min: 3 },
+    { id: "oido-chunks", key: "oidoTocChunks", min: 1 },
+    { id: "oido-tips", key: "oidoTocTips", min: 3 },
   ].filter((i) => n >= i.min);
   const nav = $("#oido-toc");
   if (!nav) return;
-  nav.innerHTML = items.map((i) => `<a href="#${i.id}" data-jump="${i.id}">${esc(i.label)}</a>`).join("");
+  nav.innerHTML = items.map((i) => `<a href="#${i.id}" data-jump="${i.id}">${esc(t(i.key))}</a>`).join("");
 }
 
 function playDailyPairs() {
@@ -3811,6 +3823,7 @@ function applyUiLang() {
   if (typeof renderSituations === "function") renderSituations();
   if (typeof renderPodcastToday === "function") renderPodcastToday();
   if (typeof renderVerbs === "function" && currentTab === "verbos") renderVerbs();
+  if (typeof renderOidoToc === "function" && currentTab === "vocales") renderOidoToc();
   if (typeof renderRemind === "function") renderRemind();
   if (typeof renderWeekReport === "function") renderWeekReport();
   if (typeof renderClassPin === "function") renderClassPin();

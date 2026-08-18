@@ -75,3 +75,21 @@ test("Plus: 90-day chart on Hoy", async ({ page }) => {
   await expect(page.locator("#hoy-streak-chart")).toBeVisible();
   await expect(page.locator("#hoy-streak-chart .streak-90")).toBeVisible();
 });
+
+test("Plus: IDB mirrors transfer keys", async ({ page }) => {
+  await boot(page);
+  const ok = await page.evaluate(() => {
+    const prog = window.ENLAB_PROG_KEYS || [];
+    const keys = window.ENLAB_IDB?.KEYS || [];
+    return {
+      n: prog.length,
+      roster: keys.includes("enlab-class-roster"),
+      place: keys.includes("enlab-place-result"),
+      same: prog.every((k) => keys.includes(k)),
+    };
+  });
+  expect(ok.n).toBeGreaterThan(40);
+  expect(ok.roster).toBe(true);
+  expect(ok.place).toBe(true);
+  expect(ok.same).toBe(true);
+});

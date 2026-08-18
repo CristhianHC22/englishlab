@@ -271,38 +271,7 @@
   }
 
   function patchQuiz() {
-    if (window._plusQuizPatched) return;
-    window._plusQuizPatched = true;
-    if (typeof makeQuizItems === "function") {
-      const orig = makeQuizItems;
-      window.makeQuizItems = function () {
-        if (quiz?.mode === "place") return makePlacementItems();
-        return orig();
-      };
-    }
-    if (typeof startQuiz === "function") {
-      const origS = startQuiz;
-      window.startQuiz = function () {
-        const mode = document.querySelector("#quiz-mode")?.value || "choice";
-        if (mode === "place") return startPlacement();
-        return origS();
-      };
-    }
-    if (typeof renderQuiz === "function") {
-      const origR = renderQuiz;
-      window.renderQuiz = function () {
-        origR();
-        if (quiz?.mode === "place" && quiz.i >= quiz.items.length) {
-          const sug = scoreToCefr(quiz.score, quiz.items.length);
-          const box = document.querySelector("#quiz-box");
-          if (!box || box.querySelector("#place-apply")) return;
-          localStorage.setItem("enlab-place-result", JSON.stringify({ score: quiz.score, n: quiz.items.length, cefr: sug, at: Date.now() }));
-          box.insertAdjacentHTML("beforeend", `<p class="row" style="margin-top:10px">
-            <button type="button" class="btn" id="place-apply" data-cefr="${esc(sug)}">${esc(tt("placeApply", { level: sug.toUpperCase() }))}</button>
-          </p>`);
-        }
-      };
-    }
+    /* startQuiz / makeQuizItems / place-apply viven en app.js. */
   }
 
   function patchRecording() {

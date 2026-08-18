@@ -84,12 +84,12 @@ Patrón bueno ya usado: `onTabPaint(fn)` / `onHomePaint(fn)` en vez de reemplaza
 
 ## Deuda conocida (no es olvido al azar)
 
-1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Siguiente paso sano: ir **bajando** modos de quiz (cert, place) a ramas nativas y **quitar** wrappers.
-2. **i18n incompleto en strings dinámicos** — `todayGame()`, TOC de Oír, tips del día, STAR, varios `innerHTML` de NR siguen en español fijo.
-3. **IDB ≠ transfer** — no todas las claves de progreso se espejan.
-4. **Panel “Rendimiento”** — cuenta packs diferidos; no es Lighthouse real.
-5. **Tarea de clase** — se **resalta** al abrir Hoy, no se auto-lanza (evita romper tests y secuestrar la sesión).
-6. **Pages publica la raíz del git** (incluye `tests/`). Inofensivo; no es un bundle de producción recortado.
+1. **`app.js` enorme** — partirlo a ESM rompería el modelo sin-build. Cert y place ya se despachan con `if` nativo en `startQuiz` (sin envolver la función). Siguen wrappers en `applySpeakVerdict` / `todayGame`.
+2. **i18n dinámico** — TOC de Oír y `todayGame` ya pasan por `t()`. STAR y varios `innerHTML` de NR/SV pueden seguir en español.
+3. **IDB = transfer** — `PROG_KEYS` vive en `idb-backup.js`. `localStorage.setItem` de esas claves se espeja solo.
+4. **Pages más flaco** — el workflow copia a `site/` sin tests, `.github`, scripts ni lockfile.
+5. **Panel “Rendimiento”** — cuenta packs diferidos; no es Lighthouse real.
+6. **Tarea de clase** — se **resalta** al abrir Hoy, no se auto-lanza (evita romper tests y secuestrar la sesión).
 7. **Google Fonts** — se piden en `index.html`; visual tests las bloquean. Offline total = fallback del sistema (ok).
 
 ## Cómo añadir algo nuevo
