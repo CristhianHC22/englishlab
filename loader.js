@@ -1,4 +1,4 @@
-/* Bundle split: carga packs S–V + bulk, luego bootstrap SV */
+/* Bundle split: carga packs S–V + bulk, bootstrap único, refresh UI */
 (function () {
   "use strict";
 
@@ -15,19 +15,28 @@
     });
   }
 
+  function refreshAfterPacks() {
+    if (typeof renderSituations === "function") renderSituations();
+    if (typeof renderPodcastToday === "function") renderPodcastToday();
+    if (window.SV?.refreshPanels) window.SV.refreshPanels();
+    if (typeof renderLabAudit === "function") renderLabAudit();
+    if (typeof renderHome === "function") renderHome();
+  }
+
   async function loadDeferred() {
     for (const src of DEFERRED) {
       try { await loadScript(src); } catch { /* optional */ }
     }
-    if (window.NR?.bootstrap) window.NR.bootstrap();
-    if (window.SV?.bootstrap) window.SV.bootstrap();
-    if (typeof renderLabAudit === "function") renderLabAudit();
-    if (typeof renderSituations === "function") renderSituations();
-    if (typeof renderHome === "function") renderHome();
+    if (!window._enlabBootstrapped) {
+      window._enlabBootstrapped = true;
+      if (window.NR?.bootstrap) window.NR.bootstrap();
+      if (window.SV?.bootstrap) window.SV.bootstrap();
+    }
+    refreshAfterPacks();
     window.dispatchEvent(new CustomEvent("enlab-packs-ready"));
   }
 
-  window.ENLAB_LOADER = { DEFERRED, loadDeferred };
+  window.ENLAB_LOADER = { DEFERRED, loadDeferred, refreshAfterPacks };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", loadDeferred);

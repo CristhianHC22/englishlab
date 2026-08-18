@@ -317,26 +317,32 @@ window.ENLAB = window.ENLAB || {};
 
   Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), newScenarios);
 
-  /* Pad existing scenarios to 20 phrases */
-  const padPhrases = [
-    { en: "Could you repeat that, please?", es: "¿Lo repites, por favor?", min: 1 },
-    { en: "Thank you so much.", es: "Muchas gracias.", min: 1 },
-    { en: "I appreciate your help.", es: "Aprecio tu ayuda.", min: 2 },
-    { en: "One moment, please.", es: "Un momento, por favor.", min: 1 },
-    { en: "That works for me.", es: "Me funciona.", min: 2 },
-    { en: "I'll come back later.", es: "Vuelvo más tarde.", min: 2 },
-    { en: "Is there anything else?", es: "¿Algo más?", min: 2 },
-    { en: "Perfect, thank you.", es: "Perfecto, gracias.", min: 1 },
-    { en: "I'm not sure I understand.", es: "No estoy seguro de entender.", min: 2 },
-    { en: "Could you speak slower?", es: "¿Más despacio?", min: 2 },
-  ];
+  /* Pad scenarios to 20 with context-specific extras (not generic clones) */
+  const scenarioPads = {
+    pharmacy: [{ en: "Take with food, not on an empty stomach.", es: "Con comida, no en ayunas.", min: 2 }],
+    gym: [{ en: "How many sets and reps do you recommend?", es: "¿Cuántas series y repeticiones?", min: 2 }],
+    vet: [{ en: "She hasn't eaten since yesterday evening.", es: "No come desde ayer.", min: 2 }],
+    bus: [{ en: "Does this bus stop at the main station?", es: "¿Para en la estación central?", min: 2 }],
+    dmv: [{ en: "I need to update my address on my license.", es: "Actualizar dirección en licencia.", min: 2 }],
+    emergency: [{ en: "Stay on the line — help is coming.", es: "No cuelgues — viene ayuda.", min: 2 }],
+    interview: [{ en: "Could you tell me about the team structure?", es: "¿Estructura del equipo?", min: 3 }],
+    coworking: [{ en: "Is the meeting room free until noon?", es: "¿Sala libre hasta mediodía?", min: 3 }],
+  };
   Object.keys(ENLAB.phrasesSituation).forEach((key) => {
     const arr = ENLAB.phrasesSituation[key];
-    let i = 0;
-    while (arr.length < TARGET && i < padPhrases.length * 3) {
-      const p = padPhrases[i % padPhrases.length];
-      if (!arr.some((x) => x.en === p.en)) arr.push({ ...p, min: p.min });
-      i += 1;
+    const pads = scenarioPads[key] || [];
+    pads.forEach((p) => {
+      if (arr.length < TARGET && !arr.some((x) => x.en === p.en)) arr.push(p);
+    });
+    const generic = [
+      { en: "Could you repeat that more slowly?", es: "¿Más despacio?", min: 1 },
+      { en: "Thank you for your patience.", es: "Gracias por la paciencia.", min: 2 },
+    ];
+    let gi = 0;
+    while (arr.length < TARGET && gi < generic.length * 4) {
+      const p = generic[gi % generic.length];
+      if (!arr.some((x) => x.en === p.en)) arr.push({ ...p });
+      gi += 1;
     }
   });
 
@@ -420,17 +426,70 @@ window.ENLAB = window.ENLAB || {};
   dictExtra.forEach((d) => {
     if (!ENLAB.dictation.some((x) => x.en === d.en)) ENLAB.dictation.push(d);
   });
+  const dictBank = [
+    { en: "The meeting starts at nine sharp.", min: 2, es: "La reunión a las nueve en punto.", week: 3, hint: "sharp → /ʃɑːrp/", hard: "sharp" },
+    { en: "I'll send the report by end of day.", min: 3, es: "Mando el reporte al cierre.", week: 3, hint: "report → /rɪˈpɔːrt/", hard: "report" },
+    { en: "Could we push it to next Monday?", min: 3, es: "¿Lo movemos al lunes?", week: 4, hint: "Monday → /ˈmʌndeɪ/", hard: "Monday" },
+    { en: "I'm running five minutes late.", min: 2, es: "Llego cinco minutos tarde.", week: 2, hint: "minutes → /ˈmɪnɪts/", hard: "minutes" },
+    { en: "Let me share my screen.", min: 3, es: "Comparto pantalla.", week: 4, hint: "screen → /skriːn/", hard: "screen" },
+    { en: "The wifi is unstable today.", min: 2, es: "El wifi inestable hoy.", week: 2, hint: "unstable → 3 sílabas", hard: "unstable" },
+    { en: "We need more time to review this.", min: 3, es: "Necesitamos más tiempo.", week: 5, hint: "review → /rɪˈvjuː/", hard: "review" },
+    { en: "I'll loop in the product owner.", min: 4, es: "Meto al product owner.", week: 6, hint: "loop in → phrasal", hard: "loop" },
+    { en: "Can you mute your microphone?", min: 2, es: "¿Silencias el micrófono?", week: 2, hint: "microphone → /ˈmaɪkrəfoʊn/", hard: "microphone" },
+    { en: "Let's take a five-minute break.", min: 2, es: "Pausa de cinco minutos.", week: 2, hint: "break → /breɪk/", hard: "break" },
+    { en: "I didn't receive your last email.", min: 3, es: "No recibí tu último email.", week: 4, hint: "receive → /rɪˈsiːv/", hard: "receive" },
+    { en: "The deadline is this Friday.", min: 2, es: "Fecha límite el viernes.", week: 3, hint: "deadline → /ˈdedlaɪn/", hard: "deadline" },
+    { en: "We're blocked on legal approval.", min: 4, es: "Bloqueados por legal.", week: 7, hint: "approval → /əˈpruːvəl/", hard: "approval" },
+    { en: "I'll follow up tomorrow morning.", min: 3, es: "Hago seguimiento mañana.", week: 4, hint: "follow → /ˈfɑːloʊ/", hard: "follow" },
+    { en: "Thanks for flagging that issue.", min: 3, es: "Gracias por avisar.", week: 5, hint: "flagging → /ˈflæɡɪŋ/", hard: "flagging" },
+    { en: "Let's schedule a quick sync.", min: 3, es: "Agendemos un sync rápido.", week: 5, hint: "schedule → /ˈskedʒuːl/", hard: "schedule" },
+    { en: "I agree with your proposal.", min: 3, es: "Estoy de acuerdo.", week: 4, hint: "proposal → /prəˈpoʊzəl/", hard: "proposal" },
+    { en: "Could you clarify the requirements?", min: 4, es: "¿Aclaras requisitos?", week: 6, hint: "requirements → 4 sílabas", hard: "requirements" },
+    { en: "I'll be out until Wednesday.", min: 3, es: "Fuera hasta el miércoles.", week: 5, hint: "Wednesday → /ˈwenzdeɪ/", hard: "Wednesday" },
+    { en: "We shipped the fix last night.", min: 4, es: "Lanzamos el fix anoche.", week: 8, hint: "shipped → /ʃɪpt/", hard: "shipped" },
+    { en: "Please keep me posted.", min: 2, es: "Mantenme al tanto.", week: 3, hint: "posted → /ˈpoʊstɪd/", hard: "posted" },
+    { en: "I need a receipt for expenses.", min: 3, es: "Necesito recibo de gastos.", week: 4, hint: "receipt → /rɪˈsiːt/", hard: "receipt" },
+    { en: "The client loved the demo.", min: 3, es: "Al cliente le encantó.", week: 5, hint: "client → /ˈklaɪənt/", hard: "client" },
+    { en: "Let's revisit this next quarter.", min: 4, es: "Lo retomamos el próximo trimestre.", week: 9, hint: "quarter → /ˈkwɔːrtər/", hard: "quarter" },
+    { en: "I'm confident we can deliver.", min: 4, es: "Confío en que entregamos.", week: 7, hint: "confident → /ˈkɑːnfɪdənt/", hard: "confident" },
+    { en: "Sorry, I was on another call.", min: 2, es: "Perdón, en otra llamada.", week: 2, hint: "another → /əˈnʌðər/", hard: "another" },
+    { en: "Can we move the stand-up to ten?", min: 3, es: "¿Movemos stand-up a las diez?", week: 4, hint: "stand-up → compuesto", hard: "stand-up" },
+    { en: "I'll draft a summary for the team.", min: 4, es: "Redacto resumen para el equipo.", week: 6, hint: "summary → /ˈsʌməri/", hard: "summary" },
+    { en: "We underestimated the effort.", min: 4, es: "Subestimamos el esfuerzo.", week: 7, hint: "effort → /ˈefərt/", hard: "effort" },
+    { en: "That's out of scope for this sprint.", min: 4, es: "Fuera de alcance este sprint.", week: 8, hint: "scope → /skoʊp/", hard: "scope" },
+    { en: "I'll ping you on Slack.", min: 3, es: "Te escribo en Slack.", week: 4, hint: "ping → /pɪŋ/", hard: "ping" },
+    { en: "We hit our target ahead of plan.", min: 4, es: "Meta antes de lo previsto.", week: 9, hint: "target → /ˈtɑːrɡɪt/", hard: "target" },
+    { en: "Let's document the decision.", min: 4, es: "Documentemos la decisión.", week: 7, hint: "document → /ˈdɑːkjumənt/", hard: "document" },
+    { en: "I'm happy to pair on this bug.", min: 4, es: "Feliz de pair en este bug.", week: 6, hint: "pair → /per/", hard: "pair" },
+    { en: "Could you review my pull request?", min: 4, es: "¿Revisas mi PR?", week: 7, hint: "request → /rɪˈkwest/", hard: "request" },
+    { en: "The build failed on staging.", min: 4, es: "Build falló en staging.", week: 8, hint: "staging → /ˈsteɪdʒɪŋ/", hard: "staging" },
+    { en: "I'll escalate if we don't hear back.", min: 4, es: "Escalo si no responden.", week: 9, hint: "escalate → /ˈeskəleɪt/", hard: "escalate" },
+    { en: "We aligned on the next milestone.", min: 4, es: "Alineados en el hito.", week: 8, hint: "milestone → /ˈmaɪlstoʊn/", hard: "milestone" },
+    { en: "Thanks for covering while I was out.", min: 4, es: "Gracias por cubrir.", week: 7, hint: "covering → /ˈkʌvərɪŋ/", hard: "covering" },
+    { en: "Let's keep this thread focused.", min: 4, es: "Hilo enfocado.", week: 6, hint: "focused → /ˈfoʊkəst/", hard: "focused" },
+    { en: "I need access to the repo.", min: 3, es: "Necesito acceso al repo.", week: 5, hint: "access → /ˈækses/", hard: "access" },
+    { en: "We're waiting on finance approval.", min: 4, es: "Esperando finanzas.", week: 8, hint: "finance → /ˈfaɪnæns/", hard: "finance" },
+    { en: "I'll send a calendar invite.", min: 3, es: "Mando invite de calendario.", week: 4, hint: "calendar → /ˈkælɪndər/", hard: "calendar" },
+    { en: "Good catch — thanks for testing.", min: 3, es: "Buen ojo — gracias por probar.", week: 5, hint: "testing → /ˈtestɪŋ/", hard: "testing" },
+    { en: "Let's debrief after the launch.", min: 4, es: "Debrief después del launch.", week: 9, hint: "debrief → /diːˈbriːf/", hard: "debrief" },
+    { en: "I'm blocked until I get credentials.", min: 4, es: "Bloqueado sin credenciales.", week: 7, hint: "credentials → 4 sílabas", hard: "credentials" },
+    { en: "We rolled back the release.", min: 4, es: "Hicimos rollback.", week: 8, hint: "rolled → /roʊld/", hard: "rolled" },
+    { en: "I'll take point on the migration.", min: 4, es: "Lidero la migración.", week: 9, hint: "migration → /maɪˈɡreɪʃən/", hard: "migration" },
+    { en: "Can we async this discussion?", min: 4, es: "¿Lo hacemos async?", week: 7, hint: "async → /eɪˈsɪŋk/", hard: "async" },
+    { en: "The metrics look healthy so far.", min: 4, es: "Métricas sanas por ahora.", week: 8, hint: "metrics → /ˈmetrɪks/", hard: "metrics" },
+    { en: "I'll prepare talking points.", min: 4, es: "Preparo talking points.", week: 7, hint: "prepare → /prɪˈper/", hard: "prepare" },
+    { en: "We need sign-off from security.", min: 4, es: "Necesitamos OK de security.", week: 9, hint: "security → /sɪˈkjʊrəti/", hard: "security" },
+    { en: "Let's celebrate the win.", min: 2, es: "Celebremos el logro.", week: 3, hint: "celebrate → /ˈselɪbreɪt/", hard: "celebrate" },
+  ];
+  dictBank.forEach((d) => {
+    if (!ENLAB.dictation.some((x) => x.en === d.en)) ENLAB.dictation.push(d);
+  });
+  ENLAB.dictation = ENLAB.dictation.filter((d) => !/^Practice sentence number/.test(d.en));
   while (ENLAB.dictation.length < 100) {
-    const i = ENLAB.dictation.length;
-    const w = Math.floor(i / 7) + 1;
-    ENLAB.dictation.push({
-      en: `Practice sentence number ${i + 1} for week ${w}.`,
-      min: Math.min(4, 1 + Math.floor(w / 4)),
-      es: `Frase de práctica ${i + 1}, semana ${w}.`,
-      week: w,
-      hint: `Semana ${w}`,
-      hard: "practice",
-    });
+    const tpl = dictBank[ENLAB.dictation.length % dictBank.length];
+    const variant = { ...tpl, en: tpl.en.replace(/\.$/, ` (${ENLAB.dictation.length + 1}).`) };
+    if (!ENLAB.dictation.some((x) => x.en === variant.en)) ENLAB.dictation.push(variant);
+    else break;
   }
 
   /* 40 podcasts en series de 3 (trabajo, viaje, vida) */
@@ -444,8 +503,21 @@ window.ENLAB = window.ENLAB || {};
     return text.split(/(?<=[.!?])\s+/).filter(Boolean).map((s, i) => ({ t: s.trim(), i }));
   }
 
+  const podScripts = {
+    "stand-up": "Quick stand-up. Yesterday I closed two tickets. Today I'll pair on auth. I'm blocked on staging keys — can someone help?",
+    feedback: "Good feedback is specific and kind. Say what worked, what didn't, and one thing to try next. Avoid vague praise like 'great job' with no detail.",
+    deadline: "We committed to Friday, but scope grew. Let's cut nice-to-haves, ship the core flow, and move polish to next sprint. Communicate early if you're stuck.",
+    onboarding: "Welcome aboard. Week one: set up your laptop, meet your buddy, and shadow a customer call. Ask questions — there are no dumb ones in week one.",
+    "lost luggage": "My bag didn't arrive. Here's my claim tag. I need essentials tonight and updates by morning. What compensation can you offer?",
+    "morning routine": "I wake at six, stretch for five minutes, and review my top three tasks. No email before breakfast — it sets the tone for the whole day.",
+  };
+
   function makePodcast(id, seriesId, ep, topic, min) {
-    const text = `Episode ${ep}: ${topic}. Today we talk about ${topic} in real English. Listen for key phrases you can use tomorrow. First tip: be clear and polite. Second: ask when you don't understand. Third: practice out loud for one minute. That's it for this mini episode on ${topic}.`;
+    const text = podScripts[topic] || (seriesId === "work"
+      ? `At work, ${topic} matters more than you think. Listen for natural phrases natives use. Pause after each sentence and repeat out loud. Small daily practice beats cramming once a week.`
+      : seriesId === "travel"
+        ? `When you travel, ${topic} situations test your English fast. Stay polite, ask short questions, and confirm details. Locals appreciate the effort even if grammar isn't perfect.`
+        : `In daily life, ${topic} comes up often. Notice how people shorten words and link sounds. Copy the rhythm, not just the vocabulary. That's how you sound natural.`);
     return {
       id,
       series: seriesId,

@@ -11,7 +11,15 @@ let verbLimit = 24;
 let hoyPairI = 0;
 let hoyPathI = -1;
 let hoyPathDay = "";
-const dirty = { vowels: true, verbs: true, speak: true, ai: true };
+const dirty = { vowels: true, verbs: true, speak: true, ai: true, hablar: true };
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
 
 function starterSet() {
   return new Set(ENLAB.starter40 || []);
@@ -302,8 +310,10 @@ function upsertLog() {
   }
   const logs = Object.values(byDate).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 60);
   localStorage.setItem("enlab-log", JSON.stringify(logs));
-  renderSessionLog();
+  renderSessionLogDebounced();
 }
+
+const renderSessionLogDebounced = debounce(renderSessionLog, 350);
 
 function renderSessionLog() {
   const el = $("#session-log");
@@ -358,7 +368,10 @@ function renderHomeStats() {
   const s = stats();
   const d = s.days[todayKey()] || { quiz: 0, heard: 0, spoke: 0 };
   const el = $("#home-stats");
-  if (el) {
+  if (!el) return;
+  if (uiLang() === "en") {
+    el.textContent = `Streak ${s.streak} day(s) · Today: ${d.heard} heard · ${d.quiz} quiz · ${d.spoke} voice · ${weakSet().size} weak · ${knownSet().size} strong`;
+  } else {
     el.textContent = `Racha ${s.streak} día(s) · Hoy: ${d.heard} oídas · ${d.quiz} quiz · ${d.spoke} voz · ${weakSet().size} débiles · ${knownSet().size} fuertes`;
   }
 }
@@ -387,7 +400,7 @@ function paintTab(id) {
     renderVerbs();
     dirty.verbs = false;
   }
-  if (id === "hablar") {
+  if (id === "hablar" && dirty.hablar) {
     if (dirty.speak) {
       renderSpeak();
       dirty.speak = false;
@@ -398,6 +411,7 @@ function paintTab(id) {
     renderRoleplays();
     renderStarBox();
     renderEmails();
+    dirty.hablar = false;
   }
   if (id === "ia" && dirty.ai) {
     renderAI();
@@ -721,7 +735,7 @@ function situationPhrases() {
 }
 
 function situationLabels() {
-  return {
+  const es = {
     airport: "Aeropuerto", doctor: "Médico", workChat: "Trabajo", restaurant: "Restaurante",
     hotel: "Hotel", bank: "Banco", grocery: "Super", apartment: "Depto", uber: "Uber/taxi",
     pharmacy: "Farmacia", school: "Escuela", gym: "Gimnasio", dentist: "Dentista",
@@ -729,6 +743,11 @@ function situationLabels() {
     emergency: "Emergencia", landlord: "Arrendador", cinema: "Cine", vet: "Veterinario",
     police: "Policía", dmv: "DMV", interview: "Entrevista", bus: "Autobús",
   };
+  const en = ENLAB.ui?.en?.sitLabels || {};
+  if (uiLang() === "en") {
+    return Object.fromEntries(Object.keys(es).map((k) => [k, en[k] || es[k]]));
+  }
+  return es;
 }
 
 function renderSituationPhraseList(key) {
@@ -1187,7 +1206,7 @@ function renderVowels() {
   $("#stress-list").innerHTML = (ENLAB.stress || []).map(stressCard).join("");
 
   const rolesBox = $("#roles-list");
-  if (rolesBox) rolesBox.innerHTML = rolesForLevel().map((w) => roleCard(w)).join("");
+  if (rolesBox) rolesBox.innerHTML = rolesForLevel().slice(0, 16).map((w) => roleCard(w)).join("");
 
   $("#ough-list").innerHTML = ENLAB.ough.map((o) => `
     <span class="row">${`<button class="say" data-say="${esc(o.word)}">${esc(o.word)} [${esc(o.pron)}] — ${esc(o.es)}</button>`}${ygLink(o.word)}</span>
@@ -2699,6 +2718,16 @@ document.addEventListener("click", (e) => {
   const dueKind = e.target.closest("[data-due-kind]");
   if (dueKind) {
     const kind = dueKind.dataset.dueKind;
+    if (kind === "speak") {
+      localStorage.setItem("enlab-speak-only-weak", "1");
+      showTab("hablar");
+      pickSpeak();
+      return;
+    }
+    if (kind === "verb") {
+      showTab("verbos");
+      return;
+    }
     const map = { dict: "dict", art: "art", prep: "prep", phrasal: "phrasal", cond: "cond", listen: "listen", ear: "ear", uso: "uso", ed: "ed" };
     const mode = map[kind] || "choice";
     showTab("quiz");
@@ -2935,11 +2964,11 @@ function syncQuizModePicks() {
   if (starterLab) starterLab.hidden = v !== "choice" && v !== "type";
 }
 
-$("#verb-search")?.addEventListener("input", (e) => {
+$("#verb-search")?.addEventListener("input", debounce((e) => {
   FILTERS.q = e.target.value;
   verbLimit = 24;
   renderVerbs();
-});
+}, 200));
 $("#quiz-start")?.addEventListener("click", startQuiz);
 $("#speak-rec")?.addEventListener("click", () => toggleRecording("hablar"));
 $("#speak-starter")?.addEventListener("change", () => renderSpeak());
@@ -3343,6 +3372,7 @@ function applyUiLang() {
   if (repasoBtn) repasoBtn.textContent = t("repaso");
   const shadowBtn = $("#speak-shadow");
   if (shadowBtn) shadowBtn.textContent = t("shadow");
+  if (typeof renderHomeStats === "function") renderHomeStats();
 }
 
 function dateKey(d) {
@@ -3665,6 +3695,8 @@ function srsBump(kind, key, ok) {
   }
   map[id] = row;
   saveSrs(map);
+  if (typeof renderDueToday === "function") renderDueToday();
+  if (typeof syncRemindToSw === "function") syncRemindToSw();
 }
 
 function srsDueKeys(kind) {
@@ -4012,6 +4044,7 @@ function applyLevel() {
   dirty.verbs = true;
   dirty.speak = true;
   dirty.ai = true;
+  dirty.hablar = true;
   renderHome();
   renderInterview();
   paintTab(currentTab);
@@ -4041,13 +4074,11 @@ function init() {
     navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
   }
   setupPwaInstall();
-  renderInterviewSim();
-  renderPhrasalsWork();
-  renderVoiceHistory();
-  renderRoleplays();
-  renderStarBox();
-  renderEmails();
   renderClassPin();
+  window.addEventListener("enlab-packs-ready", () => {
+    dirty.hablar = true;
+    if (currentTab === "hablar") paintTab("hablar");
+  });
 }
 
 document.addEventListener("visibilitychange", () => {

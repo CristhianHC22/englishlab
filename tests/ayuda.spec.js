@@ -32,6 +32,8 @@ test("Ayuda: accessibility bar", async ({ page }) => {
   await expect(page.locator("#a11y-contrast-btn")).toBeVisible();
   await page.locator("#a11y-contrast-btn").click();
   await expect(page.locator("body")).toHaveClass(/a11y-contrast/);
+  await page.locator("#a11y-motion-btn").click();
+  await expect(page.locator("body")).toHaveClass(/reduced-motion/);
 });
 
 test("Ayuda: English UI full keys", async ({ page }) => {

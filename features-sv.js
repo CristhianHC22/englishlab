@@ -2,14 +2,6 @@
 (function () {
   "use strict";
 
-  const PROG_SV = [
-    "enlab-pron-log", "enlab-story-progress", "enlab-writing-done",
-    "enlab-onboard-v3", "enlab-class-roster", "enlab-class-task",
-    "enlab-accent-pref", "enlab-a11y-contrast", "enlab-a11y-motion",
-    "enlab-student-name",
-  ];
-
-  /* ── Phonetic helpers ── */
   function ipaToPhonemes(ipa) {
     return (ipa || "").toLowerCase().replace(/[/ˈˌ\s]/g, "").split("");
   }
@@ -391,12 +383,9 @@
   /* ── Accessibility ── */
   function applyA11y() {
     const contrast = localStorage.getItem("enlab-a11y-contrast") === "1";
-    const motion = localStorage.getItem("enlab-a11y-motion") !== "0";
+    const motionOn = localStorage.getItem("enlab-a11y-motion") !== "0";
     document.body.classList.toggle("a11y-contrast", contrast);
-    document.body.classList.toggle("a11y-motion", motion);
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      document.body.classList.add("reduced-motion");
-    }
+    document.body.classList.toggle("reduced-motion", !motionOn || window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }
 
   function renderA11yBar() {
@@ -418,26 +407,23 @@
     });
   }
 
-  function patchProgKeys() {
-    if (typeof PROG_KEYS === "undefined") return;
-    PROG_SV.forEach((k) => { if (!PROG_KEYS.includes(k)) PROG_KEYS.push(k); });
-  }
-
   function patchPaintTab() {
-    if (typeof paintTab !== "function") return;
+    if (window._paintTabSvPatched || typeof paintTab !== "function") return;
+    window._paintTabSvPatched = true;
     const orig = paintTab;
     window.paintTab = function (tab) {
       orig(tab);
-      if (tab === "vocales") { renderPronPanel(); renderStoriesPanel(); }
-      if (tab === "hablar") { renderWritingPanel(); }
+      if (tab === "vocales" && ENLAB.minimalPairs) { renderPronPanel(); renderStoriesPanel(); }
+      if (tab === "hablar" && ENLAB.writingPrompts) { renderWritingPanel(); }
       if (tab === "hoy") { renderClassTaskBanner(); }
       if (tab === "ia") { renderClassPro(); renderA11yBar(); }
-      precacheTab(tab);
+      if (window._enlabBootstrapped) precacheTab(tab);
     };
   }
 
   function patchSpeakVerdict() {
-    if (typeof applySpeakVerdict !== "function") return;
+    if (window._speakVerdictSvPatched || typeof applySpeakVerdict !== "function") return;
+    window._speakVerdictSvPatched = true;
     const orig = applySpeakVerdict;
     window.applySpeakVerdict = function (said) {
       orig(said);
@@ -462,9 +448,6 @@
   function bindEvents() {
     document.addEventListener("click", (e) => {
       if (e.target.closest("#accent-pref")) return;
-      if (e.target.closest("#accent-pref")) {
-        localStorage.setItem("enlab-accent-pref", e.target.value);
-      }
       if (e.target.closest("[data-pron-rec]")) {
         const i = Number(e.target.closest("[data-pron-rec]").dataset.pronRec);
         const p = window._pronPairs?.[i];
@@ -565,26 +548,32 @@
     };
   }
 
-  function bootstrap() {
-    patchProgKeys();
-    patchPaintTab();
-    patchSpeakVerdict();
-    patchI18n();
-    applyA11y();
-    renderOnboarding();
-    renderOfflineBadge();
+  function refreshPanels() {
+    if (!ENLAB.minimalPairs?.length) return;
     renderPronPanel();
     renderStoriesPanel();
     renderWritingPanel();
     renderClassPro();
     renderClassTaskBanner();
     renderA11yBar();
+    renderOfflineBadge();
+  }
+
+  function bootstrap() {
+    if (window._svBootstrapped) return;
+    window._svBootstrapped = true;
+    patchPaintTab();
+    patchSpeakVerdict();
+    patchI18n();
+    applyA11y();
+    renderOnboarding();
     bindEvents();
-    if (typeof paintTab === "function" && typeof currentTab !== "undefined") paintTab(currentTab);
+    refreshPanels();
   }
 
   window.SV = {
     bootstrap,
+    refreshPanels,
     scorePronunciation,
     phonemeDistance,
     renderPronPanel,

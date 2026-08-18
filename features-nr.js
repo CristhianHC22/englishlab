@@ -176,20 +176,22 @@
   function renderLabAudit() {
     const host = document.querySelector("#lab-audit");
     if (!host) return;
-    const rows = LOT_AUDIT.map((lot) => {
+    const results = LOT_AUDIT.map((lot) => {
       let r = { ok: false, detail: "—", tip: "" };
       try { r = lot.check(); } catch { r.detail = "Error al comprobar"; }
-      return `<tr class="${r.ok ? "audit-ok" : "audit-warn"}">
+      return { lot, r };
+    });
+    const okN = results.filter((x) => x.r.ok).length;
+    const rows = results.map(({ lot, r }) => `<tr class="${r.ok ? "audit-ok" : "audit-warn"}">
         <td><strong>${esc(lot.id)}</strong></td>
         <td>${esc(lot.name)}</td>
         <td>${r.ok ? "✓" : "○"} ${esc(r.detail)}</td>
         <td class="muted">${esc(r.tip || "")}</td>
-      </tr>`;
-    }).join("");
-    const okN = LOT_AUDIT.filter((l) => { try { return l.check().ok; } catch { return false; } }).length;
+      </tr>`).join("");
+    const auditTitle = typeof t === "function" ? t("audit") : "Auditoría A–Z";
     host.innerHTML = `
-      <p class="kicker">Auditoría A–R</p>
-      <p><strong>${okN}/${LOT_AUDIT.length}</strong> lotes en verde (A–Z). Revisa qué falta optimizar.</p>
+      <p class="kicker">${esc(auditTitle)}</p>
+      <p><strong>${okN}/${LOT_AUDIT.length}</strong> lotes en verde. Revisa qué falta optimizar.</p>
       <div class="audit-scroll">
         <table class="audit-table">
           <thead><tr><th>Lote</th><th>Nombre</th><th>Estado</th><th>Mejora sugerida</th></tr></thead>
@@ -850,6 +852,8 @@
   }
 
   function bootstrap() {
+    if (window._nrBootstrapped) return;
+    window._nrBootstrapped = true;
     patchTodayGame();
     patchKidsMode();
     patchTransferQr();
@@ -857,22 +861,22 @@
     patchRenderQuiz();
     patchStartQuiz();
     patchPaintTab();
-    patchDuoSpeakReturn();
+    if (!window._duoSpeakPatched) {
+      window._duoSpeakPatched = true;
+      patchDuoSpeakReturn();
+    }
     renderTravelPanel();
     renderPodcastList();
     renderChatWork();
     renderDuoCard();
-    renderLabAudit();
     bindEvents();
-    if (typeof renderHome === "function") {
+    if (typeof renderHome === "function" && !window._renderHomePatched) {
+      window._renderHomePatched = true;
       const orig = renderHome;
       window.renderHome = function () {
         orig();
         renderTravelPanel();
       };
-    }
-    if (typeof paintTab === "function" && typeof currentTab !== "undefined") {
-      paintTab(currentTab);
     }
   }
 
