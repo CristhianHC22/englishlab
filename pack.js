@@ -27,6 +27,10 @@ Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
     { en: "The wifi password, please.", es: "La contraseña del wifi.", min: 2 },
     { en: "I'd like a quiet room.", es: "Quisiera una habitación silenciosa.", min: 2 },
     { en: "There's no hot water.", es: "No hay agua caliente.", min: 2 },
+    { en: "Can I get an extra towel?", es: "¿Me das una toalla extra?", min: 2 },
+    { en: "Do you have room service?", es: "¿Tienen room service?", min: 2 },
+    { en: "I'd like to extend my stay.", es: "Quisiera extender la estadía.", min: 3 },
+    { en: "Is there a shuttle to the airport?", es: "¿Hay shuttle al aeropuerto?", min: 3 },
   ],
   bank: [
     { en: "I'd like to open an account.", es: "Quisiera abrir una cuenta.", min: 3 },
@@ -37,6 +41,10 @@ Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
     { en: "Is there a fee?", es: "¿Hay comisión?", min: 2 },
     { en: "Can you check my balance?", es: "¿Me checas el saldo?", min: 2 },
     { en: "I'd like to deposit this.", es: "Quisiera depositar esto.", min: 3 },
+    { en: "I need to speak to a manager.", es: "Necesito hablar con un gerente.", min: 3 },
+    { en: "Can I get a bank statement?", es: "¿Me das un estado de cuenta?", min: 3 },
+    { en: "My PIN isn't working.", es: "Mi PIN no funciona.", min: 2 },
+    { en: "Is this branch open on Saturdays?", es: "¿Abren los sábados?", min: 2 },
   ],
   grocery: [
     { en: "Where is the milk?", es: "¿Dónde está la leche?", min: 1 },
@@ -48,6 +56,9 @@ Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
     { en: "How much is this?", es: "¿Cuánto cuesta esto?", min: 1 },
     { en: "I'm looking for pasta.", es: "Busco pasta.", min: 2 },
     { en: "Paper or plastic?", es: "¿Papel o plástico?", min: 2 },
+    { en: "Do you have organic options?", es: "¿Tienen opciones orgánicas?", min: 2 },
+    { en: "Where are the checkout lines?", es: "¿Dónde están las cajas?", min: 1 },
+    { en: "Can I use a coupon?", es: "¿Puedo usar un cupón?", min: 2 },
   ],
   apartment: [
     { en: "I'm here to see the apartment.", es: "Vengo a ver el departamento.", min: 2 },
@@ -58,6 +69,10 @@ Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
     { en: "The sink is leaking.", es: "El fregadero gotea.", min: 3 },
     { en: "Can I have a copy of the lease?", es: "¿Me das copia del contrato?", min: 3 },
     { en: "The neighbors are too loud.", es: "Los vecinos hacen mucho ruido.", min: 3 },
+    { en: "Is parking included?", es: "¿El estacionamiento está incluido?", min: 2 },
+    { en: "Who do I call for repairs?", es: "¿A quién llamo para reparaciones?", min: 3 },
+    { en: "Can I sublet the room?", es: "¿Puedo subarrendar?", min: 4 },
+    { en: "The heating isn't working.", es: "La calefacción no funciona.", min: 3 },
   ],
   uber: [
     { en: "I'm outside the main door.", es: "Estoy afuera de la puerta principal.", min: 2 },
@@ -66,6 +81,12 @@ Object.assign(ENLAB.phrasesSituation || (ENLAB.phrasesSituation = {}), {
     { en: "Could you turn on the AC?", es: "¿Puedes prender el aire?", min: 2 },
     { en: "I'll add a tip in the app.", es: "Dejo propina en la app.", min: 3 },
     { en: "That's not the right address.", es: "Esa no es la dirección.", min: 2 },
+    { en: "How long until you arrive?", es: "¿Cuánto falta para llegar?", min: 2 },
+    { en: "I'm at the pickup point.", es: "Estoy en el punto de recogida.", min: 2 },
+    { en: "Can you call when you're here?", es: "¿Llamas cuando llegues?", min: 2 },
+    { en: "Please use the rear entrance.", es: "Usa la entrada trasera.", min: 3 },
+    { en: "There's heavy traffic.", es: "Hay mucho tráfico.", min: 2 },
+    { en: "I'll share my location.", es: "Comparto mi ubicación.", min: 2 },
   ],
 });
 
@@ -139,6 +160,12 @@ ENLAB.connectedPairs = [
   { a: "better", b: "bedder", pa: "beter", pb: "beder", why: "flap T (US): better ≈ bedder", min: 4 },
   { a: "water", b: "wader", pa: "woter", pb: "woder", why: "flap T (US): water ≈ wader", min: 4 },
   { a: "city", b: "siddy", pa: "siti", pb: "sidi", why: "flap T (US): city ≈ siddy", min: 4 },
+  { a: "let me", b: "lemme", pa: "let mi", pb: "lemi", why: "let me → lemme (informal)", min: 3 },
+  { a: "give me", b: "gimme", pa: "giv mi", pb: "gimi", why: "give me → gimme", min: 3 },
+  { a: "kind of", b: "kinda", pa: "kaind ov", pb: "kainda", why: "kind of → kinda", min: 3 },
+  { a: "out of", b: "outta", pa: "aut ov", pb: "auta", why: "out of → outta", min: 3 },
+  { a: "could you", b: "couldja", pa: "kud yu", pb: "kudja", why: "could you → couldja", min: 3 },
+  { a: "meet you", b: "mee-chu", pa: "miit yu", pb: "miichu", why: "linking: t + you = chu", min: 3 },
 ];
 
 ENLAB.artQuiz = [
@@ -154,6 +181,10 @@ ENLAB.artQuiz = [
   { q: "Elige el artículo", prompt: "___ Amazon is a long river.", a: "The", opts: ["A", "The", "(nada)"], say: "The Amazon is a long river.", why: "Ríos llevan the.", min: 3 },
   { q: "Elige el artículo", prompt: "I had ___ hour to finish.", a: "an", opts: ["a", "an", "the"], say: "I had an hour to finish.", why: "hour suena /auər/ → an.", min: 2 },
   { q: "Elige el artículo", prompt: "This is ___ best coffee here.", a: "the", opts: ["a", "an", "the"], say: "This is the best coffee here.", why: "Superlativo → the best.", min: 3 },
+  { q: "Elige el artículo", prompt: "I bought ___ used car.", a: "a", opts: ["a", "an", "the"], say: "I bought a used car.", why: "used suena /yu/ → a.", min: 3 },
+  { q: "Elige el artículo", prompt: "___ moon looks bright tonight.", a: "The", opts: ["A", "An", "The"], say: "The moon looks bright tonight.", why: "Hay una sola luna → the.", min: 2 },
+  { q: "Elige el artículo", prompt: "She is ___ European.", a: "a", opts: ["a", "an", "the"], say: "She is a European.", why: "European suena /yu/ → a.", min: 3 },
+  { q: "Elige el artículo", prompt: "We had ___ amazing time.", a: "an", opts: ["a", "an", "the"], say: "We had an amazing time.", why: "amazing empieza por vocal → an.", min: 2 },
 ];
 
 ENLAB.prepQuiz = [
@@ -169,6 +200,10 @@ ENLAB.prepQuiz = [
   { q: "in / on / at", prompt: "He lives ___ Fifth Avenue.", a: "on", opts: ["in", "on", "at"], say: "He lives on Fifth Avenue.", why: "Calles: on. Número: at 12 Main St.", min: 3 },
   { q: "in / on / at", prompt: "I'm good ___ math.", a: "at", opts: ["in", "on", "at"], say: "I'm good at math.", why: "good at + skill.", min: 3 },
   { q: "in / on / at", prompt: "Don't look ___ your phone.", a: "at", opts: ["in", "on", "to"], say: "Don't look at your phone.", why: "look at, no look to.", min: 2 },
+  { q: "in / on / at", prompt: "I stay ___ home on Sundays.", a: "at", opts: ["in", "on", "at"], say: "I stay at home on Sundays.", why: "at home (no in home).", min: 2 },
+  { q: "in / on / at", prompt: "The picture is hanging ___ the wall.", a: "on", opts: ["in", "on", "at"], say: "The picture is hanging on the wall.", why: "on the wall.", min: 2 },
+  { q: "in / on / at", prompt: "We'll be there ___ a minute.", a: "in", opts: ["in", "on", "at"], say: "We'll be there in a minute.", why: "in + tiempo que falta.", min: 3 },
+  { q: "in / on / at", prompt: "She works ___ a hospital.", a: "in", opts: ["in", "on", "at"], say: "She works in a hospital.", why: "in a building; at the hospital si es punto.", min: 3 },
 ];
 
 ENLAB.phrasalQuiz = [
@@ -182,6 +217,10 @@ ENLAB.phrasalQuiz = [
   { q: "Completa", prompt: "We need to figure it ___.", a: "out", opts: ["out", "up", "in"], say: "We need to figure it out.", why: "figure out = resolver.", min: 3 },
   { q: "Completa", prompt: "I'll set ___ a meeting.", a: "up", opts: ["up", "down", "off"], say: "I'll set up a meeting.", why: "set up = agendar / configurar.", min: 3 },
   { q: "¿Qué significa?", prompt: "I'll follow up with you.", a: "te hago seguimiento", opts: ["te sigo a casa", "te hago seguimiento", "te copio"], say: "I'll follow up with you.", why: "follow up = dar seguimiento.", min: 3 },
+  { q: "¿Qué significa?", prompt: "Can you hold on?", a: "esperar un momento", opts: ["agarrar", "esperar un momento", "colgar"], say: "Can you hold on?", why: "hold on = wait / no cuelgues.", min: 2 },
+  { q: "Completa", prompt: "Don't give ___.", a: "up", opts: ["up", "in", "off"], say: "Don't give up.", why: "give up = rendirse.", min: 2 },
+  { q: "¿Qué significa?", prompt: "I'll back you up.", a: "te apoyo", opts: ["te empujo", "te apoyo", "te copio atrás"], say: "I'll back you up.", why: "back someone up = apoyar.", min: 4 },
+  { q: "Completa", prompt: "Let's pick this ___ tomorrow.", a: "up", opts: ["up", "out", "off"], say: "Let's pick this up tomorrow.", why: "pick up = retomar.", min: 3 },
 ];
 
 ENLAB.condQuiz = [
@@ -193,6 +232,9 @@ ENLAB.condQuiz = [
   { q: "Reported speech", prompt: "He said, “I'll help.” → He said he ___ help.", a: "would", opts: ["will", "would", "can"], say: "He said he would help.", why: "will → would.", min: 4 },
   { q: "Reported speech", prompt: "They said, “We went home.” → They said they ___ home.", a: "had gone", opts: ["went", "had gone", "have gone"], say: "They said they had gone home.", why: "Pasado → past perfect en reported.", min: 4 },
   { q: "Elige la forma", prompt: "I wish I ___ more time.", a: "had", opts: ["have", "had", "will have"], say: "I wish I had more time.", why: "wish + pasado para ahora.", min: 4 },
+  { q: "Elige la forma", prompt: "Unless it ___, we will go.", a: "rains", opts: ["rains", "will rain", "rained"], say: "Unless it rains, we will go.", why: "unless + presente (como if).", min: 4 },
+  { q: "Reported speech", prompt: "She asked, “Where do you live?” → She asked where I ___.", a: "lived", opts: ["live", "lived", "living"], say: "She asked where I lived.", why: "Pregunta en pasado: do → did / present → past.", min: 4 },
+  { q: "Elige la forma", prompt: "If I ___ harder, I would have passed.", a: "had studied", opts: ["studied", "had studied", "study"], say: "If I had studied harder, I would have passed.", why: "3º condicional.", min: 4 },
 ];
 
 ENLAB.dictation = [
@@ -211,6 +253,15 @@ ENLAB.dictation = [
   { en: "I'm looking forward to it.", min: 3, es: "Lo espero con ganas." },
   { en: "That's not what I meant.", min: 3, es: "No era eso lo que quería decir." },
   { en: "Can we take this offline?", min: 4, es: "¿Lo hablamos fuera de aquí?" },
+  { en: "She said she was running late.", min: 4, es: "Dijo que llegaba tarde." },
+  { en: "I'll follow up by email.", min: 3, es: "Hago seguimiento por email." },
+  { en: "We need to push the deadline.", min: 4, es: "Hay que mover la fecha límite." },
+  { en: "Let me double-check that.", min: 3, es: "Déjame verificarlo otra vez." },
+  { en: "Could you say that again?", min: 1, es: "¿Lo dices otra vez?" },
+  { en: "I didn't catch the last part.", min: 3, es: "No alcancé la última parte." },
+  { en: "We're meeting at the office at nine.", min: 2, es: "Nos vemos en la oficina a las nueve." },
+  { en: "If I were you, I'd ask one more question.", min: 4, es: "Yo en tu lugar haría una pregunta más." },
+  { en: "Please keep me in the loop.", min: 3, es: "Mantenme al tanto." },
 ];
 
 ENLAB.listenPassages = [
@@ -321,6 +372,39 @@ ENLAB.roleplays = [
       { a: "Tell me about yourself.", b: "I'm a support specialist. I help customers and I like solving problems." },
       { a: "Describe a challenge you solved.", b: "A client was blocked. I found the bug, we fixed it, and they stayed." },
       { a: "Do you have any questions for us?", b: "What does a typical day look like on the team?" },
+    ],
+  },
+  {
+    id: "pharmacy",
+    min: 2,
+    title: "En la farmacia",
+    es: "Tú pides un medicamento.",
+    turns: [
+      { a: "Hi. How can I help you?", b: "I'd like to fill this prescription." },
+      { a: "Do you have insurance?", b: "Yes. Here's my card." },
+      { a: "It'll be ready in twenty minutes.", b: "Great. I'll wait." },
+    ],
+  },
+  {
+    id: "school",
+    min: 2,
+    title: "En la escuela",
+    es: "Tú hablas con la recepción.",
+    turns: [
+      { a: "Good morning. How can I help you?", b: "I'm here to pick up my child." },
+      { a: "What's the student's name?", b: "Ana Lopez, third grade." },
+      { a: "Please sign here.", b: "Sure. Thank you." },
+    ],
+  },
+  {
+    id: "neighbor",
+    min: 3,
+    title: "Con un vecino",
+    es: "Tú pides bajar el volumen.",
+    turns: [
+      { a: "Hey. What's up?", b: "Hi. The music is a bit loud tonight." },
+      { a: "Oh, sorry. I didn't realize.", b: "Could you turn it down after ten?" },
+      { a: "Yeah, no problem.", b: "Thanks. I appreciate it." },
     ],
   },
 ];

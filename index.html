@@ -52,6 +52,7 @@
           <button type="button" class="chip" data-hide-es aria-pressed="false" title="Oculta las traducciones">Reto: sin español</button>
           <button type="button" class="chip" id="kids-toggle" aria-pressed="false">Modo niño</button>
           <button type="button" class="chip" id="ui-lang-toggle" aria-pressed="false">English UI</button>
+          <button type="button" class="chip" id="travel-toggle" aria-pressed="false" title="Mapa del día: aeropuerto, hotel, ciudad o emergencia" data-i18n="travel">Modo viaje</button>
           <button type="button" class="chip" data-pwa-install hidden>Instalar app</button>
         </div>
       </div>
@@ -72,6 +73,9 @@
         <h2>15 minutos de oído</h2>
         <p class="muted" id="home-stats"></p>
         <p id="day-theme"></p>
+        <div id="travel-map" class="card travel-map" hidden></div>
+        <div id="situations-panel" class="card situations-panel" hidden></div>
+        <div id="podcast-today" class="card" hidden></div>
         <div id="hoy-game" class="hoy-game" hidden></div>
         <p class="muted" id="hoy-hint">La rutina cambia con el nivel.</p>
         <div id="hoy-path" class="hoy-path">
@@ -79,6 +83,8 @@
           <div class="row hoy-path-actions">
             <button type="button" class="btn hoy-next">Empezar el camino</button>
             <button type="button" class="btn ghost sm" id="repaso-btn">Solo repaso (10 min)</button>
+            <button type="button" class="btn ghost sm" id="repaso-quiz-btn">Quiz débiles</button>
+            <button type="button" class="btn ghost sm" id="repaso-exit" hidden>Salir de repaso</button>
           </div>
         </div>
         <div id="hoy-streak-chart" class="streak-chart" hidden></div>
@@ -304,6 +310,12 @@
         <p class="muted">Vocales y verbos ya están. Esto es lo que más delata a un hispanohablante en conversación. Pulsa para oír. En B1 ves los de B1; en B2 aparecen los demás (flap T, gonna, unir palabras).</p>
         <div id="tips-list"></div>
       </div>
+      <div id="podcast-block" class="card" style="margin-top:16px">
+        <h3 id="oido-podcasts">Mini-podcasts (~60 s)</h3>
+        <p class="muted">Transcripción segmentada. Oyes frase a frase — ideal para shadowing.</p>
+        <div id="podcast-list" class="grid grid-2"></div>
+        <div id="podcast-player" hidden></div>
+      </div>
     </section>
 
     <section id="verbos" class="panel">
@@ -376,6 +388,15 @@
             <strong>Examen semanal</strong>
             <span>12 preguntas mixtas</span>
           </button>
+          <button type="button" class="mode-pick" data-quiz-mode="cert">
+            <strong>Examen certificado</strong>
+            <span>30 min · 24 preguntas · imprimible</span>
+          </button>
+        </div>
+        <div id="cert-timer-bar" class="cert-timer-bar" hidden>
+          <span class="muted">Tiempo restante:</span>
+          <strong id="cert-timer">30:00</strong>
+          <button type="button" class="btn ghost sm" id="cert-start-btn">Empezar examen cert</button>
         </div>
         <select id="quiz-mode" hidden>
           <option value="choice">Verbos: opción múltiple</option>
@@ -391,11 +412,13 @@
           <option value="dict">Dictado</option>
           <option value="listen">Escucha larga</option>
           <option value="weekly">Examen semanal</option>
+          <option value="cert">Examen certificado B1/B2</option>
         </select>
         <div><button class="btn" id="quiz-start">¡Jugar!</button></div>
       </div>
       <div id="ear-misses" class="card ear-misses" style="margin-top:12px" hidden></div>
       <div id="quiz-box" style="margin-top:12px"></div>
+      <div id="cert-print-area" class="print-only" hidden></div>
     </section>
 
     <section id="hablar" class="panel">
@@ -444,6 +467,28 @@
         <div id="star-box" class="star-box"></div>
         <div id="interview-sim-list"></div>
       </div>
+      <div class="card" id="phrasals-work-card" hidden>
+        <h3 data-i18n="phrasals">Phrasals de trabajo</h3>
+        <div id="phrasals-work-list"></div>
+      </div>
+      <div class="card" id="chat-work-card">
+        <h3>Slack / Teams (50 mensajes)</h3>
+        <p class="muted">Tono formal e informal. Oye el mensaje y graba tu respuesta.</p>
+        <label class="muted">Filtrar:
+          <select id="chat-tone-filter">
+            <option value="all">Todos</option>
+            <option value="informal">Informal (Slack)</option>
+            <option value="formal">Formal (Teams/email)</option>
+          </select>
+        </label>
+        <div id="chat-work-list" class="grid" style="margin-top:12px"></div>
+      </div>
+      <div class="card" id="duo-card">
+        <h3>Duo · 2 jugadores</h3>
+        <p class="muted">Mismo dispositivo. Turnos alternos A/B en role-plays o diálogos.</p>
+        <p class="duo-score muted" id="duo-score">A: 0 · B: 0</p>
+        <div id="duo-now"></div>
+      </div>
     </section>
 
     <section id="ia" class="panel">
@@ -456,6 +501,7 @@
         <h3>Plan de 21 días (15 min)</h3>
         <ol id="plan-list"></ol>
       </div>
+      <div id="lab-audit" class="card audit-panel" style="margin-top:16px"></div>
     </section>
 
     <footer>
@@ -468,6 +514,10 @@
   <script src="extras.js"></script>
   <script src="pack.js"></script>
   <script src="pack-m.js"></script>
+  <script src="pack-n.js"></script>
+  <script src="pack-o.js"></script>
+  <script src="pack-q.js"></script>
   <script src="app.js"></script>
+  <script src="features-nr.js"></script>
 </body>
 </html>

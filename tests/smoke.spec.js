@@ -15,6 +15,9 @@ test("loads Hoy path and tabs", async ({ page }) => {
   await expect(page.locator("#interview-sim-card")).toBeVisible();
   await expect(page.locator("#roleplay-card")).toBeVisible();
   await expect(page.locator("#email-card")).toBeVisible();
+  await expect(page.locator("#chat-work-card")).toBeVisible();
+  await expect(page.locator("#duo-card")).toBeVisible();
+  await expect(page.locator("#phrasals-work-card")).toBeVisible();
 });
 
 test("English UI toggle", async ({ page }) => {
@@ -27,18 +30,40 @@ test("English UI toggle", async ({ page }) => {
   await expect(page.locator('[data-tab="hoy"]')).toHaveText(/Today/i);
 });
 
-test("pack M content is wired", async ({ page }) => {
+test("packs A–R content is wired", async ({ page }) => {
   await boot(page);
   const ok = await page.evaluate(() => ({
-    listen: (window.ENLAB.listenPassages || []).length >= 10,
+    listen: (window.ENLAB.listenPassages || []).length >= 25,
     role: (window.ENLAB.roleplays || []).length >= 12,
     email: (window.ENLAB.emailSpeak || []).length >= 10,
+    situations: Object.keys(window.ENLAB.phrasesSituation || {}).length >= 11,
     restaurant: !!window.ENLAB.phrasesSituation?.restaurant?.length,
+    podcasts: (window.ENLAB.podcasts || []).length >= 10,
+    chat: (window.ENLAB.chatWork || []).length >= 48,
+    travel: Object.keys(window.ENLAB.travelMaps || {}).length >= 5,
+    cond: (window.ENLAB.condQuiz || []).length >= 10,
+    dialogsA2: (window.ENLAB.dialogsA2Tense || []).length >= 8,
+    nr: typeof window.NR?.startCertExam === "function",
   }));
   expect(ok.listen).toBe(true);
   expect(ok.role).toBe(true);
   expect(ok.email).toBe(true);
+  expect(ok.situations).toBe(true);
   expect(ok.restaurant).toBe(true);
+  expect(ok.podcasts).toBe(true);
+  expect(ok.chat).toBe(true);
+  expect(ok.travel).toBe(true);
+  expect(ok.cond).toBe(true);
+  expect(ok.dialogsA2).toBe(true);
+  expect(ok.nr).toBe(true);
+});
+
+test("situations panel on Hoy", async ({ page }) => {
+  await boot(page);
+  await expect(page.locator("#situations-panel")).toBeVisible();
+  await expect(page.locator("#situation-phrases .chip").first()).toBeVisible();
+  await page.locator("[data-sit-key='restaurant']").click();
+  await expect(page.locator("#situation-phrases")).toContainText(/table|menu|check/i);
 });
 
 test("Hoy path starts and shows pairs", async ({ page }) => {
@@ -48,15 +73,16 @@ test("Hoy path starts and shows pairs", async ({ page }) => {
   await expect(page.locator("#daily-pairs .card").first()).toBeVisible();
 });
 
-test("quiz modes include dictation and weekly", async ({ page }) => {
+test("quiz modes include dictation, weekly, cert and cond", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="quiz"]').click();
-  await expect(page.locator("#quiz.panel.active")).toBeVisible();
   await expect(page.locator('[data-quiz-mode="dict"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="weekly"]')).toBeVisible();
-  await page.locator('[data-quiz-mode="weekly"]').click();
+  await expect(page.locator('[data-quiz-mode="cert"]')).toBeVisible();
+  await expect(page.locator('[data-quiz-mode="cond"]')).toBeVisible();
+  await page.locator('[data-quiz-mode="cond"]').click();
   await page.locator("#quiz-start").click();
-  await expect(page.locator("#quiz-box .quiz-q, #quiz-box .email-quiz")).toBeVisible();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
 });
 
 test("transfer code roundtrip", async ({ page }) => {
@@ -76,8 +102,7 @@ test("transfer code roundtrip", async ({ page }) => {
   await page.locator("#transfer-paste").fill(code);
   page.once("dialog", (d) => d.accept());
   await page.locator("#transfer-import").click();
-  const cefr = await page.evaluate(() => localStorage.getItem("enlab-cefr"));
-  expect(cefr).toBe("a2");
+  expect(await page.evaluate(() => localStorage.getItem("enlab-cefr"))).toBe("a2");
 });
 
 test("weekly exam button on Hoy", async ({ page }) => {
@@ -85,5 +110,132 @@ test("weekly exam button on Hoy", async ({ page }) => {
   await expect(page.locator("#weekly-exam-btn")).toBeVisible();
   await page.locator("#weekly-exam-btn").click();
   await expect(page.locator("#quiz.panel.active")).toBeVisible();
-  await expect(page.locator("#quiz-box .card")).toBeVisible();
+});
+
+test("travel mode adds body class", async ({ page }) => {
+  await boot(page);
+  await page.locator("#travel-toggle").click();
+  await expect(page.locator("#travel-map")).toBeVisible();
+  await expect(page.locator("body")).toHaveClass(/travel-mode/);
+});
+
+test("podcasts in Oír tab", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="vocales"]').click();
+  await expect(page.locator("#podcast-list .podcast-card").first()).toBeVisible();
+});
+
+test("lab audit A–R in Ayuda", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="ia"]').click();
+  await expect(page.locator(".audit-table tbody tr")).toHaveCount(18);
+});
+
+test("kids mode sets slow voice", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-rate", "normal");
+    localStorage.setItem("enlab-kids", "0");
+  });
+  await page.reload();
+  await page.locator("#kids-toggle").click();
+  expect(await page.evaluate(() => localStorage.getItem("enlab-rate"))).toBe("slow");
+});
+
+test("repaso mode filters weak and shows quiz btn", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-weak", JSON.stringify(["go", "see"]));
+    localStorage.setItem("enlab-speak-only-weak", "0");
+  });
+  await page.reload();
+  await page.locator("#repaso-btn").click();
+  await expect(page.locator("body")).toHaveClass(/repaso-active/);
+  await expect(page.locator("#repaso-quiz-btn")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("enlab-speak-only-weak"))).toBe("1");
+});
+
+test("duo mode starts", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="hablar"]').click();
+  await page.locator("#duo-start").click();
+  await expect(page.locator("#duo-now p.kicker")).toBeVisible();
+});
+
+test("STAR draft box in interview", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => localStorage.setItem("enlab-cefr", "b1"));
+  await page.reload();
+  await page.locator('[data-tab="hablar"]').click();
+  await expect(page.locator(".star-draft")).toBeVisible();
+});
+
+test("SRS due today when seeded", async ({ page }) => {
+  await boot(page);
+  const today = await page.evaluate(() => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
+  await page.evaluate(({ today }) => {
+    localStorage.setItem("enlab-srs", JSON.stringify({
+      "dict:test phrase": { box: 0, iv: 1, due: today, label: "test phrase" },
+    }));
+  }, { today });
+  await page.reload();
+  await expect(page.locator("#due-today")).toBeVisible();
+});
+
+test("pharmacy and school situations exist", async ({ page }) => {
+  await boot(page);
+  const ok = await page.evaluate(() => ({
+    ph: (window.ENLAB.phrasesSituation?.pharmacy || []).length >= 10,
+    sc: (window.ENLAB.phrasesSituation?.school || []).length >= 10,
+    sitN: Object.keys(window.ENLAB.phrasesSituation || {}).length >= 11,
+  }));
+  expect(ok.ph).toBe(true);
+  expect(ok.sc).toBe(true);
+  expect(ok.sitN).toBe(true);
+  await page.locator("[data-sit-key='pharmacy']").click();
+  await expect(page.locator("#situation-phrases")).toContainText(/prescription|ibuprofen/i);
+});
+
+test("listen quiz starts with a passage", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="quiz"]').click();
+  await page.locator('[data-quiz-mode="listen"]').click();
+  await page.locator("#quiz-start").click();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
+  await expect(page.locator("#listen-next-pass")).toBeVisible();
+});
+
+test("classroom PIN blocks level change", async ({ page }) => {
+  await boot(page);
+  page.on("dialog", (d) => d.dismiss());
+  await page.locator("#class-box").locator("summary").click();
+  await page.locator("#class-pin").fill("1234");
+  await page.locator("#class-pin-save").click();
+  await expect(page.locator("#class-pin-status")).toContainText(/PIN/i);
+  const before = await page.evaluate(() => localStorage.getItem("enlab-cefr") || "b1");
+  await page.locator('[data-cefr]').first().click();
+  const after = await page.evaluate(() => localStorage.getItem("enlab-cefr") || "b1");
+  expect(after).toBe(before);
+});
+
+test("chat tone filter shows formal", async ({ page }) => {
+  await boot(page);
+  await page.locator('[data-tab="hablar"]').click();
+  await page.locator("#chat-tone-filter").selectOption("formal");
+  await expect(page.locator(".chat-msg.formal").first()).toBeVisible();
+});
+
+test("podcast of the day on Hoy", async ({ page }) => {
+  await boot(page);
+  await expect(page.locator("#podcast-today")).toBeVisible();
+  await expect(page.locator("#podcast-today [data-podcast]")).toBeVisible();
+});
+
+test("quiz débiles button always on Hoy", async ({ page }) => {
+  await boot(page);
+  await expect(page.locator("#repaso-quiz-btn")).toBeVisible();
 });

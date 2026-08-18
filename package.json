@@ -2,7 +2,7 @@
   "name": "englishlab",
   "private": true,
   "scripts": {
-    "check": "node --check app.js && node --check extras.js && node --check pack.js && node --check pack-m.js && node --check sw.js",
+    "check": "node --check app.js && node --check extras.js && node --check pack.js && node --check pack-m.js && node --check pack-n.js && node --check pack-o.js && node --check pack-q.js && node --check features-nr.js && node --check sw.js",
     "test": "playwright test"
   },
   "devDependencies": {

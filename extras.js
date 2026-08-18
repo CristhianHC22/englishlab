@@ -14,10 +14,15 @@ ENLAB.phrasesSituation = {
     { en: "How long is the layover?", es: "¿Cuánto dura la escala?", min: 3 },
     { en: "Which terminal is it?", es: "¿Qué terminal es?", min: 2 },
     { en: "I missed my connection.", es: "Perdí mi conexión.", min: 3 },
-    { en: "Can you help me rebook?", es: "¿Me ayudas a re reservar?", min: 3 },
+    { en: "Can you help me rebook?", es: "¿Me ayudas a reservar de nuevo?", min: 3 },
     { en: "Is boarding open yet?", es: "¿Ya abrieron embarque?", min: 2 },
     { en: "My passport is in my bag.", es: "Mi pasaporte está en la maleta.", min: 2 },
     { en: "I'm traveling for work.", es: "Viajo por trabajo.", min: 2 },
+    { en: "Is there a lounge I can use?", es: "¿Hay lounge que pueda usar?", min: 3 },
+    { en: "My bag didn't arrive.", es: "Mi maleta no llegó.", min: 2 },
+    { en: "Can I get a meal voucher?", es: "¿Me das un voucher de comida?", min: 3 },
+    { en: "Where is the taxi stand?", es: "¿Dónde está el taxi?", min: 1 },
+    { en: "I need an exit row, please.", es: "Quisiera fila de salida.", min: 3 },
   ],
   doctor: [
     { en: "I have a headache.", es: "Me duele la cabeza.", min: 2 },
@@ -35,6 +40,10 @@ ENLAB.phrasesSituation = {
     { en: "My stomach hurts.", es: "Me duele el estómago.", min: 2 },
     { en: "I can't sleep well.", es: "No duermo bien.", min: 2 },
     { en: "Thank you for your help.", es: "Gracias por su ayuda.", min: 1 },
+    { en: "Can I get a sick note?", es: "¿Me das una incapacidad?", min: 3 },
+    { en: "Should I come back if it gets worse?", es: "¿Vuelvo si empeora?", min: 3 },
+    { en: "I need a refill.", es: "Necesito recarga de la receta.", min: 3 },
+    { en: "Is this contagious?", es: "¿Es contagioso?", min: 2 },
   ],
   workChat: [
     { en: "Hi team, quick update.", es: "Hola equipo, update rápido.", min: 3 },
@@ -55,6 +64,36 @@ ENLAB.phrasesSituation = {
     { en: "I'll look into it.", es: "Lo reviso.", min: 3 },
     { en: "We're blocked on this.", es: "Estamos bloqueados en esto.", min: 3 },
     { en: "I'll send a summary.", es: "Mando un resumen.", min: 3 },
+    { en: "Can we push this to tomorrow?", es: "¿Lo pasamos a mañana?", min: 3 },
+    { en: "I'll take notes and share them.", es: "Tomo notas y las comparto.", min: 3 },
+  ],
+  pharmacy: [
+    { en: "I'd like to fill this prescription.", es: "Quiero surtir esta receta.", min: 2 },
+    { en: "Do you have this over the counter?", es: "¿Esto es de venta libre?", min: 3 },
+    { en: "I'm looking for ibuprofen.", es: "Busco ibuprofeno.", min: 2 },
+    { en: "Does this cause drowsiness?", es: "¿Esto da sueño?", min: 3 },
+    { en: "Can I take this with food?", es: "¿Lo tomo con comida?", min: 2 },
+    { en: "I need something for a cough.", es: "Necesito algo para la tos.", min: 2 },
+    { en: "Is there a generic version?", es: "¿Hay genérico?", min: 3 },
+    { en: "How much is the copay?", es: "¿Cuánto es el copago?", min: 3 },
+    { en: "My insurance isn't covering this.", es: "El seguro no lo cubre.", min: 3 },
+    { en: "Can you recommend a pharmacist?", es: "¿Hay un farmacéutico?", min: 2 },
+    { en: "I need it as soon as possible.", es: "Lo necesito lo antes posible.", min: 2 },
+    { en: "Are there any side effects?", es: "¿Hay efectos secundarios?", min: 3 },
+  ],
+  school: [
+    { en: "Where is the main office?", es: "¿Dónde está la oficina?", min: 1 },
+    { en: "I'm here to pick up my child.", es: "Vengo a recoger a mi hijo.", min: 2 },
+    { en: "What time does class start?", es: "¿A qué hora empieza la clase?", min: 1 },
+    { en: "Can I speak with the teacher?", es: "¿Puedo hablar con el maestro?", min: 2 },
+    { en: "She has a fever. She's staying home.", es: "Tiene fiebre. Se queda en casa.", min: 2 },
+    { en: "Do you need a doctor's note?", es: "¿Necesitan receta / nota médica?", min: 3 },
+    { en: "When is parent-teacher night?", es: "¿Cuándo es la junta de padres?", min: 3 },
+    { en: "He forgot his homework.", es: "Olvidó la tarea.", min: 2 },
+    { en: "Is there after-school care?", es: "¿Hay cuidado después de clase?", min: 3 },
+    { en: "How do I sign the permission slip?", es: "¿Cómo firmo el permiso?", min: 3 },
+    { en: "The bus was late this morning.", es: "El bus llegó tarde.", min: 2 },
+    { en: "She's in third grade.", es: "Está en tercero.", min: 2 },
   ],
 };
 
@@ -67,6 +106,8 @@ ENLAB.dialogsA2Tense = [
   { tag: "going", a: { en: "What are you going to do?", es: "¿Qué vas a hacer?" }, b: { en: "I'm going to study English.", es: "Voy a estudiar inglés." } },
   { tag: "perfect", a: { en: "Have you seen it?", es: "¿Lo has visto?" }, b: { en: "Yes, I've already seen it.", es: "Sí, ya lo vi. (experiencia → have)" } },
   { tag: "past", a: { en: "Did you like it?", es: "¿Te gustó?" }, b: { en: "I liked it a lot.", es: "Me gustó mucho." } },
+  { tag: "going", a: { en: "When are you going to leave?", es: "¿Cuándo te vas?" }, b: { en: "I'm going to leave at eight.", es: "Me voy a las ocho." } },
+  { tag: "perfect", a: { en: "Have you finished yet?", es: "¿Ya terminaste?" }, b: { en: "I've almost finished.", es: "Casi termino." } },
 ];
 
 ENLAB.phrasalsWork = [
@@ -82,6 +123,12 @@ ENLAB.phrasalsWork = [
   { en: "Please turn it on.", es: "Enciéndelo / actívalo.", say: "Please turn it on.", min: 2 },
   { en: "We ran out of time.", es: "Se nos acabó el tiempo.", say: "We ran out of time.", min: 3 },
   { en: "I'll get back to you.", es: "Te respondo luego.", say: "I'll get back to you.", min: 3 },
+  { en: "Can you hold on a second?", es: "¿Me esperas un segundo?", say: "Can you hold on a second?", min: 2 },
+  { en: "Let's pick this up tomorrow.", es: "Lo retomamos mañana.", say: "Let's pick this up tomorrow.", min: 3 },
+  { en: "I'll back you up in the meeting.", es: "Te apoyo en la junta.", say: "I'll back you up in the meeting.", min: 4 },
+  { en: "We need to cut back on costs.", es: "Hay que recortar costos.", say: "We need to cut back on costs.", min: 4 },
+  { en: "Don't give up yet.", es: "No te rindas aún.", say: "Don't give up yet.", min: 2 },
+  { en: "I'll point it out in the doc.", es: "Lo marco en el documento.", say: "I'll point it out in the doc.", min: 3 },
 ];
 
 ENLAB.interviewSim = [
@@ -93,6 +140,8 @@ ENLAB.interviewSim = [
   { q: "Where do you see yourself in five years?", es: "¿Dónde te ves en 5 años?", hint: "Crecimiento, no solo cargo.", min: 3 },
   { q: "Why should we hire you?", es: "¿Por qué contratarte?", hint: "2 razones + ejemplo.", min: 3 },
   { q: "Do you have any questions for us?", es: "¿Preguntas para nosotros?", hint: "Pregunta sobre el equipo o el día a día.", min: 3 },
+  { q: "Tell me about a time you worked on a team.", es: "Cuéntame de un trabajo en equipo.", hint: "STAR: situación, tarea, acción, resultado.", min: 3 },
+  { q: "How do you handle stress?", es: "¿Cómo manejas el estrés?", hint: "Ejemplo concreto + qué haces hoy.", min: 3 },
 ];
 
 /* Pares preferidos por nivel en quiz oído */
@@ -150,6 +199,15 @@ ENLAB.ui = {
     class: "Modo aula",
     weekly: "Examen semanal",
     email: "Emails",
+    travel: "Modo viaje",
+    cert: "Examen certificado",
+    podcast: "Mini-podcasts",
+    chat: "Slack / Teams",
+    duo: "Duo 2 jugadores",
+    audit: "Auditoría A–R",
+    situations: "Frases por situación",
+    phrasals: "Phrasals de trabajo",
+    repasoActive: "Modo repaso — solo débiles",
   },
   en: {
     tabs: { hoy: "Today", vocales: "Listen", verbos: "Verbs", quiz: "Play", hablar: "Speak", ia: "Help" },
@@ -172,5 +230,14 @@ ENLAB.ui = {
     class: "Classroom",
     weekly: "Weekly exam",
     email: "Emails",
+    travel: "Travel mode",
+    cert: "Certificate exam",
+    podcast: "Mini-podcasts",
+    chat: "Slack / Teams",
+    duo: "Duo (2 players)",
+    audit: "Audit A–R",
+    situations: "Situation phrases",
+    phrasals: "Work phrasals",
+    repasoActive: "Review mode — weak items only",
   },
 };

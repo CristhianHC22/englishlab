@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
@@ -544,10 +544,11 @@ function todayGame() {
   if (game === "uso") {
     return { game, label: "Hoy: 5 minutos de make/do", hint: "Calcos, make/do, Did you…?" };
   }
-  const rot = ["art", "prep", "phrasal", "dict", "listen", "weekly"][t.i % 6];
+  const rot = ["art", "prep", "phrasal", "cond", "dict", "listen", "weekly"][t.i % 7];
   if (n >= 2 && rot === "art") return { game: "art", label: "Hoy: a / an / the", hint: "an hour, a university, the sun" };
   if (n >= 2 && rot === "prep") return { game: "prep", label: "Hoy: in / on / at", hint: "on Monday · at 3 · in 1999" };
   if (n >= 3 && rot === "phrasal") return { game: "phrasal", label: "Hoy: phrasals", hint: "look up, wrap up, run out" };
+  if (n >= 3 && rot === "cond") return { game: "cond", label: "Hoy: if / said", hint: "Condicionales y reported speech" };
   if (rot === "dict") return { game: "dict", label: "Hoy: dictado", hint: "Oye una vez y escribe" };
   if (n >= 2 && rot === "listen") return { game: "listen", label: "Hoy: escucha un párrafo", hint: "Oyes un texto y 3 preguntas" };
   if (n >= 2 && rot === "weekly") return { game: "weekly", label: "Examen semanal (12)", hint: "Mezcla oído, verbos, gramática y email" };
@@ -719,6 +720,63 @@ function situationPhrases() {
   return (sit[pick] || []).filter((p) => (p.min || 1) <= lvlNum());
 }
 
+function situationLabels() {
+  return {
+    airport: "Aeropuerto", doctor: "Médico", workChat: "Trabajo", restaurant: "Restaurante",
+    hotel: "Hotel", bank: "Banco", grocery: "Super", apartment: "Depto", uber: "Uber/taxi",
+    pharmacy: "Farmacia", school: "Escuela",
+  };
+}
+
+function renderSituationPhraseList(key) {
+  const sit = ENLAB.phrasesSituation || {};
+  const list = (sit[key] || []).filter((p) => (p.min || 1) <= lvlNum());
+  return list.map((p) => `<button type="button" class="chip say" data-say="${esc(p.en)}" title="${esc(p.es)}">${esc(p.en)}</button>`).join("");
+}
+
+function renderSituations() {
+  const el = $("#situations-panel");
+  if (!el) return;
+  const sit = ENLAB.phrasesSituation || {};
+  const keys = Object.keys(sit).filter((k) => (sit[k] || []).some((p) => (p.min || 1) <= lvlNum()));
+  if (!keys.length) {
+    el.hidden = true;
+    return;
+  }
+  const [Y, M, D] = todayKey().split("-").map(Number);
+  const focus = keys[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % keys.length];
+  const labels = situationLabels();
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("situations"))}</p>
+    <p class="muted">Pulsa para oír. Hoy: <strong>${esc(labels[focus] || focus)}</strong></p>
+    <div class="row situation-tabs">${keys.map((k) =>
+    `<button type="button" class="chip ${k === focus ? "on" : ""}" data-sit-key="${esc(k)}">${esc(labels[k] || k)} <span class="muted">(${(sit[k] || []).length})</span></button>`).join("")}</div>
+    <div id="situation-phrases" class="situation-phrases">${renderSituationPhraseList(focus)}</div>`;
+}
+
+function repasoOn() {
+  return localStorage.getItem("enlab-repaso") === "1";
+}
+
+function renderPodcastToday() {
+  const el = $("#podcast-today");
+  if (!el) return;
+  const list = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= lvlNum());
+  if (!list.length) {
+    el.hidden = true;
+    return;
+  }
+  const [Y, M, D] = todayKey().split("-").map(Number);
+  const p = list[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % list.length];
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("podcast"))} · del día</p>
+    <p><strong>${esc(p.title)}</strong> · ${esc(p.duration || "~60 s")}</p>
+    <p class="muted">${(p.segments || []).length} frases con transcripción</p>
+    <button type="button" class="btn sm" data-podcast="${esc(p.id)}">Escuchar ahora</button>`;
+}
+
 function phraseBank() {
   const n = lvlNum();
   const a1 = ENLAB.phrasesA1 || [];
@@ -778,6 +836,8 @@ function renderHome() {
   renderStreakChart();
   renderWeekReport();
   renderDueToday();
+  renderSituations();
+  renderPodcastToday();
   renderTransferCode();
   upsertLog();
   renderClock();
@@ -894,6 +954,26 @@ function startHoyGame() {
   renderHoyPath();
   if (g.game === "weekly") {
     startWeeklyExam();
+    return true;
+  }
+  if (g.game === "cert" && window.NR?.startCertExam) {
+    NR.startCertExam();
+    return true;
+  }
+  if (g.game === "podcast" && window.NR) {
+    showTab("vocales");
+    document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return true;
+  }
+  if (g.game === "travel" && window.NR) {
+    showTab("hoy");
+    if (!NR.travelOn?.()) document.querySelector("#travel-toggle")?.click();
+    document.querySelector("#travel-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return true;
+  }
+  if (g.game === "chat" && window.NR) {
+    showTab("hablar");
+    document.querySelector("#chat-work-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
   }
   const sel = $("#quiz-mode");
@@ -1349,7 +1429,11 @@ function renderHoyReview() {
     ? `<button type="button" class="chip say" data-say="${esc(say)}">${esc(text)}</button>`
     : `<span class="chip">${esc(text)}</span>`;
   el.hidden = false;
+  const repasoBanner = repasoOn()
+    ? `<p class="pill ok">${esc(t("repasoActive"))}</p>`
+    : "";
   el.innerHTML = `
+    ${repasoBanner}
     <p class="kicker">Repasar</p>
     ${preview.length ? `<p>Mañana salen primero: ${esc(preview.join(" · "))}</p>` : ""}
     ${ears.length ? `<p class="muted">Oído</p><div class="review-chips">${ears.map((r) => {
@@ -1360,6 +1444,7 @@ function renderHoyReview() {
     ${uso.length ? `<p class="muted">Uso</p><div class="review-chips">${uso.map((x) => chip(x, x)).join("")}</div>` : ""}
     ${ed.length ? `<p class="muted">-ed</p><div class="review-chips">${ed.map((x) => chip(x, x)).join("")}</div>` : ""}
     ${speak.length ? `<p class="muted">Frases que no te entendió</p><div class="review-chips">${speak.map((x) => chip(x, x)).join("")}</div>` : ""}
+    ${repasoOn() ? `<p class="muted" style="margin-top:12px">Usa <strong>Quiz débiles</strong> arriba, o ve a Hablar.</p>` : ""}
     <p class="muted" style="margin-top:10px">Pulsa para oír. En Juego y Hablar salen primero.</p>`;
 }
 
@@ -1561,13 +1646,13 @@ function makeDictItems() {
 function makeListenItems() {
   const bank = (ENLAB.listenPassages || []).filter((x) => (x.min || 1) <= lvlNum());
   if (!bank.length) return [];
-  const rnd = seedFromDay();
-  let idx = Math.floor(rnd() * bank.length);
-  const p = bank[idx] || bank[0];
+  const skip = Number(sessionStorage.getItem("enlab-listen-i") || "0") || 0;
+  const p = bank[skip % bank.length] || bank[0];
+  window._listenPassage = p;
   return (p.qs || []).map((q, i) => ({
     type: "listen",
     q: q.q,
-    prompt: i === 0 ? p.title : "",
+    prompt: i === 0 ? `${p.title} · ${skip % bank.length + 1}/${bank.length}` : "",
     a: q.a,
     opts: shuffle([...(q.opts || [])]),
     say: p.text,
@@ -1673,7 +1758,12 @@ function makeQuizItems() {
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
-  const pool = shuffle([...weak, ...shuffle(source)]).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
+  let pool;
+  if (repasoOn() && weak.length && (quiz.mode === "choice" || quiz.mode === "type")) {
+    pool = shuffle(weak).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
+  } else {
+    pool = shuffle([...weak, ...shuffle(source)]).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
+  }
   const items = [];
   for (const v of pool) {
     const mode = Math.random();
@@ -1746,8 +1836,9 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert";
     const weekly = quiz.mode === "weekly";
+    const cert = quiz.mode === "cert";
     if (cierre) {
       const w = weakSet();
       quiz.items.forEach((it) => {
@@ -1781,7 +1872,7 @@ function renderQuiz() {
       ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
       : "";
     box.innerHTML = `<div class="card">
-      <h3>${cierre ? "Sesión cerrada" : weekly ? "Examen semanal listo" : "Terminado"}</h3>
+      <h3>${cierre ? "Sesión cerrada" : weekly ? "Examen semanal listo" : cert ? "Examen certificado" : "Terminado"}</h3>
       <p class="score">${quiz.score} / ${quiz.items.length}</p>
       ${weekly ? `<p class="muted">Esta semana: ${quiz.score >= 9 ? "Muy bien." : quiz.score >= 7 ? "Bien. Repasa lo que fallaste." : "Repasa vencen hoy y el camino de Hoy."}</p>` : ""}
       <p class="muted">${quiz.fails.length
@@ -1904,6 +1995,7 @@ function renderQuiz() {
         ${it.opts.map((o, i) => `<button data-opt="${encodeURIComponent(o)}">${i + 1}. ${esc(o)}</button>`).join("")}
       </div>
       ${it.why ? `<p class="muted" id="uso-why" hidden>${esc(it.why)}</p>` : ""}
+      ${it.type === "listen" && quiz.i === 0 ? `<p class="row" style="margin-top:10px"><button type="button" class="btn ghost sm" id="listen-next-pass">Otro pasaje</button></p>` : ""}
     </div>`;
     if (it.type === "ed" || it.type === "listen") speak(it.say, it.type === "listen");
     return;
@@ -2580,8 +2672,82 @@ document.addEventListener("click", (e) => {
       showTab("hablar");
       setSpeakTarget(window._speakTarget);
       toggleRecording("hablar");
+      try {
+        const done = JSON.parse(localStorage.getItem("enlab-email-done") || "[]");
+        if (!done.includes(em.subject)) {
+          done.push(em.subject);
+          localStorage.setItem("enlab-email-done", JSON.stringify(done.slice(-20)));
+        }
+      } catch { /* ignore */ }
     }
   }
+
+  if (e.target.closest("#email-next")) {
+    window._dailyEmail = null;
+    renderEmails();
+  }
+
+  if (e.target.closest("#listen-next-pass")) {
+    const n = Number(sessionStorage.getItem("enlab-listen-i") || "0") + 1;
+    sessionStorage.setItem("enlab-listen-i", String(n));
+    startQuiz();
+  }
+
+  const dueKind = e.target.closest("[data-due-kind]");
+  if (dueKind) {
+    const kind = dueKind.dataset.dueKind;
+    const map = { dict: "dict", art: "art", prep: "prep", phrasal: "phrasal", cond: "cond", listen: "listen", ear: "ear", uso: "uso", ed: "ed" };
+    const mode = map[kind] || "choice";
+    showTab("quiz");
+    const sel = $("#quiz-mode");
+    if (sel) sel.value = mode;
+    syncQuizModePicks();
+    startQuiz();
+  }
+
+  if (e.target.closest("#repaso-exit")) {
+    clearRepasoMode();
+    renderHome();
+  }
+
+  const emailPick = e.target.closest("[data-email-pick]");
+  if (emailPick) {
+    const subject = emailPick.dataset.emailPick;
+    const em = (ENLAB.emailSpeak || []).find((x) => x.subject === subject);
+    if (em) {
+      window._dailyEmail = em;
+      renderEmails();
+    }
+  }
+
+  const phRec = e.target.closest("[data-phrasal-rec]");
+  if (phRec) {
+    const p = window._phrasalsSlice?.[Number(phRec.dataset.phrasalRec)];
+    if (p) {
+      window._speakTarget = { target: p.say, helpHtml: `<span class="es-line">${esc(p.es)}</span>` };
+      setSpeakTarget(window._speakTarget);
+      showTab("hablar");
+      toggleRecording("hablar");
+    }
+  }
+
+  const sitKey = e.target.closest("[data-sit-key]");
+  if (sitKey) {
+    $$(".situation-tabs .chip").forEach((b) => b.classList.toggle("on", b === sitKey));
+    const box = $("#situation-phrases");
+    if (box) box.innerHTML = renderSituationPhraseList(sitKey.dataset.sitKey);
+  }
+
+  if (e.target.closest("#repaso-quiz-btn")) {
+    showTab("quiz");
+    const sel = $("#quiz-mode");
+    if (sel) sel.value = "choice";
+    syncQuizModePicks();
+    startQuiz();
+  }
+
+  const tabJump = e.target.closest("[data-tab-jump]");
+  if (tabJump) showTab(tabJump.dataset.tabJump);
 
   if (e.target.closest("#weekly-exam-btn")) {
     startWeeklyExam();
@@ -3166,6 +3332,8 @@ function applyUiLang() {
   if (uiBtn) uiBtn.textContent = t("uiLang");
   const kidsBtn = $("#kids-toggle");
   if (kidsBtn) kidsBtn.textContent = t("kids");
+  const travelBtn = $("#travel-toggle");
+  if (travelBtn) travelBtn.textContent = t("travel");
   const repasoBtn = $("#repaso-btn");
   if (repasoBtn) repasoBtn.textContent = t("repaso");
   const shadowBtn = $("#speak-shadow");
@@ -3223,9 +3391,11 @@ function maybeAutoAdvancePath() {
 
 function startRepasoMode() {
   localStorage.setItem("enlab-repaso", "1");
+  sessionStorage.setItem("enlab-repaso-speak-only", speakOnlyWeakOn() ? "1" : "0");
+  localStorage.setItem("enlab-speak-only-weak", "1");
+  document.body.classList.add("repaso-active");
   showTab("hoy");
-  const path = $("#hoy-path");
-  if (path) path.hidden = true;
+  $$(".hoy-next").forEach((b) => { b.hidden = true; });
   renderHoyReview();
   const box = $("#hoy-review");
   if (box) box.hidden = false;
@@ -3233,14 +3403,21 @@ function startRepasoMode() {
   startTimerLoop();
   requestWake();
   renderClock();
+  const exitBtn = $("#repaso-exit");
+  if (exitBtn) exitBtn.hidden = false;
   buzz(true);
 }
 
 function clearRepasoMode() {
   if (localStorage.getItem("enlab-repaso") !== "1") return;
   localStorage.removeItem("enlab-repaso");
-  const path = $("#hoy-path");
-  if (path) path.hidden = false;
+  document.body.classList.remove("repaso-active");
+  const prev = sessionStorage.getItem("enlab-repaso-speak-only");
+  if (prev === "0") localStorage.setItem("enlab-speak-only-weak", "0");
+  sessionStorage.removeItem("enlab-repaso-speak-only");
+  $$(".hoy-next").forEach((b) => { b.hidden = false; });
+  const exitBtn = $("#repaso-exit");
+  if (exitBtn) exitBtn.hidden = true;
 }
 
 function loadVoiceLog() {
@@ -3262,9 +3439,9 @@ function saveVoiceClip(said, blob) {
     target,
     said,
     ok,
-    audio: blob && blob.size < 80000 ? null : "",
+    audio: blob && blob.size < 120000 ? null : "",
   };
-  if (blob && blob.size < 80000) {
+  if (blob && blob.size < 120000) {
     const reader = new FileReader();
     reader.onload = () => {
       entry.audio = String(reader.result || "");
@@ -3289,7 +3466,8 @@ function renderVoiceHistory() {
   if (!box) return;
   const log = loadVoiceLog().filter((x) => x.date === todayKey()).slice(0, 5);
   if (!log.length) {
-    box.hidden = true;
+    box.hidden = false;
+    box.innerHTML = `<p class="kicker">${esc(t("voiceHist"))}</p><p class="muted">Aún no hay grabaciones hoy. Pulsa Grabarme en Hablar.</p>`;
     return;
   }
   box.hidden = false;
@@ -3345,11 +3523,12 @@ function renderStreakChart() {
     const score = (day.heard || 0) + (day.quiz || 0) + (day.spoke || 0);
     days.push({ key, score, hot: score > 0 });
   }
+  const hotN = days.filter((d) => d.hot).length;
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("streak"))}</p>
-    <div class="streak-bars" role="img" aria-label="Actividad 30 días">
-      ${days.map((d) => `<span class="streak-day ${d.hot ? "hot" : ""}" title="${esc(d.key)}"></span>`).join("")}
+    <p class="kicker">${esc(t("streak"))} · ${hotN}/30 días activos</p>
+    <div class="streak-bars" role="img" aria-label="${hotN} días con práctica en los últimos 30">
+      ${days.map((d) => `<span class="streak-day ${d.hot ? "hot" : ""}" title="${esc(d.key)}: ${d.score} acciones"></span>`).join("")}
     </div>`;
 }
 
@@ -3403,6 +3582,15 @@ function renderTransferCode() {
     const code = transferEncode(buildTransferPayload());
     ta.value = code;
     drawTransferQr(code.slice(0, 400));
+    let hint = $("#transfer-chunks");
+    if (!hint) {
+      hint = document.createElement("p");
+      hint.id = "transfer-chunks";
+      hint.className = "muted";
+      ta.insertAdjacentElement("afterend", hint);
+    }
+    const n = Math.ceil(code.length / 3);
+    hint.textContent = `El QR es una huella visual (no ISO). Copia el código entero (${code.length} caracteres). Checksum: ${code.length % 997}.`;
   } catch {
     ta.value = "";
   }
@@ -3509,8 +3697,11 @@ function renderDueToday() {
   el.hidden = false;
   el.innerHTML = `
     <p class="kicker">${esc(t("due"))}</p>
-    <div class="review-chips">${due.map((x) => `<button type="button" class="chip say" data-say="${esc(x.label.split(" / ")[0])}">${esc(x.label)}</button>`).join("")}</div>
-    <p class="muted">Fallaste o toca repasarlo. Sale primero en Juego y Dictado.</p>`;
+    <div class="review-chips">${due.map((x) => {
+      const kind = (x.id.split(":")[0] || "item");
+      return `<button type="button" class="chip say due-${esc(kind)}" data-due-kind="${esc(kind)}" data-say="${esc(x.label.split(" / ")[0])}"><span class="due-tag">${esc(kind)}</span> ${esc(x.label)}</button>`;
+    }).join("")}</div>
+    <p class="muted">Pulsa una etiqueta (dict, art…) para jugar ese modo. Sale primero en Juego.</p>`;
 }
 
 function renderWeekReport() {
@@ -3532,6 +3723,16 @@ function renderWeekReport() {
     heard += h;
     quizN += q;
     spoke += s;
+  }
+  if (!heard && !quizN && !spoke && !days) {
+    el.hidden = false;
+    const done = weeklyExamDone();
+    const wscore = weeklyScoreText();
+    const weeklyBtn = done
+      ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
+      : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
+    el.innerHTML = `<p class="muted">${esc(t("week"))}: empieza hoy tu primera sesión.</p><p class="row">${weeklyBtn}</p>`;
+    return;
   }
   el.hidden = false;
   const done = weeklyExamDone();
@@ -3610,7 +3811,19 @@ function renderStarBox() {
   const bits = ENLAB.starScaffold || [];
   el.innerHTML = `
     <p class="muted"><strong>STAR</strong> para “describe a challenge”:</p>
-    <ol class="star-list">${bits.map((s) => `<li><strong>${esc(s.part)} · ${esc(s.en)}</strong> — <span class="es-line">${esc(s.es)}</span></li>`).join("")}</ol>`;
+    <ol class="star-list">${bits.map((s) => `<li><strong>${esc(s.part)} · ${esc(s.en)}</strong> — <span class="es-line">${esc(s.es)}</span></li>`).join("")}</ol>
+    <details class="star-draft">
+      <summary>Borrador STAR (30–60 s)</summary>
+      <label class="muted">S — Situación<textarea id="star-s" rows="2" placeholder="Context: when, where…"></textarea></label>
+      <label class="muted">T — Tarea<textarea id="star-t" rows="2" placeholder="What you had to do…"></textarea></label>
+      <label class="muted">A — Acción<textarea id="star-a" rows="2" placeholder="What you did…"></textarea></label>
+      <label class="muted">R — Resultado<textarea id="star-r" rows="2" placeholder="Outcome, numbers if possible…"></textarea></label>
+      <button type="button" class="btn sm" id="star-speak">Oír mi borrador en inglés</button>
+    </details>`;
+  $("#star-speak")?.addEventListener("click", () => {
+    const text = ["star-s", "star-t", "star-a", "star-r"].map((id) => $(`#${id}`)?.value?.trim()).filter(Boolean).join(". ");
+    if (text) speak(text, true);
+  });
 }
 
 function renderRoleplays() {
@@ -3626,7 +3839,7 @@ function startRoleplay(id) {
   const scene = (ENLAB.roleplays || []).find((x) => x.id === id);
   const box = $("#roleplay-now");
   if (!scene || !box) return;
-  window._roleplay = { scene, i: 0 };
+  window._roleplay = { scene, i: 0, until: Date.now() + 120000 };
   box.hidden = false;
   paintRoleplayTurn();
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -3637,12 +3850,14 @@ function paintRoleplayTurn() {
   const box = $("#roleplay-now");
   if (!st || !box) return;
   const turn = st.scene.turns[st.i];
-  if (!turn) {
-    box.innerHTML = `<p class="session-done">Role-play listo. Puedes repetirlo o elegir otro.</p>`;
+  const left = st.until ? Math.max(0, Math.ceil((st.until - Date.now()) / 1000)) : 0;
+  if (!turn || left <= 0) {
+    box.innerHTML = `<p class="session-done">${left <= 0 && turn ? "Se acabaron los 2 minutos." : "Role-play listo."} Puedes repetirlo o elegir otro.</p>`;
+    if (window._roleTick) { clearInterval(window._roleTick); window._roleTick = null; }
     return;
   }
   box.innerHTML = `
-    <p class="kicker">${esc(st.scene.title)} · ${st.i + 1}/${st.scene.turns.length}</p>
+    <p class="kicker">${esc(st.scene.title)} · ${st.i + 1}/${st.scene.turns.length} · <span id="role-timer">${left}s</span></p>
     <p class="muted es-line">${esc(st.scene.es)}</p>
     <p><strong>A:</strong> ${esc(turn.a)}</p>
     <p><strong>Tú:</strong> ${esc(turn.b)}</p>
@@ -3652,6 +3867,13 @@ function paintRoleplayTurn() {
       <button type="button" class="btn ghost" data-role-next>Siguiente giro</button>
     </div>
     <p class="status" id="role-status"></p>`;
+  if (window._roleTick) clearInterval(window._roleTick);
+  window._roleTick = setInterval(() => {
+    const el = $("#role-timer");
+    const remain = Math.max(0, Math.ceil((st.until - Date.now()) / 1000));
+    if (el) el.textContent = `${remain}s`;
+    if (remain <= 0) paintRoleplayTurn();
+  }, 500);
 }
 
 function renderEmails() {
@@ -3662,18 +3884,30 @@ function renderEmails() {
     box.innerHTML = `<p class="muted">Disponible desde A2.</p>`;
     return;
   }
-  const em = seededShuffle(items)[0];
+  const done = new Set(JSON.parse(localStorage.getItem("enlab-email-done") || "[]"));
+  let em = window._dailyEmail;
+  if (!em || !items.some((x) => x.subject === em.subject)) {
+    em = seededShuffle(items.filter((e) => !done.has(e.subject)))[0] || seededShuffle(items)[0];
+  }
   window._dailyEmail = em;
   box.innerHTML = `
-    <p class="kicker">Email de hoy</p>
-    <p><strong>${esc(em.subject)}</strong> <span class="muted">· ${esc(em.from)}</span></p>
-    <pre class="email-body">${esc(em.body)}</pre>
-    <p class="muted es-line">${esc(em.es)}</p>
-    <div class="row">
-      <button type="button" class="btn ghost" data-email-say>Oír en voz alta</button>
-      <button type="button" class="btn sm" data-email-reply>Grabar respuesta</button>
-    </div>
-    <p class="muted">Respuesta modelo: <em>${esc(em.reply)}</em></p>`;
+    <p class="kicker">${esc(t("email"))} · ${items.length} disponibles</p>
+    <details class="email-pick" open>
+      <summary><strong>${esc(em.subject)}</strong> <span class="muted">· ${esc(em.from)}</span></summary>
+      <pre class="email-body">${esc(em.body)}</pre>
+      <p class="muted es-line">${esc(em.es)}</p>
+      <div class="row">
+        <button type="button" class="btn ghost" data-email-say>Oír en voz alta</button>
+        <button type="button" class="btn sm" data-email-reply>Grabar respuesta</button>
+        <button type="button" class="btn ghost sm" id="email-next">Otro email</button>
+      </div>
+      <p class="muted">Respuesta modelo: <em>${esc(em.reply)}</em></p>
+    </details>
+    <details class="email-all" style="margin-top:10px">
+      <summary class="muted">Ver todos (${items.length})</summary>
+      <div class="email-grid">${items.map((e) => `
+        <button type="button" class="chip ${done.has(e.subject) ? "ok" : ""}" data-email-pick="${esc(e.subject)}">${esc(e.subject)}</button>`).join("")}</div>
+    </details>`;
 }
 
 function renderInterviewSim() {
@@ -3698,32 +3932,26 @@ function renderInterviewSim() {
 }
 
 function renderPhrasalsWork() {
-  let card = $("#phrasals-work-card");
-  if (!card) {
-    const host = $("#interview-sim-card");
-    if (!host) return;
-    card = document.createElement("div");
-    card.className = "card";
-    card.id = "phrasals-work-card";
-    card.innerHTML = `<h3>Phrasals de trabajo</h3><div id="phrasals-work-list"></div>`;
-    host.insertAdjacentElement("afterend", card);
-  }
+  const card = $("#phrasals-work-card");
   const list = $("#phrasals-work-list");
+  if (!card || !list) return;
   const items = (ENLAB.phrasalsWork || []).filter((p) => (p.min || 3) <= lvlNum());
   if (!items.length) {
     card.hidden = true;
     return;
   }
   card.hidden = false;
-  list.innerHTML = items.map((p) => `
+  list.innerHTML = items.map((p, i) => `
     <div class="card" data-track="phrase" data-phrase="${esc(p.en)}">
       <p>${esc(p.en)}</p>
       <p class="muted es-line">${esc(p.es)}</p>
       <div class="row">
         <button class="say" data-say="${esc(p.say)}">Oír</button>
+        <button type="button" class="btn sm" data-phrasal-rec="${i}">Grabar</button>
         ${ygLink(p.en.split(" ")[0], t("real"))}
       </div>
     </div>`).join("");
+  window._phrasalsSlice = items;
 }
 
 function exportProgress() {
@@ -3866,7 +4094,10 @@ $("#ui-lang-toggle")?.addEventListener("click", () => {
 
 $("#repaso-btn")?.addEventListener("click", () => startRepasoMode());
 
-$("#speak-shadow")?.addEventListener("click", () => openShadowBox());
+$("#speak-shadow")?.addEventListener("click", () => {
+  openShadowBox();
+  runShadowing();
+});
 
 $("#shadow-go")?.addEventListener("click", () => runShadowing());
 
