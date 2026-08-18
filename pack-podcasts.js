@@ -1,0 +1,456 @@
+/* 28 mini-podcasts únicos (ES/EN) — con pack-n.js = 40 total */
+window.ENLAB = window.ENLAB || {};
+
+(function () {
+  const PODCASTS = [
+    {
+      id: "work-feedback",
+      title: "Giving feedback",
+      min: 3,
+      duration: "~58 s",
+      segments: [
+        { en: "Can I give you quick feedback on the deck?", es: "¿Te doy feedback rápido del deck?" },
+        { en: "The story is clear in the first three slides.", es: "La historia se entiende en las tres primeras diapositivas." },
+        { en: "Slide seven feels crowded — maybe split it.", es: "La siete está cargada — quizá dividirla." },
+        { en: "Your demo at the end landed really well.", es: "El demo final funcionó muy bien." },
+        { en: "One thing to try: lead with the customer quote.", es: "Prueba abrir con la cita del cliente." },
+      ],
+      qs: [
+        { q: "¿Qué salió bien?", a: "demo at the end", opts: ["nothing", "demo at the end", "slide seven only"] },
+        { q: "¿Qué mejorar?", a: "split slide seven", opts: ["delete the deck", "split slide seven", "add fifty slides"] },
+      ],
+    },
+    {
+      id: "work-deadline",
+      title: "When the deadline moves",
+      min: 3,
+      duration: "~60 s",
+      segments: [
+        { en: "Heads-up: launch moved from Friday to Wednesday.", es: "Aviso: el launch pasa de viernes a miércoles." },
+        { en: "That's two days earlier — what's must-have?", es: "Dos días antes — ¿qué es imprescindible?" },
+        { en: "Payments and login ship. Analytics can wait.", es: "Pagos y login salen. Analytics espera." },
+        { en: "I'll post a cut list in the channel.", es: "Publico la lista de recortes en el canal." },
+        { en: "If you're blocked, say so before stand-up.", es: "Si estás bloqueado, dilo antes del stand-up." },
+      ],
+      qs: [
+        { q: "¿Nueva fecha?", a: "Wednesday", opts: ["Friday", "Wednesday", "next month"] },
+        { q: "¿Qué se recorta?", a: "Analytics", opts: ["Payments", "Analytics", "Login"] },
+      ],
+    },
+    {
+      id: "work-onboarding",
+      title: "Buddy on day one",
+      min: 2,
+      duration: "~55 s",
+      segments: [
+        { en: "Welcome! I'm Alex — your onboarding buddy.", es: "¡Bienvenido! Soy Alex — tu buddy de onboarding." },
+        { en: "First stop: IT will set up your laptop.", es: "Primero: IT configura tu laptop." },
+        { en: "Then we'll grab lunch and meet the team.", es: "Luego almorzamos y conoces al equipo." },
+        { en: "Don't worry about knowing every tool today.", es: "No te preocupes por saber todas las herramientas hoy." },
+        { en: "Slack me anytime — no question is too small.", es: "Escríbeme cuando quieras — ninguna duda es pequeña." },
+      ],
+      qs: [
+        { q: "¿Quién ayuda?", a: "Alex", opts: ["Alex", "Nobody", "HR only"] },
+        { q: "¿Primero?", a: "IT laptop setup", opts: ["Deploy to prod", "IT laptop setup", "Quit"] },
+      ],
+    },
+    {
+      id: "work-remote",
+      title: "Remote work day",
+      min: 2,
+      duration: "~54 s",
+      segments: [
+        { en: "I'm working from home today — same hours.", es: "Hoy trabajo desde casa — mismo horario." },
+        { en: "I'll be on Slack; call me if it's urgent.", es: "Estoy en Slack; llámame si es urgente." },
+        { en: "My camera might be off during deep work.", es: "Puede que apague cámara en trabajo profundo." },
+        { en: "I'll share notes after the three p.m. sync.", es: "Comparto notas después del sync de las tres." },
+        { en: "Back in the office tomorrow.", es: "Mañana vuelvo a la oficina." },
+      ],
+      qs: [
+        { q: "¿Dónde hoy?", a: "from home", opts: ["from home", "on vacation", "offline all day"] },
+        { q: "¿Urgente?", a: "call me", opts: ["ignore Slack", "call me", "wait a week"] },
+      ],
+    },
+    {
+      id: "work-client-call",
+      title: "Before the client call",
+      min: 3,
+      duration: "~57 s",
+      segments: [
+        { en: "Client call in ten — quick prep.", es: "Llamada con cliente en diez — prep rápida." },
+        { en: "They care about timeline and risk.", es: "Les importan timeline y riesgo." },
+        { en: "I'll open; you cover the technical piece.", es: "Yo abro; tú cubres la parte técnica." },
+        { en: "If they push on price, loop in Maria.", es: "Si presionan precio, metemos a Maria." },
+        { en: "Let's confirm next steps before we hang up.", es: "Confirmemos próximos pasos antes de colgar." },
+      ],
+      qs: [
+        { q: "¿Qué les importa?", a: "timeline and risk", opts: ["lunch menu", "timeline and risk", "weather"] },
+        { q: "¿Precio?", a: "loop in Maria", opts: ["say yes to anything", "loop in Maria", "hang up"] },
+      ],
+    },
+    {
+      id: "work-demo-day",
+      title: "Demo day nerves",
+      min: 3,
+      duration: "~59 s",
+      segments: [
+        { en: "Demo in five minutes — breathe.", es: "Demo en cinco minutos — respira." },
+        { en: "Show the happy path first, not edge cases.", es: "Muestra el camino feliz primero, no casos raros." },
+        { en: "If something breaks, name it and move on.", es: "Si algo falla, dilo y sigue." },
+        { en: "Leave time for one question at the end.", es: "Deja tiempo para una pregunta al final." },
+        { en: "You know this product — speak like a human.", es: "Conoces el producto — habla natural." },
+      ],
+      qs: [
+        { q: "¿Qué mostrar primero?", a: "happy path", opts: ["every bug", "happy path", "nothing"] },
+        { q: "¿Si falla?", a: "name it and move on", opts: ["panic and leave", "name it and move on", "blame the audience"] },
+      ],
+    },
+    {
+      id: "work-retro",
+      title: "Sprint retro",
+      min: 3,
+      duration: "~56 s",
+      segments: [
+        { en: "Retro time — what went well?", es: "Hora del retro — ¿qué salió bien?" },
+        { en: "Pairing helped us ship the API faster.", es: "El pair nos ayudó a sacar la API antes." },
+        { en: "What didn't? Late specs slowed QA.", es: "¿Qué no? Specs tardías frenaron QA." },
+        { en: "One action: specs due Tuesday noon.", es: "Acción: specs el martes al mediodía." },
+        { en: "We'll check that in two weeks.", es: "Lo revisamos en dos semanas." },
+      ],
+      qs: [
+        { q: "¿Qué ayudó?", a: "Pairing", opts: ["Silence", "Pairing", "More meetings"] },
+        { q: "¿Acción?", a: "specs due Tuesday", opts: ["cancel retro", "specs due Tuesday", "work weekends"] },
+      ],
+    },
+    {
+      id: "work-conflict",
+      title: "Disagreement in a meeting",
+      min: 4,
+      duration: "~61 s",
+      segments: [
+        { en: "I hear you — we both want fewer bugs.", es: "Te escucho — los dos queremos menos bugs." },
+        { en: "I disagree that we should skip tests.", es: "No estoy de acuerdo en saltarnos tests." },
+        { en: "Can we try a one-week experiment with both?", es: "¿Probamos una semana con ambos?" },
+        { en: "If metrics worsen, we revisit Friday.", es: "Si empeoran métricas, revisamos el viernes." },
+        { en: "Fair? Let's document it in the ticket.", es: "¿Justo? Lo documentamos en el ticket." },
+      ],
+      qs: [
+        { q: "¿Propuesta?", a: "one-week experiment", opts: ["fire someone", "one-week experiment", "ignore forever"] },
+        { q: "¿Revisión?", a: "Friday", opts: ["never", "Friday", "next year"] },
+      ],
+    },
+    {
+      id: "work-promotion",
+      title: "Growth conversation",
+      min: 4,
+      duration: "~60 s",
+      segments: [
+        { en: "I'd like to talk about my growth path.", es: "Quiero hablar de mi camino de crecimiento." },
+        { en: "I've led two launches this year.", es: "Lideré dos launches este año." },
+        { en: "What skills do you need to see for the next level?", es: "¿Qué habilidades necesitas ver para el siguiente nivel?" },
+        { en: "Can we set clear goals for the next six months?", es: "¿Metas claras para los próximos seis meses?" },
+        { en: "I'd appreciate honest feedback along the way.", es: "Agradecería feedback honesto en el camino." },
+      ],
+      qs: [
+        { q: "¿Tema?", a: "growth path", opts: ["vacation only", "growth path", "resignation"] },
+        { q: "¿Plazo metas?", a: "six months", opts: ["six months", "six days", "never"] },
+      ],
+    },
+    {
+      id: "work-all-hands",
+      title: "All-hands question",
+      min: 3,
+      duration: "~55 s",
+      segments: [
+        { en: "Thanks for the update on Q3.", es: "Gracias por el update de Q3." },
+        { en: "How will layoffs affect our roadmap?", es: "¿Cómo afectan los recortes al roadmap?" },
+        { en: "We focus on revenue features first.", es: "Priorizamos features de ingresos primero." },
+        { en: "Support and reliability stay staffed.", es: "Soporte y confiabilidad siguen con equipo." },
+        { en: "More detail in the FAQ after this call.", es: "Más detalle en el FAQ después de la llamada." },
+      ],
+      qs: [
+        { q: "¿Pregunta?", a: "layoffs and roadmap", opts: ["lunch menu", "layoffs and roadmap", "movie tips"] },
+        { q: "¿Qué sigue?", a: "FAQ", opts: ["silence", "FAQ", "instant promotion"] },
+      ],
+    },
+    {
+      id: "travel-check-in",
+      title: "Airbnb check-in",
+      min: 2,
+      duration: "~53 s",
+      segments: [
+        { en: "Hi — we're here for the booking under Kim.", es: "Hola — estamos por la reserva a nombre Kim." },
+        { en: "The lockbox code is four seven two nine.", es: "El código del lockbox es cuatro siete dos nueve." },
+        { en: "Wi-Fi is on the fridge — network GuestFive.", es: "El Wi‑Fi está en la nevera — red GuestFive." },
+        { en: "Check-out is eleven, keys in the box.", es: "Check-out a las once, llaves en la caja." },
+        { en: "Text me if anything doesn't work.", es: "Escríbeme si algo no funciona." },
+      ],
+      qs: [
+        { q: "¿Código?", a: "4729", opts: ["1234", "4729", "0000"] },
+        { q: "¿Check-out?", a: "eleven", opts: ["eleven", "midnight", "never"] },
+      ],
+    },
+    {
+      id: "travel-customs",
+      title: "Customs interview",
+      min: 3,
+      duration: "~58 s",
+      segments: [
+        { en: "Purpose of visit?", es: "¿Motivo del viaje?" },
+        { en: "Tourism — two weeks.", es: "Turismo — dos semanas." },
+        { en: "Where are you staying?", es: "¿Dónde te quedas?" },
+        { en: "A hotel in downtown — here's the address.", es: "Un hotel en el centro — aquí la dirección." },
+        { en: "Anything to declare? Just personal clothes.", es: "¿Algo que declarar? Solo ropa personal." },
+        { en: "Welcome. Enjoy your stay.", es: "Bienvenido. Disfruta la estadía." },
+      ],
+      qs: [
+        { q: "¿Motivo?", a: "Tourism", opts: ["Work forever", "Tourism", "Moving permanently"] },
+        { q: "¿Declarar?", a: "personal clothes", opts: ["ten laptops", "personal clothes", "cash only"] },
+      ],
+    },
+    {
+      id: "travel-lost-bag",
+      title: "Lost at the carousel",
+      min: 2,
+      duration: "~60 s",
+      segments: [
+        { en: "My bag didn't show up on the belt.", es: "Mi maleta no salió en la cinta." },
+        { en: "Here's my baggage tag — flight four one eight.", es: "Aquí la etiqueta — vuelo cuatro uno ocho." },
+        { en: "It might be in Denver — last connection was tight.", es: "Puede estar en Denver — la conexión fue apretada." },
+        { en: "Can you deliver to my hotel if it arrives tonight?", es: "¿La entregan al hotel si llega esta noche?" },
+        { en: "I need toiletries and a change of clothes.", es: "Necesito artículos de aseo y ropa de cambio." },
+      ],
+      qs: [
+        { q: "¿Problema?", a: "bag didn't show up", opts: ["wrong flight", "bag didn't show up", "too many bags"] },
+        { q: "¿Posible ciudad?", a: "Denver", opts: ["Denver", "Miami", "London"] },
+      ],
+    },
+    {
+      id: "travel-taxi",
+      title: "Taxi from the airport",
+      min: 1,
+      duration: "~50 s",
+      segments: [
+        { en: "Hi — to this address, please.", es: "Hola — a esta dirección, por favor." },
+        { en: "How long will it take in this traffic?", es: "¿Cuánto tarda con este tráfico?" },
+        { en: "About thirty minutes — meter or flat rate?", es: "Unos treinta minutos — taxímetro o tarifa fija?" },
+        { en: "Flat rate is fine. Can I pay by card?", es: "Tarifa fija está bien. ¿Pago con tarjeta?" },
+        { en: "Sure. Keep the receipt for your hotel.", es: "Claro. Guarda el recibo para el hotel." },
+      ],
+      qs: [
+        { q: "¿Tiempo?", a: "thirty minutes", opts: ["five minutes", "thirty minutes", "five hours"] },
+        { q: "¿Pago?", a: "card", opts: ["card", "only coins", "barter"] },
+      ],
+    },
+    {
+      id: "travel-museum",
+      title: "Museum desk",
+      min: 2,
+      duration: "~54 s",
+      segments: [
+        { en: "Two tickets for the special exhibit, please.", es: "Dos entradas para la expo especial, por favor." },
+        { en: "Students get half price with ID.", es: "Estudiantes mitad de precio con carnet." },
+        { en: "Audio guides are three dollars extra.", es: "Audioguías tres dólares extra." },
+        { en: "The Van Gogh room closes at five.", es: "La sala Van Gogh cierra a las cinco." },
+        { en: "No flash photography in the main gallery.", es: "Sin flash en la galería principal." },
+      ],
+      qs: [
+        { q: "¿Descuento?", a: "half price with ID", opts: ["free always", "half price with ID", "double price"] },
+        { q: "¿Cierra Van Gogh?", a: "five", opts: ["midnight", "five", "never"] },
+      ],
+    },
+    {
+      id: "travel-street-food",
+      title: "Street food order",
+      min: 2,
+      duration: "~52 s",
+      segments: [
+        { en: "What's the special today?", es: "¿Cuál es el especial de hoy?" },
+        { en: "Chicken bowl with extra veggies.", es: "Bowl de pollo con extra verduras." },
+        { en: "Mild spice, please — not too hot.", es: "Picante suave, por favor — no muy fuerte." },
+        { en: "To go. No onions if you can.", es: "Para llevar. Sin cebolla si se puede." },
+        { en: "That smells amazing — how much?", es: "Huele increíble — ¿cuánto es?" },
+      ],
+      qs: [
+        { q: "¿Plato?", a: "Chicken bowl", opts: ["Pizza", "Chicken bowl", "Salad only"] },
+        { q: "¿Picante?", a: "Mild", opts: ["Extra hot", "Mild", "No food"] },
+      ],
+    },
+    {
+      id: "travel-border",
+      title: "Border by car",
+      min: 3,
+      duration: "~57 s",
+      segments: [
+        { en: "Passports ready — windows down.", es: "Pasaportes listos — ventanas abajo." },
+        { en: "How long will you stay in Canada?", es: "¿Cuánto te quedas en Canadá?" },
+        { en: "Four days — visiting friends in Toronto.", es: "Cuatro días — visito amigos en Toronto." },
+        { en: "Any fruits or meat in the car?", es: "¿Frutas o carne en el carro?" },
+        { en: "No — just clothes and gifts.", es: "No — solo ropa y regalos." },
+        { en: "Drive safe. Next vehicle.", es: "Maneja con cuidado. Siguiente vehículo." },
+      ],
+      qs: [
+        { q: "¿Cuánto tiempo?", a: "Four days", opts: ["Four days", "Four years", "Forever"] },
+        { q: "¿Comida?", a: "No fruits or meat", opts: ["Whole pig", "No fruits or meat", "Ten watermelons"] },
+      ],
+    },
+    {
+      id: "travel-jet-lag",
+      title: "Jet lag tips",
+      min: 2,
+      duration: "~55 s",
+      segments: [
+        { en: "I landed at six a.m. local time.", es: "Aterricé a las seis de la mañana, hora local." },
+        { en: "Stay awake until nine p.m. tonight.", es: "Mantente despierto hasta las nueve de la noche." },
+        { en: "Sunlight helps reset your clock.", es: "La luz solar ayuda a resetear el reloj." },
+        { en: "Skip heavy naps — twenty minutes max.", es: "Evita siestas largas — máximo veinte minutos." },
+        { en: "Hydrate more than you think you need.", es: "Hidrátate más de lo que crees." },
+      ],
+      qs: [
+        { q: "¿Hasta cuándo despierto?", a: "nine p.m.", opts: ["noon", "nine p.m.", "sleep all day"] },
+        { q: "¿Siesta?", a: "twenty minutes max", opts: ["four hours", "twenty minutes max", "never sleep"] },
+      ],
+    },
+    {
+      id: "travel-insurance",
+      title: "Travel insurance call",
+      min: 3,
+      duration: "~59 s",
+      segments: [
+        { en: "I need to file a claim for a canceled flight.", es: "Necesito reclamar por un vuelo cancelado." },
+        { en: "Policy number ending in eight four two.", es: "Póliza terminada en ocho cuatro dos." },
+        { en: "The airline rebooked me for Monday.", es: "La aerolínea me reprogramó para el lunes." },
+        { en: "I paid for a hotel Sunday night out of pocket.", es: "Pagué hotel el domingo de mi bolsillo." },
+        { en: "I'll email receipts within forty-eight hours.", es: "Enviaré recibos en cuarenta y ocho horas." },
+      ],
+      qs: [
+        { q: "¿Motivo?", a: "canceled flight", opts: ["lost passport forever", "canceled flight", "bought shoes"] },
+        { q: "¿Recibos?", a: "within forty-eight hours", opts: ["never", "within forty-eight hours", "in five years"] },
+      ],
+    },
+    {
+      id: "life-groceries",
+      title: "Self-checkout",
+      min: 1,
+      duration: "~51 s",
+      segments: [
+        { en: "Self-checkout — scan your first item.", es: "Autocobro — escanea tu primer artículo." },
+        { en: "Place it in the bagging area.", es: "Colócalo en la zona de bolsas." },
+        { en: "Unexpected item? Remove and rescan.", es: "¿Artículo inesperado? Quítalo y escanea otra vez." },
+        { en: "Produce code for bananas is four zero one one.", es: "Código de plátanos es cuatro cero uno uno." },
+        { en: "Pay with card — tap or insert.", es: "Paga con tarjeta — acerca o inserta." },
+      ],
+      qs: [
+        { q: "¿Plátanos?", a: "4011", opts: ["4011", "9999", "0000"] },
+        { q: "¿Pago?", a: "card", opts: ["card", "leave without paying", "only cash always"] },
+      ],
+    },
+    {
+      id: "life-laundry",
+      title: "Laundromat",
+      min: 2,
+      duration: "~54 s",
+      segments: [
+        { en: "Do you have quarters for the machines?", es: "¿Tienes monedas para las máquinas?" },
+        { en: "Wash cold for colors — hot shrinks this shirt.", es: "Lava en frío colores — caliente encoge esta camisa." },
+        { en: "Dryer takes about forty minutes.", es: "La secadora tarda unos cuarenta minutos." },
+        { en: "Don't forget detergent in slot three.", es: "No olvides detergente en la ranura tres." },
+        { en: "I'll fold on the table by the window.", es: "Doblo en la mesa junto a la ventana." },
+      ],
+      qs: [
+        { q: "¿Colores?", a: "Wash cold", opts: ["Wash hot always", "Wash cold", "Never wash"] },
+        { q: "¿Secadora?", a: "forty minutes", opts: ["forty minutes", "four hours", "instant"] },
+      ],
+    },
+    {
+      id: "life-car-repair",
+      title: "Mechanic estimate",
+      min: 3,
+      duration: "~58 s",
+      segments: [
+        { en: "My brakes squeak when I stop.", es: "Los frenos chillan al parar." },
+        { en: "We'll inspect pads and rotors today.", es: "Revisamos pastillas y discos hoy." },
+        { en: "Estimate is three twenty — parts and labor.", es: "Presupuesto tres veinte — piezas y mano de obra." },
+        { en: "Call before any work over four hundred.", es: "Llama antes de trabajo mayor a cuatro cientos." },
+        { en: "Car ready by five if we start now.", es: "Auto listo a las cinco si empezamos ya." },
+      ],
+      qs: [
+        { q: "¿Problema?", a: "brakes squeak", opts: ["brakes squeak", "new paint", "radio too loud"] },
+        { q: "¿Presupuesto?", a: "three twenty", opts: ["three twenty", "three thousand", "free"] },
+      ],
+    },
+    {
+      id: "life-parent-call",
+      title: "Weekly call home",
+      min: 2,
+      duration: "~55 s",
+      segments: [
+        { en: "Hi Mom — can you hear me okay?", es: "Hola mamá — ¿me escuchas bien?" },
+        { en: "Work is busy but good.", es: "El trabajo está ocupado pero bien." },
+        { en: "I'm eating better — less takeout.", es: "Como mejor — menos delivery." },
+        { en: "Don't worry, I'm getting enough sleep.", es: "No te preocupes, duermo suficiente." },
+        { en: "Love you — talk Sunday same time?", es: "Te quiero — ¿domingo a la misma hora?" },
+      ],
+      qs: [
+        { q: "¿Comida?", a: "less takeout", opts: ["more takeout only", "less takeout", "never eat"] },
+        { q: "¿Próxima llamada?", a: "Sunday", opts: ["Sunday", "never", "in five years"] },
+      ],
+    },
+    {
+      id: "life-pet-vet",
+      title: "Vet visit",
+      min: 2,
+      duration: "~57 s",
+      segments: [
+        { en: "My dog has been scratching a lot.", es: "Mi perro se rasca mucho." },
+        { en: "Any changes in food or soap?", es: "¿Cambios en comida o jabón?" },
+        { en: "We switched laundry detergent last week.", es: "Cambiamos detergente la semana pasada." },
+        { en: "Could be contact allergy — try hypoallergenic wash.", es: "Podría ser alergia — prueba lavado hipoalergénico." },
+        { en: "Come back if it doesn't improve in five days.", es: "Vuelve si no mejora en cinco días." },
+      ],
+      qs: [
+        { q: "¿Síntoma?", a: "scratching", opts: ["flying", "scratching", "singing"] },
+        { q: "¿Posible causa?", a: "detergent", opts: ["detergent", "moon phase", "too much TV"] },
+      ],
+    },
+    {
+      id: "life-moving",
+      title: "Moving day",
+      min: 2,
+      duration: "~54 s",
+      segments: [
+        { en: "Elevator is reserved until noon for movers.", es: "Ascensor reservado hasta mediodía para mudanza." },
+        { en: "Label boxes by room — kitchen, bedroom.", es: "Etiqueta cajas por cuarto — cocina, dormitorio." },
+        { en: "Fragile goes on top, not bottom.", es: "Frágil arriba, no abajo." },
+        { en: "I'll change the address with the post office.", es: "Cambio la dirección en correos." },
+        { en: "Pizza when we're done — you've earned it.", es: "Pizza cuando terminemos — te lo mereces." },
+      ],
+      qs: [
+        { q: "¿Ascensor?", a: "until noon", opts: ["forever", "until noon", "never use"] },
+        { q: "¿Frágil?", a: "on top", opts: ["on bottom", "on top", "throw away"] },
+      ],
+    },
+    {
+      id: "life-cooking",
+      title: "Recipe in English",
+      min: 2,
+      duration: "~52 s",
+      segments: [
+        { en: "Preheat the oven to three seventy-five.", es: "Precalienta el horno a tres setenta y cinco." },
+        { en: "Dice the onion — small, even pieces.", es: "Pica la cebolla — trozos pequeños y parejos." },
+        { en: "Sauté until golden, not burned.", es: "Saltea hasta dorado, no quemado." },
+        { en: "Season with salt and a pinch of pepper.", es: "Sazona con sal y una pizca de pimienta." },
+        { en: "Taste before you serve — adjust if needed.", es: "Prueba antes de servir — ajusta si hace falta." },
+      ],
+      qs: [
+        { q: "¿Horno?", a: "375", opts: ["375", "37", "3750"] },
+        { q: "¿Cebolla?", a: "until golden", opts: ["until black", "until golden", "raw always"] },
+      ],
+    },
+  ];
+
+  ENLAB.podcasts = ENLAB.podcasts || [];
+  PODCASTS.forEach((p) => {
+    if (!ENLAB.podcasts.some((x) => x.id === p.id)) ENLAB.podcasts.push(p);
+  });
+})();

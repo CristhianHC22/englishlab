@@ -32,3 +32,34 @@ test("Quiz: 100 dictations in bank", async ({ page }) => {
   const n = await page.evaluate(() => (window.ENLAB.dictation || []).length);
   expect(n).toBeGreaterThanOrEqual(100);
 });
+
+test("Quiz: story SRS mode after unlock", async ({ page }) => {
+  await boot(page);
+  await page.waitForFunction(() => (window.ENLAB?.branchStories || []).length >= 20);
+  await page.locator('[data-tab="vocales"]').click();
+  await page.locator('[data-story="coffee-wrong"]').click();
+  await page.locator(".story-choice").first().click();
+  await page.locator(".story-choice").first().click();
+  await page.locator('[data-tab="quiz"]').click();
+  await page.locator('[data-quiz-mode="story"]').click();
+  await page.locator("#quiz-start").click();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
+  await expect(page.locator("#quiz-box .choices button").first()).toBeVisible();
+});
+
+test("Quiz: due story chip starts story quiz", async ({ page }) => {
+  await boot(page);
+  await page.waitForFunction(() => (window.ENLAB?.branchStories || []).length >= 20);
+  await page.locator('[data-tab="vocales"]').click();
+  await page.locator('[data-story="slack-typo"]').click();
+  await page.locator(".story-choice").first().click();
+  await page.locator(".story-choice").first().click();
+  await page.locator('[data-tab="hoy"]').click();
+  await page.waitForFunction(() => {
+    const box = document.querySelector("#due-today");
+    return box && !box.hidden && box.querySelector(".due-story");
+  });
+  await page.locator("#due-today .due-story").first().click();
+  await expect(page.locator("#quiz.panel.active")).toBeVisible();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
+});

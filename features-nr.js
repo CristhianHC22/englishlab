@@ -111,7 +111,7 @@
       return { ok: em && wk, detail: `${(ENLAB.emailSpeak || []).length} emails, weekly quiz`, tip: "Examen semanal en Hoy" };
     }},
     { id: "N", name: "Podcasts + 20 pasajes extra", check: () => {
-      const p = (ENLAB.podcasts || []).length >= 12;
+      const p = (ENLAB.podcasts || []).length >= 40;
       const l = (ENLAB.listenPassages || []).length >= 25;
       return { ok: p && l, detail: `${(ENLAB.podcasts || []).length} podcasts, ${(ENLAB.listenPassages || []).length} pasajes`, tip: "Podcast del día en Hoy + quiz al terminar" };
     }},
@@ -139,15 +139,29 @@
     { id: "S", name: "Pronunciación + IPA + mínimos pares", check: () => {
       const p = (ENLAB.minimalPairs || []).length >= 25;
       const panel = !!document.querySelector("#pron-panel");
-      return { ok: p && panel, detail: `${(ENLAB.minimalPairs || []).length} pares`, tip: "Graba y compara fonética" };
+      const chart = !!(window.PRON?.renderVowelChartSvg);
+      return { ok: p && panel && chart, detail: `${(ENLAB.minimalPairs || []).length} pares · formantes`, tip: "LPC formantes F1/F2 + gráfico vocal" };
     }},
     { id: "T", name: "Aula pro + CSV + tarea", check: () => {
       const pro = !!document.querySelector("#class-pro-panel");
       return { ok: pro, detail: "Dashboard aula pro", tip: "Importa códigos transfer" };
     }},
     { id: "U", name: "20 historias ramificadas", check: () => {
-      const n = (ENLAB.branchStories || []).length;
-      return { ok: n >= 20 && !!document.querySelector("#stories-panel"), detail: `${n} historias`, tip: "Progreso guardado" };
+      const stories = ENLAB.branchStories || [];
+      const n = stories.length;
+      const minDepth = stories.length ? Math.min(...stories.map((s) => {
+        if (!s.nodes || !s.start) return 1;
+        const walk = (id, d = 0) => {
+          const node = s.nodes[id];
+          if (!node) return d;
+          if (node.ending) return d + 1;
+          const next = (node.choices || []).map((c) => walk(c.next, d + 1));
+          return next.length ? Math.max(...next) : d + 1;
+        };
+        return walk(s.start);
+      })) : 0;
+      const quiz = typeof makeStoryItems === "function";
+      return { ok: n >= 20 && minDepth >= 5 && !!document.querySelector("#stories-panel") && quiz, detail: `${n} historias · min ${minDepth} pasos · quiz SRS`, tip: "Vocabulario desbloqueable → SRS + Juego" };
     }},
     { id: "V", name: "Writing + rúbrica", check: () => {
       const n = (ENLAB.writingPrompts || []).length;
@@ -156,10 +170,11 @@
     { id: "W", name: "500 frases · 25 situaciones", check: () => {
       const sit = ENLAB.phrasesSituation || {};
       const total = Object.keys(sit).reduce((n, k) => n + (sit[k]?.length || 0), 0);
-      return { ok: Object.keys(sit).length >= 25 && total >= 480, detail: `${Object.keys(sit).length} escenarios, ${total} frases`, tip: "Shadowing en situaciones" };
+      const shadow = typeof runSituationShadow === "function";
+      return { ok: Object.keys(sit).length >= 25 && total >= 480 && shadow, detail: `${Object.keys(sit).length} escenarios, ${total} frases`, tip: "Shadowing en situaciones" };
     }},
     { id: "X", name: "100 dictados + 40 podcasts", check: () => {
-      return { ok: (ENLAB.dictation || []).length >= 100 && (ENLAB.podcasts || []).length >= 40, detail: `${(ENLAB.dictation || []).length} dict, ${(ENLAB.podcasts || []).length} pod`, tip: "Hints fonéticos" };
+      return { ok: (ENLAB.dictation || []).length >= 100 && (window.ENLAB.podcasts || []).length >= 40, detail: `${(ENLAB.dictation || []).length} dict, ${(ENLAB.podcasts || []).length} pod`, tip: "40 guiones únicos en pack-n + pack-podcasts" };
     }},
     { id: "Y", name: "Onboarding + offline + a11y", check: () => {
       const off = !!document.querySelector("#offline-badge");
@@ -169,7 +184,8 @@
     { id: "Z", name: "i18n EN + bundle split", check: () => {
       const ui = !!(ENLAB.ui?.en?.pron && ENLAB.ui?.en?.onboard);
       const loader = !!window.ENLAB_LOADER;
-      return { ok: ui && loader, detail: `EN UI ${ui ? "✓" : "—"}, loader ${loader ? "✓" : "—"}`, tip: "English UI toggle" };
+      const idb = !!window.ENLAB_IDB;
+      return { ok: ui && loader && idb, detail: `EN UI ${ui ? "✓" : "—"}, loader ${loader ? "✓" : "—"}, IDB ${idb ? "✓" : "—"}`, tip: "English UI toggle + backup IDB" };
     }},
   ];
 
@@ -191,14 +207,14 @@
     const auditTitle = typeof t === "function" ? t("audit") : "Auditoría A–Z";
     host.innerHTML = `
       <p class="kicker">${esc(auditTitle)}</p>
-      <p><strong>${okN}/${LOT_AUDIT.length}</strong> lotes en verde. Revisa qué falta optimizar.</p>
+      <p>${esc(typeof t === "function" ? t("auditSummary", { ok: okN, total: LOT_AUDIT.length }) : `${okN}/${LOT_AUDIT.length} lotes en verde.`)}</p>
       <div class="audit-scroll">
         <table class="audit-table">
-          <thead><tr><th>Lote</th><th>Nombre</th><th>Estado</th><th>Mejora sugerida</th></tr></thead>
+          <thead><tr><th>${esc(t("auditColLot"))}</th><th>${esc(t("auditColName"))}</th><th>${esc(t("auditColStatus"))}</th><th>${esc(t("auditColTip"))}</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="muted">Actualiza al usar la app. No es un examen — es checklist de calidad.</p>`;
+      <p class="muted">${esc(t("auditFootnote"))}</p>`;
   }
 
   /* ── Modo viaje ── */

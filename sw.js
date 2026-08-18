@@ -1,4 +1,4 @@
-const CACHE = "enlab-v20";
+const CACHE = "enlab-v25";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,8 @@ const ASSETS = [
   "./guide.js",
   "./levels.js",
   "./extras.js",
+  "./i18n.js",
+  "./idb-backup.js",
   "./pack.js",
   "./pack-m.js",
   "./pack-n.js",
@@ -17,9 +19,11 @@ const ASSETS = [
   "./pack-u.js",
   "./pack-v.js",
   "./pack-bulk.js",
+  "./pack-podcasts.js",
   "./features-nr.js",
   "./features-sv.js",
   "./loader.js",
+  "./pron-audio.js",
   "./manifest.webmanifest",
   "./icon.svg",
 ];

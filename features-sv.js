@@ -24,28 +24,153 @@
     return dp[m][n] / Math.max(m, n);
   }
 
-  function scorePronunciation(said, targetIpa, targetText) {
-    if (!said) return { score: 0, pct: 0, note: "No se oyó nada" };
+  function textPronScore(said, targetIpa, targetText) {
+    if (!said) return { pct: 0, note: "No se oyó nada", dist: 1 };
+    if (typeof speakHeardOk === "function" && speakHeardOk(said, targetText)) {
+      return { pct: 100, note: "Transcripción coincide.", dist: 0 };
+    }
     const norm = typeof speakVariants === "function"
       ? speakVariants(said).join(" ")
       : said.toLowerCase();
-    if (typeof speakHeardOk === "function" && speakHeardOk(said, targetText)) {
-      return { score: 100, pct: 100, note: "¡Muy bien! Coincide con el objetivo." };
-    }
     const dist = phonemeDistance(norm.replace(/\s/g, ""), targetIpa);
     const pct = Math.max(0, Math.round((1 - dist) * 100));
-    let note = pct >= 80 ? "Cerca — repite más despacio." : pct >= 50 ? "Se entiende, sigue practicando." : "Lejos del objetivo — oye otra vez.";
-    return { score: pct, pct, note, dist };
+    const note = pct >= 80 ? "Texto cerca — repite más despacio."
+      : pct >= 50 ? "Se entiende por texto, afina vocal."
+      : "Lejos del objetivo — oye otra vez.";
+    return { pct, note, dist };
+  }
+
+  function scorePronunciation(said, targetIpa, targetText, opts) {
+    opts = opts || {};
+    const text = textPronScore(said, targetIpa, targetText);
+    const pair = opts.pair;
+    const formants = opts.formants;
+    const formantResult = (formants && pair && window.PRON?.scoreFormantPair)
+      ? window.PRON.scoreFormantPair(formants, pair.ipaA, pair.ipaB)
+      : null;
+
+    if (formantResult) {
+      const hasText = said && text.pct > 0;
+      const pct = hasText
+        ? Math.round(text.pct * 0.32 + formantResult.pct * 0.68)
+        : formantResult.pct;
+      const fNote = `F1 ${formants.f1} · F2 ${formants.f2} Hz`;
+      const note = `${formantResult.note} · ${fNote}`;
+      return {
+        score: pct,
+        pct,
+        note,
+        dist: text.dist,
+        textPct: text.pct,
+        formantPct: formantResult.pct,
+        formants,
+        formantResult,
+        method: "lpc+text",
+      };
+    }
+
+    return {
+      score: text.pct,
+      pct: text.pct,
+      note: text.note,
+      dist: text.dist,
+      textPct: text.pct,
+      method: "ipa",
+    };
+  }
+
+  async function scorePronunciationAsync(said, targetIpa, targetText, blob, pair) {
+    let formants = null;
+    if (blob?.size && window.PRON?.analyzeFormants) {
+      formants = await window.PRON.analyzeFormants(blob);
+    }
+    return scorePronunciation(said, targetIpa, targetText, { formants, pair });
+  }
+
+  function formatPronScore(r) {
+    if (!r) return "";
+    const tag = r.method === "lpc+text" ? "🎙" : "IPA";
+    return `${r.pct}% ${tag} — ${r.note}`;
   }
 
   function loadStoryProgress() {
     try { return JSON.parse(localStorage.getItem("enlab-story-progress") || "{}"); } catch { return {}; }
   }
 
-  function saveStoryProgress(id, nodeId, score) {
+  function saveStoryProgress(id, patch) {
     const p = loadStoryProgress();
-    p[id] = { node: nodeId, score: Math.max(p[id]?.score || 0, score || 0), at: Date.now() };
+    p[id] = { ...(p[id] || {}), ...patch, at: Date.now() };
     localStorage.setItem("enlab-story-progress", JSON.stringify(p));
+    if (window.ENLAB_IDB?.mirror) window.ENLAB_IDB.mirror("enlab-story-progress", JSON.stringify(p));
+  }
+
+  function storyMaxSteps(story) {
+    if (!story?.nodes || !story.start) return 1;
+    const memo = {};
+    const walk = (nodeId) => {
+      if (memo[nodeId] !== undefined) return memo[nodeId];
+      const node = story.nodes[nodeId];
+      if (!node) return 0;
+      if (node.ending) {
+        memo[nodeId] = 1;
+        return 1;
+      }
+      let max = 0;
+      (node.choices || []).forEach((c) => {
+        max = Math.max(max, 1 + walk(c.next));
+      });
+      memo[nodeId] = max;
+      return max;
+    };
+    return Math.max(1, walk(story.start));
+  }
+
+  function unlockChoiceVocab(storyId, choice) {
+    const phrases = choice?.vocab || [];
+    const p = loadStoryProgress();
+    const seen = new Set(p[storyId]?.vocab || []);
+    let added = 0;
+    phrases.forEach((phrase) => {
+      if (!phrase || seen.has(phrase)) return;
+      if (typeof storyVocabUnlock === "function" && storyVocabUnlock(storyId, phrase)) {
+        seen.add(phrase);
+        added += 1;
+      }
+    });
+    if (added) saveStoryProgress(storyId, { vocab: [...seen] });
+    return added;
+  }
+
+  function storyVocabHtml(storyId, { compact } = {}) {
+    const vocab = loadStoryProgress()[storyId]?.vocab || [];
+    if (!vocab.length) return "";
+    const label = typeof t === "function" ? t("storyVocab") : "Vocabulario desbloqueado";
+    const chips = vocab.map((v) =>
+      `<button type="button" class="chip say sm story-vocab-chip" data-say="${esc(v)}" title="SRS">${esc(v)}</button>`,
+    ).join("");
+    if (compact) return `<span class="story-vocab-count muted">${vocab.length} frases SRS</span>`;
+    return `<div class="story-vocab-bank"><p class="kicker">${esc(label)}</p><div class="story-vocab-chips">${chips}</div></div>`;
+  }
+
+  function beginStoryRun(storyId) {
+    const story = (ENLAB.branchStories || []).find((s) => s.id === storyId);
+    if (!story) return;
+    const prev = loadStoryProgress()[storyId] || {};
+    saveStoryProgress(storyId, {
+      node: story.start,
+      path: [story.start],
+      vocab: prev.vocab || [],
+      score: prev.score || 0,
+    });
+    paintStory(storyId, story.start);
+  }
+
+  function advanceStory(storyId, nextNodeId, choice) {
+    unlockChoiceVocab(storyId, choice);
+    const p = loadStoryProgress()[storyId] || {};
+    const path = [...(p.path || []), nextNodeId];
+    saveStoryProgress(storyId, { path, node: nextNodeId });
+    paintStory(storyId, nextNodeId);
   }
 
   function loadRoster() {
@@ -64,13 +189,15 @@
     const accent = localStorage.getItem("enlab-accent-pref") || "us";
     host.innerHTML = `
       <p class="kicker">${esc(typeof t === "function" ? t("pron") : "Pronunciación")}</p>
-      <p class="muted">${esc(typeof t === "function" ? t("pronHint") : "Mínimos pares + IPA. Graba y compara.")}</p>
+      <p class="muted">${esc(typeof t === "function" ? t("pronHint") : "Mínimos pares + IPA. Graba y compara con formantes F1/F2.")}</p>
       <label class="muted">${esc(typeof t === "function" ? t("accent") : "Acento")}:
         <select id="accent-pref">
           <option value="us" ${accent === "us" ? "selected" : ""}>US</option>
           <option value="uk" ${accent === "uk" ? "selected" : ""}>UK</option>
         </select>
       </label>
+      <div id="vowel-chart-live" class="vowel-chart-wrap">${window.PRON?.renderVowelChartSvg ? window.PRON.renderVowelChartSvg() : ""}</div>
+      <p class="muted vowel-chart-note">${esc(typeof t === "function" ? t("vowelChartHint") : "Graba A: el punto verde es tu F1/F2 vs la vocal objetivo.")}</p>
       <div class="grid grid-2" style="margin-top:12px">
         ${pairs.slice(0, 12).map((p, i) => `
           <div class="card pron-pair" data-pron-i="${i}">
@@ -118,13 +245,16 @@
     const stories = ENLAB.branchStories.filter((s) => (s.min || 1) <= (typeof lvlNum === "function" ? lvlNum() : 2));
     host.innerHTML = `
       <p class="kicker">${esc(typeof t === "function" ? t("stories") : "Historias ramificadas")}</p>
-      <p class="muted">${stories.length} micro-novelas · decisiones · vocabulario</p>
+      <p class="muted">${esc(typeof t === "function" ? t("storyHint", { n: stories.length }) : `${stories.length} micro-novelas · ramas largas · vocabulario → SRS`)}</p>
       <div class="grid grid-2">
         ${stories.map((s) => {
-          const done = prog[s.id]?.score >= 2;
+          const row = prog[s.id] || {};
+          const done = row.score >= 2;
+          const vocabN = (row.vocab || []).length;
+          const depth = storyMaxSteps(s);
           return `<button type="button" class="mode-pick ${done ? "ok" : ""}" data-story="${esc(s.id)}">
             <strong>${esc(s.title)}</strong>
-            <span>${esc(s.level)} · ${done ? "✓" : "—"}</span>
+            <span>${esc(s.level)} · ${depth} pasos · ${vocabN ? `${vocabN} SRS` : (done ? "✓" : "—")}</span>
           </button>`;
         }).join("")}
       </div>
@@ -138,26 +268,48 @@
     const node = story.nodes[nodeId || story.start];
     if (!node) return;
     box.hidden = false;
+    const prog = loadStoryProgress()[storyId] || {};
+    const step = (prog.path || []).length || 1;
+    const maxSteps = storyMaxSteps(story);
+    const stepLabel = typeof t === "function" ? t("storyStep", { step, max: maxSteps }) : `Paso ${step} / ${maxSteps}`;
+
     if (node.ending) {
-      saveStoryProgress(storyId, nodeId, node.score || 2);
+      if (node.vocab?.length) unlockChoiceVocab(storyId, { vocab: node.vocab });
+      const score = node.score || 2;
+      saveStoryProgress(storyId, {
+        node: nodeId,
+        score: Math.max(prog.score || 0, score),
+      });
+      const scoreLabel = typeof t === "function" ? t("storyScore", { score, max: 3 }) : `Puntuación: ${score}/3`;
+      const srsNote = typeof t === "function" ? t("storySrsNote") : "Frases añadidas a Repaso vence hoy (Hoy).";
       box.innerHTML = `
-        <p class="kicker">${esc(story.title)} · final</p>
+        <p class="kicker">${esc(story.title)} · ${esc(typeof t === "function" ? t("storyEnding") : "final")}</p>
+        <p class="story-step muted">${esc(stepLabel)}</p>
         <p>${esc(node.text)}</p>
         <p class="muted es-line">${esc(node.es || "")}</p>
-        <p class="session-done">Puntuación: ${node.score || 2}/3</p>
-        <button type="button" class="btn sm" data-story="${esc(storyId)}">Repetir</button>
-        <button type="button" class="btn ghost sm" id="story-back">Volver a lista</button>`;
+        <p class="session-done">${esc(scoreLabel)}</p>
+        ${storyVocabHtml(storyId)}
+        <p class="muted">${esc(srsNote)}</p>
+        <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+          <button type="button" class="btn sm" data-start-story-quiz>${esc(typeof t === "function" ? t("storyQuizGo") : "Quiz de frases SRS")}</button>
+          <button type="button" class="btn sm" data-story="${esc(storyId)}">${esc(typeof t === "function" ? t("storyReplay") : "Repetir")}</button>
+          <button type="button" class="btn ghost sm" id="story-back">${esc(typeof t === "function" ? t("storyBack") : "Volver a lista")}</button>
+        </div>`;
+      if (typeof renderDueToday === "function") renderDueToday();
       return;
     }
+    window._storyChoiceCtx = { storyId, nodeId, choices: node.choices || [] };
     box.innerHTML = `
       <p class="kicker">${esc(story.title)} · ${esc(story.level)}</p>
+      <p class="story-step muted">${esc(stepLabel)}</p>
       <p>${esc(node.text)}</p>
       <p class="muted es-line">${esc(node.es || "")}</p>
+      ${storyVocabHtml(storyId, { compact: step > 1 })}
       <div class="story-choices">
-        ${(node.choices || []).map((c) => `
-          <button type="button" class="btn ghost sm story-choice" data-story-id="${esc(storyId)}" data-story-next="${esc(c.next)}">
+        ${(node.choices || []).map((c, i) => `
+          <button type="button" class="btn ghost sm story-choice" data-story-id="${esc(storyId)}" data-story-next="${esc(c.next)}" data-story-choice-i="${i}">
             ${esc(c.label)}
-            ${c.vocab?.[0] ? `<span class="muted"> · ${esc(c.vocab[0])}</span>` : ""}
+            ${c.vocab?.[0] ? `<span class="muted story-vocab-preview"> · 🔓 ${esc(c.vocab[0])}</span>` : ""}
           </button>`).join("")}
       </div>`;
   }
@@ -375,7 +527,7 @@
       hoy: ["./pack-q.js", "./pack-bulk.js"],
     };
     const files = tabAssets[tab] || [];
-    const cache = await caches.open(typeof CACHE !== "undefined" ? CACHE : "enlab-v20");
+    const cache = await caches.open(typeof CACHE !== "undefined" ? CACHE : "enlab-v24");
     await Promise.all(files.map((f) => fetch(f).then((r) => r.ok && cache.put(f, r)).catch(() => {})));
     renderOfflineBadge();
   }
@@ -427,20 +579,42 @@
     const orig = applySpeakVerdict;
     window.applySpeakVerdict = function (said) {
       orig(said);
-      if (window._pronPending != null) {
-        const i = window._pronPending;
-        const p = window._pronPairs?.[i];
-        const el = document.querySelector(`#pron-score-${i}`);
-        if (p && el) {
-          const r = scorePronunciation(said, p.ipaA, p.sayA || p.a);
-          el.hidden = false;
-          el.textContent = `${r.pct}% — ${r.note}`;
-          el.classList.toggle("ok", r.pct >= 70);
-          const log = JSON.parse(localStorage.getItem("enlab-pron-log") || "[]");
-          log.push({ pair: p.a, pct: r.pct, at: Date.now() });
-          localStorage.setItem("enlab-pron-log", JSON.stringify(log.slice(-50)));
+      if (window._pronPending == null) return;
+      const i = window._pronPending;
+      const p = window._pronPairs?.[i];
+      const el = document.querySelector(`#pron-score-${i}`);
+      window._pronPending = null;
+      if (!p || !el) return;
+      el.hidden = false;
+      el.classList.remove("ok");
+      el.textContent = typeof t === "function" ? "Analizando formantes…" : "Analizando formantes…";
+      const blob = typeof recState !== "undefined" ? recState.lastBlob : null;
+      const finish = (r) => {
+        el.textContent = formatPronScore(r);
+        el.classList.toggle("ok", r.pct >= 70);
+        el.title = r.formants ? `F1 ${r.formants.f1} Hz · F2 ${r.formants.f2} Hz` : (r.note || "");
+        if (r.formants && window.PRON?.plotFormantOnChart) {
+          window.PRON.plotFormantOnChart(r.formants.f1, r.formants.f2, p);
         }
-        window._pronPending = null;
+        try {
+          const log = JSON.parse(localStorage.getItem("enlab-pron-log") || "[]");
+          log.push({
+            pair: p.a,
+            pct: r.pct,
+            method: r.method,
+            f1: r.formants?.f1,
+            f2: r.formants?.f2,
+            at: Date.now(),
+          });
+          localStorage.setItem("enlab-pron-log", JSON.stringify(log.slice(-50)));
+        } catch { /* ignore */ }
+      };
+      if (typeof scorePronunciationAsync === "function" && window.PRON) {
+        scorePronunciationAsync(said, p.ipaA, p.sayA || p.a, blob, p).then(finish).catch(() => {
+          finish(scorePronunciation(said, p.ipaA, p.sayA || p.a, { pair: p }));
+        });
+      } else {
+        finish(scorePronunciation(said, p.ipaA, p.sayA || p.a, { pair: p }));
       }
     };
   }
@@ -460,12 +634,17 @@
         }
       }
       if (e.target.closest("[data-story]")) {
-        paintStory(e.target.closest("[data-story]").dataset.story, null);
+        beginStoryRun(e.target.closest("[data-story]").dataset.story);
         document.querySelector("#story-now")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest(".story-choice")) {
         const btn = e.target.closest(".story-choice");
-        paintStory(btn.dataset.storyId, btn.dataset.storyNext);
+        let choice = null;
+        const ci = btn.dataset.storyChoiceI;
+        if (ci != null && window._storyChoiceCtx?.storyId === btn.dataset.storyId) {
+          choice = window._storyChoiceCtx.choices[Number(ci)];
+        }
+        advanceStory(btn.dataset.storyId, btn.dataset.storyNext, choice);
       }
       if (e.target.closest("#story-back")) {
         renderStoriesPanel();
@@ -575,9 +754,15 @@
     bootstrap,
     refreshPanels,
     scorePronunciation,
+    scorePronunciationAsync,
     phonemeDistance,
+    formatPronScore,
     renderPronPanel,
     renderStoriesPanel,
+    storyMaxSteps,
+    unlockChoiceVocab,
+    beginStoryRun,
+    advanceStory,
     renderWritingPanel,
     renderClassPro,
   };

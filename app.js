@@ -5,13 +5,15 @@ const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak",
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
-let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar" };
+let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar", lastBlob: null };
 let currentTab = "hoy";
 let verbLimit = 24;
 let hoyPairI = 0;
 let hoyPathI = -1;
 let hoyPathDay = "";
 const dirty = { vowels: true, verbs: true, speak: true, ai: true, hablar: true };
+const oidoPainted = new Set();
+let oidoObserver = null;
 
 function debounce(fn, ms) {
   let t;
@@ -227,10 +229,10 @@ function renderHoyCheck() {
   if (!el) return;
   const s = sessionData();
   const items = [
-    { ok: s.pairs.length >= 4, label: `1. Oír los 4 pares (${Math.min(s.pairs.length, 4)}/4)` },
-    { ok: s.verbs.length >= 5, label: `2. Oír 5 verbos (${Math.min(s.verbs.length, 10)}/5)` },
-    { ok: s.phrases.length >= 1, label: `3. Grabar o oír el diálogo (${Math.min(s.phrases.length, 2)}/1)` },
-    { ok: s.quizDone, label: "4. Cerrar con 3 preguntas" },
+    { ok: s.pairs.length >= 4, label: t("checkPairs", { n: Math.min(s.pairs.length, 4) }) },
+    { ok: s.verbs.length >= 5, label: t("checkVerbs", { n: Math.min(s.verbs.length, 10) }) },
+    { ok: s.phrases.length >= 1, label: t("checkDialog", { n: Math.min(s.phrases.length, 2) }) },
+    { ok: s.quizDone, label: t("checkQuiz") },
   ];
   const done = items.filter((x) => x.ok).length;
   const pct = (done / items.length) * 100;
@@ -239,7 +241,7 @@ function renderHoyCheck() {
       ${items.map((x) => `<li class="${x.ok ? "done" : ""}">${esc(x.label)}</li>`).join("")}
     </ul>
     <div class="session-bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
-    ${done === 4 ? `<p class="session-done">¡Listo! Sesión del día guardada.</p>` : ""}
+    ${done === 4 ? `<p class="session-done">${esc(t("sessionDone"))}</p>` : ""}
   `;
   if (done === 4) clearRepasoMode();
   if (done === 4 && sessionStorage.getItem("enlab-celeb") !== todayKey()) {
@@ -269,7 +271,9 @@ function sessionTaskCount(s) {
 
 function formatLogDate(iso) {
   const [Y, M, D] = String(iso).split("-").map(Number);
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = uiLang() === "en"
+    ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    : ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   if (!Y || !M || !D) return iso;
   return `${D} ${months[M - 1]} ${Y}`;
 }
@@ -320,19 +324,19 @@ function renderSessionLog() {
   if (!el) return;
   const logs = loadLogs();
   if (!logs.length) {
-    el.innerHTML = `<p class="muted">Aún no hay sesiones. En cuanto oigas, hagas quiz o hables, aparece el día de hoy aquí. Se guarda solo en este Chrome/Edge, en este PC. No hace falta servidor.</p>`;
+    el.innerHTML = `<p class="muted">${esc(t("sessionEmpty"))}</p>`;
     return;
   }
   el.innerHTML = `
     <ul class="log-list">
       ${logs.slice(0, 21).map((row) => {
         const n = row.tasks || 0;
-        const bit = row.complete ? "completa" : (n ? `${n}/4 bloques` : "empezada");
+        const bit = row.complete ? t("sessionComplete") : (n ? t("sessionBlocks", { n }) : t("sessionStarted"));
         const lvl = row.cefr ? String(row.cefr).toUpperCase() : "—";
         return `<li>
           <strong>${esc(formatLogDate(row.date))}</strong>
           <span class="pill ${row.complete ? "ok" : ""}">${esc(bit)}</span>
-          <span class="muted">${esc(lvl)} · ${row.heard || 0} oídas · ${row.quiz || 0} quiz · ${row.spoke || 0} voz</span>
+          <span class="muted">${esc(lvl)} · ${row.heard || 0} ${t("logHeard")} · ${row.quiz || 0} ${t("logQuiz")} · ${row.spoke || 0} ${t("logVoice")}</span>
         </li>`;
       }).join("")}
     </ul>
@@ -369,11 +373,14 @@ function renderHomeStats() {
   const d = s.days[todayKey()] || { quiz: 0, heard: 0, spoke: 0 };
   const el = $("#home-stats");
   if (!el) return;
-  if (uiLang() === "en") {
-    el.textContent = `Streak ${s.streak} day(s) · Today: ${d.heard} heard · ${d.quiz} quiz · ${d.spoke} voice · ${weakSet().size} weak · ${knownSet().size} strong`;
-  } else {
-    el.textContent = `Racha ${s.streak} día(s) · Hoy: ${d.heard} oídas · ${d.quiz} quiz · ${d.spoke} voz · ${weakSet().size} débiles · ${knownSet().size} fuertes`;
-  }
+  el.textContent = t("homeStats", {
+    streak: s.streak,
+    heard: d.heard,
+    quiz: d.quiz,
+    spoke: d.spoke,
+    weak: weakSet().size,
+    strong: knownSet().size,
+  });
 }
 
 function showTab(id) {
@@ -483,22 +490,22 @@ function verbCard(v, compact = false) {
       <div>
         <strong>${esc(v.inf)}</strong>
         ${v.fam === "reg" ? '<span class="pill">-ed</span>' : (isStarter(v) ? '<span class="pill">40</span>' : "")}
-        ${v.work && !isStarter(v) && v.fam !== "reg" ? '<span class="pill">trabajo</span>' : ""}
-        ${weak ? '<span class="pill warn">débil</span>' : ""}
-        ${known ? '<span class="pill ok">fuerte</span>' : ""}
+        ${v.work && !isStarter(v) && v.fam !== "reg" ? `<span class="pill">${esc(t("verbWorkPill"))}</span>` : ""}
+        ${weak ? `<span class="pill warn">${esc(t("verbWeak"))}</span>` : ""}
+        ${known ? `<span class="pill ok">${esc(t("verbStrong"))}</span>` : ""}
         <div class="muted"><span class="es-line">${esc(v.es)}</span> · ${esc(fam)}</div>
       </div>
       <div>${esc(v.past)}<div class="muted">[${esc(v.pPast)}]</div></div>
       <div>${esc(v.pp)}<div class="muted">[${esc(v.pPp)}]</div></div>
       ${compact ? "" : `<div class="muted">[${esc(v.pInf)}]</div>`}
       <div class="row">
-        <button class="say" data-say="${esc(v.inf)}">Presente</button>
-        <button class="say" data-say="${esc(speakForms(v))}">3 formas</button>
-        <button class="say" data-say="${esc(simplePastOf(v))}">I + pasado</button>
-        <button class="say" data-say="${esc(perfectOf(v))}">I have…</button>
+        <button class="say" data-say="${esc(v.inf)}">${esc(t("verbPresent"))}</button>
+        <button class="say" data-say="${esc(speakForms(v))}">${esc(t("verbForms"))}</button>
+        <button class="say" data-say="${esc(simplePastOf(v))}">${esc(t("verbPast"))}</button>
+        <button class="say" data-say="${esc(perfectOf(v))}">${esc(t("verbPerfect"))}</button>
         ${ygLink(v.inf)}
-        <button class="btn ghost sm" data-weak="${esc(v.inf)}">${weak ? "Ya no débil" : "Débil"}</button>
-        <button class="btn ghost sm" data-known="${esc(v.inf)}">${known ? "Quitar fuerte" : "Fuerte"}</button>
+        <button class="btn ghost sm" data-weak="${esc(v.inf)}">${weak ? esc(t("verbWeakOff")) : esc(t("verbWeak"))}</button>
+        <button class="btn ghost sm" data-known="${esc(v.inf)}">${known ? esc(t("verbStrongOff")) : esc(t("verbStrong"))}</button>
       </div>
     </div>`;
 }
@@ -756,6 +763,30 @@ function renderSituationPhraseList(key) {
   return list.map((p) => `<button type="button" class="chip say" data-say="${esc(p.en)}" title="${esc(p.es)}">${esc(p.en)}</button>`).join("");
 }
 
+let sitShadowTimer = null;
+
+function runSituationShadow(key) {
+  const sit = ENLAB.phrasesSituation || {};
+  const list = (sit[key] || []).filter((p) => (p.min || 1) <= lvlNum()).slice(0, 10);
+  if (!list.length) return;
+  clearTimeout(sitShadowTimer);
+  let i = 0;
+  const step = () => {
+    if (i >= list.length) {
+      const el = $("#sit-shadow-status");
+      if (el) el.textContent = typeof t === "function" ? t("sitShadowDone") : "Shadowing terminado.";
+      return;
+    }
+    const p = list[i];
+    i += 1;
+    const el = $("#sit-shadow-status");
+    if (el) el.textContent = typeof t === "function" ? t("sitShadowNow", { n: i, total: list.length }) : `${i}/${list.length}: repite en voz alta`;
+    speak(p.en, true);
+    sitShadowTimer = setTimeout(step, 4200);
+  };
+  step();
+}
+
 function renderSituations() {
   const el = $("#situations-panel");
   if (!el) return;
@@ -771,9 +802,13 @@ function renderSituations() {
   el.hidden = false;
   el.innerHTML = `
     <p class="kicker">${esc(t("situations"))}</p>
-    <p class="muted">Pulsa para oír. Hoy: <strong>${esc(labels[focus] || focus)}</strong></p>
+    <p class="muted">${esc(t("situationsToday"))} <strong>${esc(labels[focus] || focus)}</strong></p>
     <div class="row situation-tabs">${keys.map((k) =>
     `<button type="button" class="chip ${k === focus ? "on" : ""}" data-sit-key="${esc(k)}">${esc(labels[k] || k)} <span class="muted">(${(sit[k] || []).length})</span></button>`).join("")}</div>
+    <div class="row" style="margin:8px 0">
+      <button type="button" class="btn ghost sm" data-sit-shadow="${esc(focus)}">${esc(typeof t === "function" ? t("sitShadowGo") : "Shadowing (10 frases)")}</button>
+      <span class="muted" id="sit-shadow-status"></span>
+    </div>
     <div id="situation-phrases" class="situation-phrases">${renderSituationPhraseList(focus)}</div>`;
 }
 
@@ -793,10 +828,10 @@ function renderPodcastToday() {
   const p = list[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % list.length];
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("podcast"))} · del día</p>
+    <p class="kicker">${esc(t("podcast"))} · ${esc(t("podcastOfDay"))}</p>
     <p><strong>${esc(p.title)}</strong> · ${esc(p.duration || "~60 s")}</p>
-    <p class="muted">${(p.segments || []).length} frases con transcripción</p>
-    <button type="button" class="btn sm" data-podcast="${esc(p.id)}">Escuchar ahora</button>`;
+    <p class="muted">${esc(t("podcastSegCount", { n: (p.segments || []).length }))}</p>
+    <button type="button" class="btn sm" data-podcast="${esc(p.id)}">${esc(t("podcastListen"))}</button>`;
 }
 
 function phraseBank() {
@@ -833,8 +868,8 @@ function renderHome() {
   const theme = dayTheme();
   const hint = $("#hoy-hint");
   const meta = ENLAB.cefr && ENLAB.cefr[level()];
-  if (hint && meta) hint.textContent = `Nivel ${meta.name} (${meta.short || meta.title}). Cambia a medianoche.`;
-  $("#day-theme").textContent = `Día del plan (ciclo 21): ${theme.i}/21 — ${theme.text}`;
+  if (hint && meta) hint.textContent = t("levelHint", { name: meta.name, short: meta.short || meta.title });
+  $("#day-theme").textContent = t("planDay", { i: theme.i, text: theme.text });
   renderHoyGame();
   renderHoyPath();
   const daily = todaysDeck();
@@ -876,12 +911,12 @@ function renderHoyGame() {
     return;
   }
   const n = g.game === "ed" ? edWeakSet().size : usoWeakSet().size;
-  const extra = n ? ` <span class="muted">(${n} para repasar)</span>` : "";
+  const extra = n ? ` <span class="muted">${t("toReview", { n })}</span>` : "";
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">Juego del día</p>
+    <p class="kicker">${esc(t("hoyGameKicker"))}</p>
     <p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button>${extra}</p>
-    <p class="muted">${esc(g.hint)} También está siempre en la pestaña Juego.</p>`;
+    <p class="muted">${esc(g.hint)} ${esc(t("hoyGameAlso"))}</p>`;
 }
 
 function ensureHoyPathDay() {
@@ -904,24 +939,24 @@ function persistHoyPath() {
 }
 
 function hoyPath() {
-  const steps = [{ id: "pairs", sel: "#hoy-step-1", label: "Oye estas parejas" }];
-  if (lvlNum() >= 2) steps.push({ id: "role", sel: "#block-daily-role", label: "Palabra camaleón" });
-  steps.push({ id: "verbs", sel: "#hoy-step-3", label: "10 verbos del día" });
-  steps.push({ id: "dialog", sel: "#hoy-step-4", label: "Di este diálogo" });
+  const steps = [{ id: "pairs", sel: "#hoy-step-1", label: t("pathStepPairs") }];
+  if (lvlNum() >= 2) steps.push({ id: "role", sel: "#block-daily-role", label: t("pathStepRole") });
+  steps.push({ id: "verbs", sel: "#hoy-step-3", label: t("pathStepVerbs") });
+  steps.push({ id: "dialog", sel: "#hoy-step-4", label: t("pathStepDialog") });
   const planI = dayTheme().i - 1;
   if (planI >= 17 && planI <= 20 && lvlNum() >= 2) {
-    steps.push({ id: "flap", sel: "#block-rhythm", label: "Flap T / gonna" });
+    steps.push({ id: "flap", sel: "#block-rhythm", label: t("pathStepFlap") });
   }
-  steps.push({ id: "cierre", sel: "#hoy-step-cierre", label: "3 preguntas" });
+  steps.push({ id: "cierre", sel: "#hoy-step-cierre", label: t("pathStepCierre") });
   return steps;
 }
 
 function pathHint(step) {
   const s = sessionData();
-  if (step.id === "pairs" && s.pairs.length < 4) return "Oye las 4 parejas (o pulsa Oír las 4).";
-  if (step.id === "verbs" && s.verbs.length < 5) return "Pulsa Presente o 3 formas en 5 verbos.";
-  if (step.id === "dialog" && s.phrases.length < 1) return "Oye A y graba B aquí mismo.";
-  if (step.id === "cierre" && !s.quizDone) return "Las 3 preguntas marcan la sesión.";
+  if (step.id === "pairs" && s.pairs.length < 4) return t("pathHintPairs");
+  if (step.id === "verbs" && s.verbs.length < 5) return t("pathHintVerbs");
+  if (step.id === "dialog" && s.phrases.length < 1) return t("pathHintDialog");
+  if (step.id === "cierre" && !s.quizDone) return t("pathHintCierre");
   return "";
 }
 
@@ -932,19 +967,17 @@ function renderHoyPath() {
   const i = hoyPathI;
   const last = path.length - 1;
   const g = todayGame();
-  let text = "Un botón te lleva: pares, verbos, diálogo, 3 preguntas.";
-  let label = "Empezar el camino";
+  let text = t("pathDefault");
+  let label = t("startPath");
   if (i >= 0 && i <= last) {
     const extra = pathHint(path[i]);
-    text = `Paso ${i + 1} de ${path.length}: ${path[i].label}${extra ? ` · ${extra}` : ""}`;
-    if (i < last) label = `Siguiente: ${path[i + 1].label}`;
+    text = t("pathStep", { i: i + 1, total: path.length, label: path[i].label }) + (extra ? ` · ${extra}` : "");
+    if (i < last) label = t("pathNext", { label: path[i + 1].label });
     else if (g.game) label = g.label;
-    else label = "Listo";
+    else label = t("pathReady");
   } else if (i > last) {
-    text = g.game
-      ? "Camino del día hecho. Puedes repetirlo o ir al juego extra."
-      : "Camino del día hecho. Puedes repetirlo o seguir explorando.";
-    label = "Repetir el camino";
+    text = g.game ? t("pathDoneGame") : t("pathDoneExplore");
+    label = t("pathRepeat");
   }
   if (copy) copy.textContent = text;
   $$(".hoy-next").forEach((b) => { b.textContent = label; });
@@ -957,6 +990,7 @@ function goHoyStep(i) {
   hoyPathI = i;
   persistHoyPath();
   $$(".step-card").forEach((c) => c.classList.remove("path-now", "flash"));
+  paintOidoByJump((path[i].sel || "").replace("#", ""));
   const el = $(path[i].sel);
   if (el && el.style.display !== "none") {
     el.classList.add("path-now", "flash");
@@ -1155,16 +1189,48 @@ function renderGroupCards(box, groups, n) {
     </div>`).join("");
 }
 
-function renderVowels() {
+function oidoSections() {
+  return [
+    { id: "intro", host: "#vowel-intro", eager: true, render: paintOidoIntro },
+    { id: "decidir", host: "#vowel-decide", eager: true, render: paintOidoDecide },
+    { id: "reglas", host: "#vowel-rules", jump: ["oido-reglas"], render: paintOidoRules },
+    { id: "clave", host: "#vowel-key", jump: ["oido-clave"], render: paintOidoKey },
+    { id: "mapa", host: "#vowel-maps", jump: ["oido-mapa"], render: paintOidoMaps },
+    { id: "contrastes", host: "#vowel-pairs", jump: ["oido-contrastes"], render: paintOidoPairs },
+    { id: "trampas", host: "#vowel-traps", jump: ["oido-trampas"], render: paintOidoTraps },
+    { id: "roles", host: "#roles-list", jump: ["oido-roles", "block-roles"], render: paintOidoRoles },
+    { id: "stress", host: "#stress-list", jump: ["oido-acento", "block-b1-stress"], render: paintOidoStress },
+    { id: "ough", host: "#ough-list", jump: ["oido-ough", "block-b1-ough"], render: paintOidoOugh },
+    { id: "silent", host: "#silent-list", jump: ["oido-mudas", "block-a2-extra"], render: paintOidoSilent },
+    { id: "contra", host: "#contraction-list", jump: ["oido-contra"], render: paintOidoContra },
+    { id: "endings", host: "#endings-list", jump: ["oido-endings", "block-endings"], render: paintOidoEndings },
+    { id: "rhythm", host: "#rhythm-list", jump: ["oido-ritmo", "block-rhythm"], render: paintOidoRhythm },
+    { id: "chunks", host: "#chunks-list", jump: ["oido-chunks", "block-chunks"], render: paintOidoChunks },
+    { id: "tips", host: "#tips-list", jump: ["oido-tips", "block-b-tips"], render: paintOidoTips },
+  ];
+}
+
+function paintOidoIntro() {
   const n = lvlNum();
   const intros = n <= 1 ? ENLAB.vowelIntro.slice(0, 1) : ENLAB.vowelIntro;
-  $("#vowel-intro").innerHTML = `<div class="card">${intros.map((p) => `<p>${esc(p)}</p>`).join("")}</div>`;
-  $("#vowel-decide").innerHTML = ENLAB.decideSteps.filter((s) => (s.min || 1) <= n).map((s) => `
+  const el = $("#vowel-intro");
+  if (el) el.innerHTML = `<div class="card">${intros.map((p) => `<p>${esc(p)}</p>`).join("")}</div>`;
+}
+
+function paintOidoDecide() {
+  const n = lvlNum();
+  const el = $("#vowel-decide");
+  if (el) el.innerHTML = ENLAB.decideSteps.filter((s) => (s.min || 1) <= n).map((s) => `
     <div class="card lesson">
       <h3>${esc(s.q)}</h3>
       <p>${esc(s.a)}</p>
     </div>`).join("");
-  $("#vowel-rules").innerHTML = ENLAB.vowelRules.filter((r) => (r.min || 1) <= n).map((r) => `
+}
+
+function paintOidoRules() {
+  const n = lvlNum();
+  const el = $("#vowel-rules");
+  if (el) el.innerHTML = ENLAB.vowelRules.filter((r) => (r.min || 1) <= n).map((r) => `
     <div class="card lesson" style="margin-bottom:12px">
       <h3>${esc(r.title)}</h3>
       <p>${esc(r.body)}</p>
@@ -1179,12 +1245,20 @@ function renderVowels() {
       ${r.listen ? `<div class="row">${sayWords(r.listen)}</div>` : ""}
       ${r.note ? `<p class="note">${esc(r.note)}</p>` : ""}
     </div>`).join("");
-  $("#vowel-key").innerHTML = `<div class="mini-table">${ENLAB.vowelKey.map((row) => `
+}
+
+function paintOidoKey() {
+  const el = $("#vowel-key");
+  if (el) el.innerHTML = `<div class="mini-table">${ENLAB.vowelKey.map((row) => `
     <div><strong>${esc(row[0])}</strong> · ${esc(row[1])}<div class="muted">Ej.: ${esc(row[2])}</div></div>
   `).join("")}</div>`;
+}
 
+function paintOidoMaps() {
+  const n = lvlNum();
   const letters = n <= 1 ? [...ENLAB.vowels] : [...ENLAB.vowels, ENLAB.letterExtra.Y];
-  $("#vowel-maps").innerHTML = letters.map((v) => `
+  const el = $("#vowel-maps");
+  if (el) el.innerHTML = letters.map((v) => `
     <div class="card">
       <h3>Letra ${esc(v.letter)}</h3>
       <p class="muted">${esc(ENLAB.letterNotes[v.letter] || "")}</p>
@@ -1193,67 +1267,189 @@ function renderVowels() {
         <div class="row">${s.examples.map((w) => `<button class="say" data-say="${esc(w)}">${esc(w)}</button>`).join("")}</div>
       `).join("")}
     </div>`).join("");
+}
 
-  $("#vowel-pairs").innerHTML = ENLAB.pairs.map(pairRow).join("");
+function paintOidoPairs() {
+  const el = $("#vowel-pairs");
+  if (el) el.innerHTML = ENLAB.pairs.map(pairRow).join("");
+}
 
-  $("#vowel-traps").innerHTML = ENLAB.traps.map((t) => `
+function paintOidoTraps() {
+  const el = $("#vowel-traps");
+  if (el) el.innerHTML = ENLAB.traps.map((t) => `
     <div class="card">
       <div class="muted">Evita: ${esc(t.bad)}</div>
       <p><strong>${esc(t.good)}</strong></p>
       <p class="muted">${esc(t.tip)}</p>
     </div>`).join("");
+}
 
-  $("#stress-list").innerHTML = (ENLAB.stress || []).map(stressCard).join("");
+function paintOidoRoles() {
+  const el = $("#roles-list");
+  if (el) el.innerHTML = rolesForLevel().slice(0, 16).map((w) => roleCard(w)).join("");
+}
 
-  const rolesBox = $("#roles-list");
-  if (rolesBox) rolesBox.innerHTML = rolesForLevel().slice(0, 16).map((w) => roleCard(w)).join("");
+function paintOidoStress() {
+  const el = $("#stress-list");
+  if (el) el.innerHTML = (ENLAB.stress || []).map(stressCard).join("");
+}
 
-  $("#ough-list").innerHTML = ENLAB.ough.map((o) => `
+function paintOidoOugh() {
+  const el = $("#ough-list");
+  if (el) el.innerHTML = ENLAB.ough.map((o) => `
     <span class="row">${`<button class="say" data-say="${esc(o.word)}">${esc(o.word)} [${esc(o.pron)}] — ${esc(o.es)}</button>`}${ygLink(o.word)}</span>
   `).join("");
+}
 
-  renderGroupCards($("#silent-list"), ENLAB.dropLetters, n);
-  renderGroupCards($("#endings-list"), ENLAB.tailTalk, n);
+function paintOidoSilent() {
+  renderGroupCards($("#silent-list"), ENLAB.dropLetters, lvlNum());
+}
 
-  $("#contraction-list").innerHTML = ENLAB.contractions.map((c) => `
+function paintOidoContra() {
+  const el = $("#contraction-list");
+  if (el) el.innerHTML = ENLAB.contractions.map((c) => `
     <div class="card">
       <strong>${esc(c.en)}</strong> = ${esc(c.full)}
       <div class="muted es-line">${esc(c.es)}</div>
       <button class="say" data-say="${esc(c.say)}">Escuchar</button>
       ${ygLink(c.en.split(" ")[0])}
     </div>`).join("");
+}
 
-  const rhythmBox = $("#rhythm-list");
-  if (rhythmBox) {
-    rhythmBox.innerHTML = (ENLAB.rhythm || []).filter((r) => (r.min || 3) <= n).map((r) => `
-      <div class="card lesson" style="margin-bottom:12px">
-        <h3>${esc(r.title)}</h3>
-        <p>${esc(r.body)}</p>
-        <div class="row">${sayWords(r.listen)}</div>
-      </div>`).join("");
-  }
+function paintOidoEndings() {
+  renderGroupCards($("#endings-list"), ENLAB.tailTalk, lvlNum());
+}
 
-  const chunksBox = $("#chunks-list");
-  if (chunksBox) {
-    chunksBox.innerHTML = (ENLAB.chunkTips || []).filter((t) => (t.min || 1) <= n).map((t) => `
-      <div class="card lesson" style="margin-bottom:12px">
-        <div class="kicker">${esc(t.tag || "")}</div>
-        <h3>${esc(t.title)}</h3>
-        <p>${esc(t.body)}</p>
-        <div class="row">${sayWords(t.listen || [])}</div>
-      </div>`).join("");
-  }
+function paintOidoRhythm() {
+  const el = $("#rhythm-list");
+  if (!el) return;
+  el.innerHTML = (ENLAB.rhythm || []).filter((r) => (r.min || 3) <= lvlNum()).map((r) => `
+    <div class="card lesson" style="margin-bottom:12px">
+      <h3>${esc(r.title)}</h3>
+      <p>${esc(r.body)}</p>
+      <div class="row">${sayWords(r.listen)}</div>
+    </div>`).join("");
+}
 
-  const tipsBox = $("#tips-list");
-  if (tipsBox) {
-    tipsBox.innerHTML = (ENLAB.bTips || []).filter((t) => (t.min || 3) <= n).map((t) => `
-      <div class="card lesson" style="margin-bottom:12px">
-        <div class="kicker">${esc(t.tag || "")}</div>
-        <h3>${esc(t.title)}</h3>
-        <p>${esc(t.body)}</p>
-        <div class="row">${sayWords(t.listen || [])}${t.yg ? ygLink(t.yg) : ""}</div>
-      </div>`).join("");
+function paintOidoChunks() {
+  const el = $("#chunks-list");
+  if (!el) return;
+  el.innerHTML = (ENLAB.chunkTips || []).filter((t) => (t.min || 1) <= lvlNum()).map((t) => `
+    <div class="card lesson" style="margin-bottom:12px">
+      <div class="kicker">${esc(t.tag || "")}</div>
+      <h3>${esc(t.title)}</h3>
+      <p>${esc(t.body)}</p>
+      <div class="row">${sayWords(t.listen || [])}</div>
+    </div>`).join("");
+}
+
+function paintOidoTips() {
+  const el = $("#tips-list");
+  if (!el) return;
+  el.innerHTML = (ENLAB.bTips || []).filter((t) => (t.min || 3) <= lvlNum()).map((t) => `
+    <div class="card lesson" style="margin-bottom:12px">
+      <div class="kicker">${esc(t.tag || "")}</div>
+      <h3>${esc(t.title)}</h3>
+      <p>${esc(t.body)}</p>
+      <div class="row">${sayWords(t.listen || [])}${t.yg ? ygLink(t.yg) : ""}</div>
+    </div>`).join("");
+}
+
+let oidoUserScroll = false;
+let oidoArmScroll = null;
+
+function paintOidoSection(id) {
+  if (oidoPainted.has(id)) return;
+  const spec = oidoSections().find((s) => s.id === id);
+  if (!spec) return;
+  spec.render();
+  oidoPainted.add(id);
+  const host = $(spec.host);
+  if (host) host.classList.add("is-ready");
+  if (oidoObserver && host) oidoObserver.unobserve(host);
+}
+
+function paintOidoByJump(jumpId) {
+  if (!jumpId) return;
+  const spec = oidoSections().find((s) => s.id === jumpId || (s.jump || []).includes(jumpId));
+  if (spec) paintOidoSection(spec.id);
+}
+
+function paintAllOido() {
+  oidoSections().forEach((s) => paintOidoSection(s.id));
+}
+
+function resetOidoLazy() {
+  oidoPainted.clear();
+  oidoUserScroll = false;
+  if (oidoArmScroll) {
+    document.removeEventListener("scroll", oidoArmScroll, true);
+    oidoArmScroll = null;
   }
+  if (oidoObserver) {
+    oidoObserver.disconnect();
+    oidoObserver = null;
+  }
+  oidoSections().forEach((s) => {
+    const el = $(s.host);
+    if (!el) return;
+    el.innerHTML = "";
+    el.classList.remove("is-ready");
+  });
+}
+
+function observeOidoLazy() {
+  const lazy = oidoSections().filter((s) => !s.eager && !oidoPainted.has(s.id));
+  if (!lazy.length) return;
+  if (typeof IntersectionObserver !== "function") {
+    lazy.forEach((s) => paintOidoSection(s.id));
+    return;
+  }
+  if (oidoObserver) oidoObserver.disconnect();
+  oidoObserver = new IntersectionObserver((entries) => {
+    if (!oidoUserScroll) return;
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const id = entry.target.getAttribute("data-oido-sec");
+      if (id) paintOidoSection(id);
+    });
+  }, { root: null, rootMargin: "100px 0px 60px 0px", threshold: 0.01 });
+  lazy.forEach((s) => {
+    const el = $(s.host);
+    if (!el) return;
+    el.setAttribute("data-oido-sec", s.id);
+    oidoObserver.observe(el);
+  });
+}
+
+function armOidoScroll() {
+  const started = Date.now();
+  oidoArmScroll = () => {
+    if (Date.now() - started < 160) return;
+    oidoUserScroll = true;
+    document.removeEventListener("scroll", oidoArmScroll, true);
+    oidoArmScroll = null;
+    oidoSections().filter((s) => !s.eager && !oidoPainted.has(s.id)).forEach((s) => {
+      const el = $(s.host);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight + 100 && r.bottom > -60) paintOidoSection(s.id);
+    });
+  };
+  document.addEventListener("scroll", oidoArmScroll, { capture: true, passive: true });
+}
+
+function renderVowels() {
+  resetOidoLazy();
+  paintOidoSection("intro");
+  paintOidoSection("decidir");
+  observeOidoLazy();
+  armOidoScroll();
+}
+
+if (!window._oidoPrintBound) {
+  window._oidoPrintBound = true;
+  window.addEventListener("beforeprint", paintAllOido);
 }
 
 function filteredVerbs() {
@@ -1299,7 +1495,11 @@ function renderVerbs() {
     box.insertAdjacentHTML("beforeend",
       `<p style="margin:14px 0 0"><button type="button" class="btn" data-verb-more>Ver más (${list.length - slice.length})</button></p>`);
   }
-  $("#verb-count").textContent = `${Math.min(slice.length, list.length)} de ${list.length} visibles · ${ENLAB.verbs.length} en total`;
+  $("#verb-count").textContent = t("verbCount", {
+    shown: Math.min(slice.length, list.length),
+    total: list.length,
+    all: ENLAB.verbs.length,
+  });
 }
 
 function uniqueOpts(correct, pool) {
@@ -1777,6 +1977,7 @@ function makeQuizItems() {
   if (quiz.mode === "dict") return makeDictItems();
   if (quiz.mode === "listen") return makeListenItems();
   if (quiz.mode === "weekly") return makeWeeklyExamItems();
+  if (quiz.mode === "story") return makeStoryItems();
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -1858,7 +2059,7 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story";
     const weekly = quiz.mode === "weekly";
     const cert = quiz.mode === "cert";
     if (cierre) {
@@ -1913,6 +2114,7 @@ function renderQuiz() {
       ${quiz.mode === "dict" ? `<p class="muted">I'm / I am cuentan. Escucha otra vez si hace falta.</p>` : ""}
       ${quiz.mode === "listen" ? `<p class="muted">Vuelve a oír el párrafo. Las 3 preguntas son del mismo texto.</p>` : ""}
       ${weekly ? `<p class="muted">Oído + verbos + gramática + email. Puedes repetirlo la próxima semana.</p>` : ""}
+      ${quiz.mode === "story" ? `<p class="muted">${esc(typeof t === "function" ? t("storyQuizTip") : "Repasa frases de historias. Las falladas vuelven mañana en Vence hoy.")}</p>` : ""}
       ${cierre ? `<p class="muted">Esto cuenta como el quiz del día. El resto de Juego es extra.</p>` : ""}
       ${extraGame}
       <button class="btn" id="quiz-again">${cierre ? "Otra vez estas 3" : weekly ? "Otro examen (mezcla nueva)" : "Otro round"}</button>
@@ -1945,7 +2147,7 @@ function renderQuiz() {
     const submit = () => {
       const val = $("#quiz-input").value;
       const ok = it.type === "dict" ? speakHeardOk(val, it.a) || answersMatch(val, it.a) : answersMatch(val, it.a);
-      $("#quiz-typed").textContent = ok ? "Correcto" : `Era: ${it.a}`;
+      $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
       else quiz.fails.push(it.inf);
@@ -1991,7 +2193,7 @@ function renderQuiz() {
     const submit = () => {
       const val = $("#quiz-input").value;
       const ok = speakHeardOk(val, it.a) || answersMatch(val, it.a);
-      $("#quiz-typed").textContent = ok ? "Correcto" : `Era: ${it.a}`;
+      $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
       else quiz.fails.push(it.inf);
@@ -2003,8 +2205,8 @@ function renderQuiz() {
     $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     return;
   }
-  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email") {
-    const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? "Escucha" : "Uso";
+  if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email" || it.type === "story") {
+    const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? "Escucha" : it.type === "story" ? (typeof t === "function" ? t("storyQuizMode") : "Historia") : "Uso";
     box.innerHTML = `<div class="card">
       <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · Aciertos ${quiz.score}</div>
       <div class="quiz-q">${quizQ(it)}</div>
@@ -2365,6 +2567,7 @@ async function toggleRecording(surface) {
   }
   recState.chunks = [];
   recState.said = "";
+  recState.lastBlob = null;
   recState.discard = false;
   recState.recStream = new MediaStream(recState.stream.getAudioTracks().map((t) => t.clone()));
   const mime = ["audio/webm", "audio/mp4", "audio/ogg"].find((t) => MediaRecorder.isTypeSupported(t));
@@ -2380,6 +2583,7 @@ async function toggleRecording(surface) {
       return;
     }
     if (!recState.chunks.length) {
+      recState.lastBlob = null;
       applySpeakVerdict(recState.said);
       saveVoiceClip(recState.said, null);
       bump("spoke");
@@ -2387,6 +2591,7 @@ async function toggleRecording(surface) {
       return;
     }
     const blob = new Blob(recState.chunks, { type: recState.rec.mimeType || "audio/webm" });
+    recState.lastBlob = blob;
     if (recState.url) URL.revokeObjectURL(recState.url);
     recState.url = URL.createObjectURL(blob);
     const player = recEls().player;
@@ -2403,7 +2608,7 @@ async function toggleRecording(surface) {
   recState.rec.start();
   const ui = recEls();
   if (ui.btn) {
-    ui.btn.textContent = "Detener";
+    ui.btn.textContent = t("speakRecordStop");
     ui.btn.classList.add("rec-on");
   }
   setRecStatus("Grabando… di la frase. Al detener, se comprueba sola.");
@@ -2524,7 +2729,7 @@ function renderAI() {
       <pre class="prompt" id="pr-${i}">${esc(p.text)}</pre>
       <button class="btn ghost" data-copy="pr-${i}">Copiar prompt</button>
     </div>`).join("");
-  $("#plan-list").innerHTML = ENLAB.plan.map((d, i) => `<li>Día ${i + 1}: ${esc(planItem(d).text)}</li>`).join("");
+  $("#plan-list").innerHTML = ENLAB.plan.map((d, i) => `<li>${esc(t("planDayLabel", { n: i + 1 }))} ${esc(planItem(d).text)}</li>`).join("");
 }
 
 function dialogCard(d) {
@@ -2617,6 +2822,7 @@ document.addEventListener("click", (e) => {
   if (jump) {
     e.preventDefault();
     showTab("vocales");
+    paintOidoByJump(jump.dataset.jump);
     const el = document.getElementById(jump.dataset.jump);
     if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
@@ -2728,7 +2934,11 @@ document.addEventListener("click", (e) => {
       showTab("verbos");
       return;
     }
-    const map = { dict: "dict", art: "art", prep: "prep", phrasal: "phrasal", cond: "cond", listen: "listen", ear: "ear", uso: "uso", ed: "ed" };
+    if (kind === "story") {
+      startStoryQuiz();
+      return;
+    }
+    const map = { dict: "dict", art: "art", prep: "prep", phrasal: "phrasal", cond: "cond", listen: "listen", ear: "ear", uso: "uso", ed: "ed", story: "story" };
     const mode = map[kind] || "choice";
     showTab("quiz");
     const sel = $("#quiz-mode");
@@ -2768,6 +2978,20 @@ document.addEventListener("click", (e) => {
     $$(".situation-tabs .chip").forEach((b) => b.classList.toggle("on", b === sitKey));
     const box = $("#situation-phrases");
     if (box) box.innerHTML = renderSituationPhraseList(sitKey.dataset.sitKey);
+    const shBtn = $("#situations-panel")?.querySelector("[data-sit-shadow]");
+    if (shBtn) shBtn.dataset.sitShadow = sitKey.dataset.sitKey;
+    return;
+  }
+
+  const sitShadow = e.target.closest("[data-sit-shadow]");
+  if (sitShadow) {
+    runSituationShadow(sitShadow.dataset.sitShadow);
+    return;
+  }
+
+  if (e.target.closest("#start-story-quiz") || e.target.closest("[data-start-story-quiz]")) {
+    startStoryQuiz();
+    return;
   }
 
   if (e.target.closest("#repaso-quiz-btn")) {
@@ -2868,12 +3092,12 @@ document.addEventListener("click", (e) => {
   if (copy) {
     const text = document.getElementById(copy.dataset.copy).textContent;
     navigator.clipboard.writeText(text);
-    copy.textContent = "Copiado";
-    setTimeout(() => { copy.textContent = "Copiar prompt"; }, 1200);
+    copy.textContent = t("copied");
+    setTimeout(() => { copy.textContent = t("copyPrompt"); }, 1200);
   }
 
   const opt = e.target.closest("[data-opt]");
-  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen", "email"];
+  const pickTypes = ["choice", "ear", "uso", "ed", "art", "prep", "phrasal", "cond", "listen", "email", "story"];
   if (opt && quiz.items[quiz.i] && pickTypes.includes(quiz.items[quiz.i].type)) {
     const val = decodeURIComponent(opt.dataset.opt);
     const it = quiz.items[quiz.i];
@@ -2894,7 +3118,8 @@ document.addEventListener("click", (e) => {
     if (it.type !== "choice" && it.type !== "ear") {
       const why = $("#uso-why");
       if (why) why.hidden = false;
-      bumpPickWeak(it.type === "listen" ? "listen" : it.type, it.inf, val === it.a);
+      if (it.type === "story") srsBump("story", it.inf, val === it.a);
+      else bumpPickWeak(it.type === "listen" ? "listen" : it.type, it.inf, val === it.a);
     }
     if (it.type === "ear") {
       bumpEar(it.inf, val === it.a);
@@ -3144,8 +3369,8 @@ function renderClock() {
   }
   const btn = $("#hoy-timer-btn");
   if (btn) {
-    if (left <= 0 && !timerState().running) btn.textContent = "Otra vez";
-    else btn.textContent = timerState().running ? "Pausar" : "Empezar 15 min";
+    if (left <= 0 && !timerState().running) btn.textContent = t("timerAgain");
+    else btn.textContent = timerState().running ? t("timerPause") : t("hoyTimerStart");
   }
 }
 
@@ -3206,27 +3431,25 @@ function renderRemind() {
   if (btn) {
     btn.classList.toggle("on", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
-    btn.textContent = on ? "Aviso on" : "Activar aviso";
+    btn.textContent = on ? t("remindOnBtn") : t("remindOn");
   }
   const st = $("#remind-status");
   if (!st) return;
   if (!("Notification" in window) || location.protocol === "file:") {
-    st.textContent = "Los avisos no funcionan abriendo el archivo. Usa Chrome con la página en http o la app instalada.";
+    st.textContent = t("remindFileProto");
     return;
   }
   if (on && Notification.permission === "granted") {
-    const extra = isStandalone()
-      ? " Con la app instalada, Chrome puede recordarte aunque cierres la pestaña (no siempre a la hora exacta)."
-      : " Instala la app para un aviso aunque cierres la pestaña. La hora exacta sigue pidiendo Chrome o la app abierta.";
-    st.textContent = `Te aviso a las ${remindTime()} en este aparato. Si ya completaste Hoy, no suena.${extra}`;
+    const extra = isStandalone() ? t("remindExtraStandalone") : t("remindExtraBrowser");
+    st.textContent = t("remindScheduled", { time: remindTime(), extra });
     syncRemindToSw();
     return;
   }
   if (on && Notification.permission === "denied") {
-    st.textContent = "Bloqueaste avisos. Candado de la barra → Notificaciones → Permitir.";
+    st.textContent = t("remindBlocked");
     return;
   }
-  st.textContent = "Elige una hora. El aviso llega si Chrome o la app siguen abiertos. Instala la app para un recordatorio extra.";
+  st.textContent = t("remindDefault");
   syncRemindToSw();
 }
 
@@ -3332,9 +3555,33 @@ function uiLang() {
   return localStorage.getItem("enlab-ui-lang") === "en" ? "en" : "es";
 }
 
-function t(key) {
+function t(key, vars) {
   const lang = uiLang();
-  return ENLAB.ui?.[lang]?.[key] ?? ENLAB.ui?.es?.[key] ?? key;
+  const parts = String(key).split(".");
+  let val = ENLAB.ui?.[lang];
+  for (const p of parts) val = val?.[p];
+  if (val == null) {
+    val = ENLAB.ui?.es;
+    for (const p of parts) val = val?.[p];
+  }
+  if (typeof val !== "string") return String(key);
+  if (!vars) return val;
+  return val.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : `{${k}}`));
+}
+
+function applyQuizModeI18n() {
+  $$("[data-quiz-mode]").forEach((btn) => {
+    const m = btn.dataset.quizMode;
+    const mode = t(`quizModes.${m}.t`);
+    const sub = t(`quizModes.${m}.s`);
+    const strong = btn.querySelector("strong");
+    const span = btn.querySelector("span");
+    if (strong && mode) strong.textContent = mode;
+    if (span && sub) span.textContent = sub;
+  });
+  const aria = t("quizModesAria");
+  const picks = document.querySelector(".mode-picks");
+  if (picks && aria) picks.setAttribute("aria-label", aria);
 }
 
 function kidsOn() {
@@ -3354,25 +3601,78 @@ function applyKidsMode() {
 function applyUiLang() {
   const lang = uiLang();
   document.documentElement.lang = lang === "en" ? "en" : "es";
+  document.title = "English Lab";
   $$("[data-i18n]").forEach((el) => {
-    const val = ENLAB.ui?.[lang]?.[el.dataset.i18n] ?? ENLAB.ui?.es?.[el.dataset.i18n];
-    if (val) el.textContent = val;
+    const val = t(el.dataset.i18n);
+    if (val && val !== el.dataset.i18n) el.textContent = val;
   });
+  $$("[data-i18n-placeholder]").forEach((el) => {
+    const val = t(el.dataset.i18nPlaceholder);
+    if (val) el.placeholder = val;
+  });
+  $$("[data-i18n-title]").forEach((el) => {
+    const val = t(el.dataset.i18nTitle);
+    if (val) el.title = val;
+  });
+  $$("[data-i18n-aria]").forEach((el) => {
+    const val = t(el.dataset.i18nAria);
+    if (val) el.setAttribute("aria-label", val);
+  });
+  $$("option[data-i18n]").forEach((opt) => {
+    const val = t(opt.dataset.i18n);
+    if (val) opt.textContent = val;
+  });
+  const levelBar = $("#level-bar");
+  if (levelBar) levelBar.setAttribute("aria-label", t("levelAria"));
+  const rateRow = document.querySelector(".rate-row");
+  if (rateRow) rateRow.setAttribute("aria-label", t("voiceLabel"));
+  const nav = document.querySelector("nav.tabs");
+  if (nav) nav.setAttribute("aria-label", t("navAria"));
   $$("[data-tab]").forEach((tab) => {
     const label = ENLAB.ui?.[lang]?.tabs?.[tab.dataset.tab];
     if (label) tab.textContent = label;
   });
-  const uiBtn = $("#ui-lang-toggle");
-  if (uiBtn) uiBtn.textContent = t("uiLang");
-  const kidsBtn = $("#kids-toggle");
-  if (kidsBtn) kidsBtn.textContent = t("kids");
-  const travelBtn = $("#travel-toggle");
-  if (travelBtn) travelBtn.textContent = t("travel");
-  const repasoBtn = $("#repaso-btn");
-  if (repasoBtn) repasoBtn.textContent = t("repaso");
-  const shadowBtn = $("#speak-shadow");
-  if (shadowBtn) shadowBtn.textContent = t("shadow");
+  applyQuizModeI18n();
+  const map = {
+    "#ui-lang-toggle": "uiLang", "#kids-toggle": "kids", "#travel-toggle": "travel",
+    "#repaso-btn": "repaso", "#repaso-quiz-btn": "quizWeak", "#repaso-exit": "repasoExit",
+    "#hoy-timer-btn": "hoyTimerStart", "#remind-toggle": "remindOn",
+    "#quiz-start": "quizStart", "#speak-listen": "speakListen", "#speak-rec": "speakRec",
+    "#speak-next": "speakNext", "#shadow-go": "shadowGo", "#transfer-copy": "transferCopy",
+    "#transfer-import": "transferImport", "#class-pin-save": "classPinSave",
+    "#class-pin-clear": "classPinClear", "#class-print": "classPrint",
+    "#prog-export": "export", "#prog-import": "import", "#play-daily-pairs": "step1Play",
+    "#cert-start-btn": "certStart", "#speak-shadow": "shadow", "#speak-hoy": "speakHoy",
+    "#start-ear-from-oido": "oidoPlayEar", "#start-ed-from-oido": "oidoPlayEd2",
+    "#start-uso-from-oido": "oidoPlayUso", "#welcome-go": "startPath",
+  };
+  Object.entries(map).forEach(([sel, key]) => {
+    const el = $(sel);
+    if (el) el.textContent = t(key);
+  });
+  const footNext = document.querySelector(".hoy-path-foot .hoy-next");
+  if (footNext && hoyPathI >= 0 && hoyPathI < hoyPath().length - 1) footNext.textContent = t("hoyNext");
+  $$(".hoy-path-actions .hoy-next, #hoy-path .hoy-next").forEach((b) => {
+    if (hoyPathI < 0) b.textContent = t("startPath");
+  });
+  $$("[data-pwa-install]").forEach((b) => { b.textContent = t("installApp"); });
+  const heroKicker = document.querySelector(".hero .kicker");
+  if (heroKicker && !heroKicker.dataset.i18n) heroKicker.textContent = t("heroKicker");
+  const lede = $("#level-lede");
+  if (lede) lede.textContent = t("heroLede");
   if (typeof renderHomeStats === "function") renderHomeStats();
+  if (typeof renderHoyPath === "function") renderHoyPath();
+  if (typeof renderHoyCheck === "function") renderHoyCheck();
+  if (typeof renderSituations === "function") renderSituations();
+  if (typeof renderPodcastToday === "function") renderPodcastToday();
+  if (typeof renderVerbs === "function" && currentTab === "verbos") renderVerbs();
+  if (typeof renderRemind === "function") renderRemind();
+  if (typeof renderWeekReport === "function") renderWeekReport();
+  if (typeof renderClassPin === "function") renderClassPin();
+  dirty.hablar = true;
+  if (currentTab === "hablar") paintTab("hablar");
+  if (window.NR?.renderLabAudit && currentTab === "ia") window.NR.renderLabAudit();
+  if (window.SV?.refreshPanels && currentTab === "ia") window.SV.refreshPanels();
 }
 
 function dateKey(d) {
@@ -3502,7 +3802,7 @@ function renderVoiceHistory() {
   const log = loadVoiceLog().filter((x) => x.date === todayKey()).slice(0, 5);
   if (!log.length) {
     box.hidden = false;
-    box.innerHTML = `<p class="kicker">${esc(t("voiceHist"))}</p><p class="muted">Aún no hay grabaciones hoy. Pulsa Grabarme en Hablar.</p>`;
+    box.innerHTML = `<p class="kicker">${esc(t("voiceHist"))}</p><p class="muted">${esc(t("voiceHistEmpty"))}</p>`;
     return;
   }
   box.hidden = false;
@@ -3625,7 +3925,7 @@ function renderTransferCode() {
       ta.insertAdjacentElement("afterend", hint);
     }
     const n = Math.ceil(code.length / 3);
-    hint.textContent = `El QR es una huella visual (no ISO). Copia el código entero (${code.length} caracteres). Checksum: ${code.length % 997}.`;
+    hint.textContent = t("transferQrHint", { len: code.length, cs: code.length % 997 });
   } catch {
     ta.value = "";
   }
@@ -3637,9 +3937,9 @@ function importTransferCode(raw) {
     applyLevel();
     renderRemind();
     renderTransferCode();
-    alert(uiLang() === "en" ? "Progress imported." : "Progreso importado.");
+    alert(t("progressImported"));
   } catch {
-    alert(uiLang() === "en" ? "Invalid code." : "Código inválido.");
+    alert(t("progressInvalid"));
   }
 }
 
@@ -3675,8 +3975,87 @@ function loadSrs() {
   }
 }
 
+function storyPhraseEs(storyId, phrase) {
+  const story = (ENLAB.branchStories || []).find((s) => s.id === storyId);
+  if (!story?.nodes || !phrase) return "";
+  for (const node of Object.values(story.nodes)) {
+    for (const c of node.choices || []) {
+      if ((c.vocab || []).includes(phrase)) return node.es || "";
+    }
+    if ((node.vocab || []).includes(phrase)) return node.es || "";
+  }
+  return "";
+}
+
+function storySrsPool(limit = 10) {
+  const today = todayKey();
+  const map = loadSrs();
+  const all = Object.entries(map).filter(([id]) => id.startsWith("story:"));
+  const due = all.filter(([, row]) => row?.due && row.due <= today);
+  const src = due.length ? due : all;
+  return shuffle(src.map(([id, row]) => ({
+    id,
+    phrase: row.phrase || id.split("|").slice(1).join("|"),
+    storyId: row.story || id.replace(/^story:/, "").split("|")[0],
+  }))).slice(0, limit);
+}
+
+function makeStoryItems() {
+  const pool = storySrsPool(12);
+  if (!pool.length) return [];
+  const phrases = pool.map((p) => p.phrase);
+  return pool.slice(0, 8).map((item) => {
+    const wrong = shuffle(phrases.filter((p) => p !== item.phrase)).slice(0, 2);
+    const opts = shuffle([item.phrase, ...wrong]);
+    const es = storyPhraseEs(item.storyId, item.phrase);
+    const story = (ENLAB.branchStories || []).find((s) => s.id === item.storyId);
+    return {
+      type: "story",
+      q: typeof t === "function" ? t("storyQuizQ") : "Elige la frase en inglés correcta:",
+      esHint: es || (story?.title || item.storyId),
+      a: item.phrase,
+      opts,
+      say: item.phrase,
+      inf: item.id.replace(/^story:/, ""),
+    };
+  });
+}
+
+function startStoryQuiz() {
+  quiz = { i: 0, score: 0, items: makeStoryItems(), fails: [], mode: "story", host: "#quiz-box" };
+  if (!quiz.items.length) {
+    const box = quizBox();
+    if (box) {
+      box.innerHTML = `<div class="card"><p class="muted">${esc(typeof t === "function" ? t("storyQuizEmpty") : "Juega historias y desbloquea frases primero.")}</p></div>`;
+    }
+    return;
+  }
+  showTab("quiz");
+  const sel = $("#quiz-mode");
+  if (sel) sel.value = "story";
+  syncQuizModePicks();
+  renderQuiz();
+  quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function saveSrs(map) {
   localStorage.setItem("enlab-srs", JSON.stringify(map));
+  if (window.ENLAB_IDB?.mirror) window.ENLAB_IDB.mirror("enlab-srs", JSON.stringify(map));
+}
+
+function storyVocabUnlock(storyId, phrase) {
+  if (!storyId || !phrase) return false;
+  const clean = String(phrase).trim();
+  if (!clean) return false;
+  const slug = clean.slice(0, 56);
+  const id = `story:${storyId}|${slug}`;
+  const map = loadSrs();
+  if (map[id]) return false;
+  map[id] = { box: 0, iv: 1, due: todayKey(), phrase: clean, story: storyId };
+  saveSrs(map);
+  if (typeof renderDueToday === "function") renderDueToday();
+  if (typeof syncRemindToSw === "function") syncRemindToSw();
+  return true;
 }
 
 function srsBump(kind, key, ok) {
@@ -3716,8 +4095,13 @@ function srsDueList(limit = 8) {
     .filter(([, row]) => row && row.due && row.due <= today)
     .sort((a, b) => String(a[1].due).localeCompare(String(b[1].due)))
     .slice(0, limit)
-    .map(([id]) => {
-      const label = id.replace(/^(ear|verb|uso|ed|speak|dict|art|prep|phrasal|cond|listen):/, "").replace("|", " / ");
+    .map(([id, row]) => {
+      let label = row?.phrase;
+      if (!label) {
+        label = id.replace(/^(ear|verb|uso|ed|speak|dict|art|prep|phrasal|cond|listen|story):/, "");
+        if (label.includes("|")) label = label.split("|").slice(1).join("|");
+      }
+      label = String(label).replace("|", " / ");
       return { id, label };
     });
 }
@@ -3738,7 +4122,7 @@ function renderDueToday() {
       const kind = (x.id.split(":")[0] || "item");
       return `<button type="button" class="chip say due-${esc(kind)}" data-due-kind="${esc(kind)}" data-say="${esc(x.label.split(" / ")[0])}"><span class="due-tag">${esc(kind)}</span> ${esc(x.label)}</button>`;
     }).join("")}</div>
-    <p class="muted">Pulsa una etiqueta (dict, art…) para jugar ese modo. Sale primero en Juego.</p>`;
+    <p class="muted">${esc(typeof t === "function" ? t("dueHint") : "Pulsa una etiqueta para jugar ese modo. Sale primero en Juego.")}</p>`;
 }
 
 function renderWeekReport() {
@@ -3768,7 +4152,7 @@ function renderWeekReport() {
     const weeklyBtn = done
       ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
       : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
-    el.innerHTML = `<p class="muted">${esc(t("week"))}: empieza hoy tu primera sesión.</p><p class="row">${weeklyBtn}</p>`;
+    el.innerHTML = `<p class="muted">${esc(t("weeklyReportStart", { week: t("week") }))}</p><p class="row">${weeklyBtn}</p>`;
     return;
   }
   el.hidden = false;
@@ -3777,7 +4161,14 @@ function renderWeekReport() {
   const weeklyBtn = done
     ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
     : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
-  el.innerHTML = `<p class="muted">${esc(t("week"))}: ${days}/7 días · ${heard} oídas · ${quizN} quiz · ${spoke} voz · ${srsDueList(99).length} vencen hoy</p><p class="row">${weeklyBtn}</p>`;
+  el.innerHTML = `<p class="muted">${esc(t("weeklyReport", {
+    week: t("week"),
+    days,
+    heard,
+    quiz: quizN,
+    spoke,
+    due: srsDueList(99).length,
+  }))}</p><p class="row">${weeklyBtn}</p>`;
 }
 
 function classroomPin() {
@@ -3794,23 +4185,21 @@ function classroomAllowsChange() {
     return true;
   }
   const st = $("#class-pin-status");
-  if (st) st.textContent = "PIN incorrecto. El nivel no cambió.";
+  if (st) st.textContent = t("classPinWrong");
   return false;
 }
 
 function renderClassPin() {
   const st = $("#class-pin-status");
   if (!st) return;
-  st.textContent = classroomPin()
-    ? (uiLang() === "en" ? "PIN on. Level changes need the PIN." : "PIN activo. Cambiar nivel pide el PIN.")
-    : (uiLang() === "en" ? "No PIN." : "Sin PIN.");
+  st.textContent = classroomPin() ? t("classPinOn") : t("classPinOff");
 }
 
 function saveClassPin() {
   const raw = ($("#class-pin")?.value || "").replace(/\D/g, "");
   if (raw.length < 4) {
     const st = $("#class-pin-status");
-    if (st) st.textContent = "Usa 4 a 6 dígitos.";
+    if (st) st.textContent = t("classPinDigits");
     return;
   }
   localStorage.setItem("enlab-class-pin", raw);
@@ -4014,9 +4403,9 @@ function importProgress(file) {
       });
       applyLevel();
       renderRemind();
-      alert("Progreso importado.");
+      alert(t("progressImported"));
     } catch {
-      alert("No pude leer ese archivo. ¿Es un JSON exportado de este Lab?");
+      alert(t("progressFileInvalid"));
     }
   };
   reader.readAsText(file);
@@ -4073,11 +4462,19 @@ function init() {
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
   }
+  if (window.ENLAB_IDB?.restoreMissing) {
+    window.ENLAB_IDB.restoreMissing().then((ok) => {
+      if (ok) {
+        renderDueToday();
+        if (typeof renderHome === "function") renderHome();
+      }
+    });
+  }
   setupPwaInstall();
   renderClassPin();
   window.addEventListener("enlab-packs-ready", () => {
     dirty.hablar = true;
-    if (currentTab === "hablar") paintTab("hablar");
+    if (currentTab === "hablar" || currentTab === "vocales" || currentTab === "ia") paintTab(currentTab);
   });
 }
 

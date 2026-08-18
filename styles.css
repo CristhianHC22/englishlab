@@ -111,6 +111,13 @@ button.say:focus-visible, nav.tabs button:focus-visible, .mode-pick:focus-visibl
 }
 .oido-toc a:hover { background: var(--accent); color: #fff; }
 
+.oido-slot:not(.is-ready) {
+  min-height: 300px;
+}
+@media print {
+  .oido-slot:not(.is-ready) { min-height: 0; }
+}
+
 nav.tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -830,6 +837,23 @@ body.kids-mode #lab-audit { display: none; }
 .chip.due-ear { border-color: var(--accent); }
 .chip.due-dict { border-color: var(--accent-2); }
 .chip.due-art, .chip.due-prep, .chip.due-phrasal, .chip.due-cond { border-color: #6a5acd; }
+.chip.due-story { border-color: #2a7a6e; }
+
+.vowel-chart-wrap { margin: 12px 0 4px; max-width: 320px; }
+.vowel-chart { width: 100%; height: auto; display: block; }
+.vowel-chart-bg { fill: var(--card); stroke: var(--line); stroke-width: 0.5; }
+.vowel-lbl { fill: var(--muted); font-size: 5px; font-family: system-ui, sans-serif; }
+.vowel-lbl.on { fill: var(--accent); font-weight: 700; }
+.vowel-axis { fill: var(--muted); font-size: 4px; font-family: system-ui, sans-serif; }
+.vowel-target { fill: var(--accent); opacity: 0.85; }
+.vowel-rival { fill: var(--accent-2); opacity: 0.7; }
+.vowel-you { fill: #2ecc71; stroke: var(--ink); stroke-width: 0.8; }
+.vowel-chart-note { font-size: 13px; margin: 0 0 8px; }
+.story-step { font-size: 13px; margin: 4px 0 10px; }
+.story-vocab-bank { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.story-vocab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.story-vocab-preview { font-size: 13px; }
+.story-vocab-count { display: block; margin: 8px 0; }
 #duo-now.player-1 { box-shadow: inset 4px 0 0 var(--accent); }
 #duo-now.player-2 { box-shadow: inset 4px 0 0 var(--accent-2); }
 .star-draft textarea { width: 100%; margin: 6px 0 10px; font-family: inherit; border-radius: 8px; border: 1px solid var(--line); padding: 8px; }
@@ -854,12 +878,35 @@ body.kids-mode #lab-audit { display: none; }
 .a11y-bar .row { flex-wrap: wrap; gap: 8px; align-items: center; }
 body.a11y-contrast {
   --bg: #000;
+  --ink: #fff;
   --fg: #fff;
+  --card: #0a0a0a;
   --muted: #ddd;
-  --line: #666;
+  --line: #888;
   --accent: #00e5cc;
   --accent-soft: #003830;
+  --accent-2: #ffb347;
+  --ok: #5dff8a;
+  --bad: #ff6b63;
+  --shadow: none;
 }
+body.a11y-contrast .chip,
+body.a11y-contrast button.say,
+body.a11y-contrast .choices button,
+body.a11y-contrast .mode-pick,
+body.a11y-contrast input[type="search"],
+body.a11y-contrast input[type="text"],
+body.a11y-contrast input[type="time"],
+body.a11y-contrast nav.tabs button,
+body.a11y-contrast .level-chip,
+body.a11y-contrast select {
+  background: #000;
+  color: #fff;
+  border-color: #fff;
+}
+body.a11y-contrast nav.tabs { background: #000; }
+body.a11y-contrast .role-card,
+body.a11y-contrast pre.prompt { background: #111; color: #fff; }
 body.a11y-contrast .chip, body.a11y-contrast .btn { border-width: 2px; }
 body.reduced-motion *, body.a11y-motion.reduced-motion * {
   animation: none !important;

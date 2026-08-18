@@ -7,7 +7,7 @@ async function boot(page) {
     localStorage.setItem("enlab-onboard-v3", "1");
   });
   await page.reload();
-  await page.waitForFunction(() => (window.ENLAB?.minimalPairs || []).length >= 25);
+  await page.waitForFunction(() => Object.keys(window.ENLAB?.phrasesSituation || {}).length >= 25);
 }
 
 test("Hoy: path, situations, class task, offline badge", async ({ page }) => {

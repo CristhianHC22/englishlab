@@ -46,6 +46,16 @@ test("Ayuda: English UI full keys", async ({ page }) => {
   await page.reload();
   await page.waitForFunction(() => window.ENLAB?.ui?.en?.pron);
   await expect(page.locator('[data-tab="hoy"]')).toHaveText(/Today/i);
+  await expect(page.locator('[data-i18n="hoyTitle"]')).toHaveText(/15 minutes/i);
   await page.locator('[data-tab="vocales"]').click();
-  await expect(page.locator("#oido-podcasts")).toHaveText(/podcast/i);
+  await expect(page.locator('[data-i18n="oidoTitle"]')).toHaveText(/Listen/i);
+  await page.locator('[data-tab="verbos"]').click();
+  await expect(page.locator('[data-i18n="verbosTitle"]')).toHaveText(/Verbs/i);
+  await page.locator('[data-tab="quiz"]').click();
+  await expect(page.locator('[data-i18n="quizStart"]')).toHaveText(/Play/i);
+  await page.locator('[data-tab="hablar"]').click();
+  await expect(page.locator('[data-i18n="speakRec"]')).toHaveText(/Record/i);
+  await page.locator('[data-tab="ia"]').click();
+  await page.waitForFunction(() => document.querySelector(".audit-table th"));
+  await expect(page.locator(".audit-table th").first()).toHaveText(/Lot/i);
 });

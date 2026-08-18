@@ -48,8 +48,13 @@ test("packs A–R content is wired", async ({ page }) => {
     cond: (window.ENLAB.condQuiz || []).length >= 10,
     dialogsA2: (window.ENLAB.dialogsA2Tense || []).length >= 8,
     nr: typeof window.NR?.startCertExam === "function",
-    sv: typeof window.SV?.scorePronunciation === "function",
+    sv: typeof window.SV?.scorePronunciationAsync === "function",
+    pron: typeof window.PRON?.scoreFormantPair === "function",
     stories: (window.ENLAB.branchStories || []).length >= 20,
+    storyDepth: (() => {
+      const s = (window.ENLAB.branchStories || []).find((x) => x.id === "bus-lost");
+      return s && typeof window.SV?.storyMaxSteps === "function" && window.SV.storyMaxSteps(s) >= 5;
+    })(),
     dict100: (window.ENLAB.dictation || []).length >= 100,
     minimal: (window.ENLAB.minimalPairs || []).length >= 25,
   }));
@@ -66,6 +71,7 @@ test("packs A–R content is wired", async ({ page }) => {
   expect(ok.nr).toBe(true);
   expect(ok.sv).toBe(true);
   expect(ok.stories).toBe(true);
+  expect(ok.storyDepth).toBe(true);
   expect(ok.dict100).toBe(true);
   expect(ok.minimal).toBe(true);
 });
@@ -250,4 +256,14 @@ test("podcast of the day on Hoy", async ({ page }) => {
 test("quiz débiles button always on Hoy", async ({ page }) => {
   await boot(page);
   await expect(page.locator("#repaso-quiz-btn")).toBeVisible();
+});
+
+test("index.html defers pack-m/n/o/q to loader", async ({ request }) => {
+  const html = await (await request.get("/index.html")).text();
+  expect(html).not.toMatch(/<script src="pack-m\.js">/);
+  expect(html).not.toMatch(/<script src="pack-n\.js">/);
+  expect(html).not.toMatch(/<script src="pack-o\.js">/);
+  expect(html).not.toMatch(/<script src="pack-q\.js">/);
+  expect(html).toMatch(/<script src="pack\.js">/);
+  expect(html).toMatch(/<script src="loader\.js">/);
 });

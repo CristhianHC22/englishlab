@@ -1,4 +1,4 @@
-/* Contenido masivo: 500 frases situacionales, 100 dictados, 40 podcasts */
+/* Contenido masivo: 500 frases situacionales, 100 dictados. Podcasts → pack-podcasts.js */
 window.ENLAB = window.ENLAB || {};
 
 (function bulkContent() {
@@ -491,60 +491,4 @@ window.ENLAB = window.ENLAB || {};
     if (!ENLAB.dictation.some((x) => x.en === variant.en)) ENLAB.dictation.push(variant);
     else break;
   }
-
-  /* 40 podcasts en series de 3 (trabajo, viaje, vida) */
-  const series = [
-    { id: "work", title: "Work", topics: ["stand-up", "feedback", "deadline", "onboarding", "promotion", "conflict", "remote", "client call", "demo day", "retro", "budget", "hire", "fire drill", "all-hands"] },
-    { id: "travel", title: "Travel", topics: ["check-in", "customs", "lost luggage", "taxi", "museum", "street food", "hostel", "road trip", "cruise", "hiking", "border", "jet lag", "travel insurance", "souvenir"] },
-    { id: "life", title: "Daily life", topics: ["morning routine", "groceries", "laundry", "neighbor", "gym", "cooking", "streaming", "budget", "car repair", "dentist", "parent call", "weekend plans", "moving day", "pet care"] },
-  ];
-
-  function makeSegments(text) {
-    return text.split(/(?<=[.!?])\s+/).filter(Boolean).map((s, i) => ({ t: s.trim(), i }));
-  }
-
-  const podScripts = {
-    "stand-up": "Quick stand-up. Yesterday I closed two tickets. Today I'll pair on auth. I'm blocked on staging keys — can someone help?",
-    feedback: "Good feedback is specific and kind. Say what worked, what didn't, and one thing to try next. Avoid vague praise like 'great job' with no detail.",
-    deadline: "We committed to Friday, but scope grew. Let's cut nice-to-haves, ship the core flow, and move polish to next sprint. Communicate early if you're stuck.",
-    onboarding: "Welcome aboard. Week one: set up your laptop, meet your buddy, and shadow a customer call. Ask questions — there are no dumb ones in week one.",
-    "lost luggage": "My bag didn't arrive. Here's my claim tag. I need essentials tonight and updates by morning. What compensation can you offer?",
-    "morning routine": "I wake at six, stretch for five minutes, and review my top three tasks. No email before breakfast — it sets the tone for the whole day.",
-  };
-
-  function makePodcast(id, seriesId, ep, topic, min) {
-    const text = podScripts[topic] || (seriesId === "work"
-      ? `At work, ${topic} matters more than you think. Listen for natural phrases natives use. Pause after each sentence and repeat out loud. Small daily practice beats cramming once a week.`
-      : seriesId === "travel"
-        ? `When you travel, ${topic} situations test your English fast. Stay polite, ask short questions, and confirm details. Locals appreciate the effort even if grammar isn't perfect.`
-        : `In daily life, ${topic} comes up often. Notice how people shorten words and link sounds. Copy the rhythm, not just the vocabulary. That's how you sound natural.`);
-    return {
-      id,
-      series: seriesId,
-      episode: ep,
-      title: `${topic.charAt(0).toUpperCase() + topic.slice(1)}`,
-      duration: "~60s",
-      min,
-      segments: makeSegments(text),
-      qs: [
-        { q: "¿Tema?", a: topic, opts: [topic, "vacation", "grammar"] },
-        { q: "¿Cuántos tips?", a: "three", opts: ["one", "two", "three"] },
-        { q: "¿Qué hacer si no entiendes?", a: "ask", opts: ["leave", "ask", "ignore"] },
-      ],
-    };
-  }
-
-  ENLAB.podcasts = ENLAB.podcasts || [];
-  let podCount = ENLAB.podcasts.length;
-  series.forEach((s) => {
-    s.topics.slice(0, 14).forEach((topic, idx) => {
-      if (podCount >= 40) return;
-      const ep = (idx % 3) + 1;
-      const id = `${s.id}-${topic.replace(/\s+/g, "-")}`;
-      if (!ENLAB.podcasts.some((p) => p.id === id)) {
-        ENLAB.podcasts.push(makePodcast(id, s.id, ep, topic, 2 + (idx % 3)));
-        podCount += 1;
-      }
-    });
-  });
 })();
