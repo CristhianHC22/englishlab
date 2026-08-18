@@ -1792,7 +1792,7 @@ function makeEarItems(exam = false) {
     return {
       type: "ear",
       exam,
-      q: "¿Qué palabra oíste?",
+      q: t("quizHeardQ"),
       a: spoken,
       opts: shuffle([p.a, p.b]),
       labels: {
@@ -1879,7 +1879,7 @@ function makeEdItems() {
   }
   return shuffle(picked).slice(0, 10).map((v) => ({
     type: "ed",
-    q: "¿Cómo suena el -ed?",
+    q: t("quizEdQ"),
     prompt: `${v.inf} → ${v.past}`,
     a: label[v.ed],
     opts: [...opts],
@@ -1920,7 +1920,7 @@ function makeDictItems() {
   const rest = shuffle(bank.filter((x) => !hard.includes(x)));
   return [...hard, ...rest].slice(0, 8).map((x) => ({
     type: "dict",
-    q: "Escribe lo que oíste (contracciones OK)",
+    q: t("quizDictQ"),
     esHint: hideEsOn() ? "" : x.es,
     a: x.en,
     say: x.en,
@@ -1980,7 +1980,7 @@ function makeWeeklyExamItems() {
   verbs.forEach((v) => {
     items.push({
       type: "choice",
-      q: `Pasado de “${v.inf}”`,
+      q: t("quizPastOf", { inf: v.inf }),
       esHint: v.es,
       a: v.past.split(" / ")[0],
       opts: uniqueOpts(v.past.split(" / ")[0], source.map((x) => x.past)),
@@ -2060,7 +2060,7 @@ function makeQuizItems() {
       const kind = mode < 0.5 ? "past" : "pp";
       items.push({
         type: "type",
-        q: kind === "past" ? `Escribe el pasado de “${v.inf}”` : `Escribe el participio de “${v.inf}” (I have ____)`,
+        q: kind === "past" ? t("quizTypePast", { inf: v.inf }) : t("quizTypePp", { inf: v.inf }),
         esHint: kind === "past" ? v.es : "",
         a: kind === "past" ? v.past : v.pp,
         say: v.inf,
@@ -2069,7 +2069,7 @@ function makeQuizItems() {
     } else if (mode < 0.35 || (hideEs && mode >= 0.65)) {
       items.push({
         type: "choice",
-        q: `Pasado de “${v.inf}”`,
+        q: t("quizPastOf", { inf: v.inf }),
         esHint: v.es,
         a: v.past,
         opts: uniqueOpts(v.past, verbSource().map((x) => x.past)),
@@ -2079,7 +2079,7 @@ function makeQuizItems() {
     } else if (mode < 0.65) {
       items.push({
         type: "choice",
-        q: `Participio de “${v.inf}” (I have ____)`,
+        q: t("quizPpOf", { inf: v.inf }),
         a: v.pp,
         opts: uniqueOpts(v.pp, verbSource().map((x) => x.pp)),
         say: v.inf,
@@ -2378,7 +2378,7 @@ function makeCierreItems() {
   if (v) {
     items.push({
       type: "choice",
-      q: `Pasado de “${v.inf}”`,
+      q: t("quizPastOf", { inf: v.inf }),
       esHint: v.es,
       a: v.past.split(" / ")[0],
       opts: uniqueOpts(v.past.split(" / ")[0], source.map((x) => x.past.split(" / ")[0])),
@@ -2430,8 +2430,8 @@ function speakPool() {
       { target: d.b.en, helpHtml: `Tú · <span class="es-line">${esc(d.b.es)}</span>` },
     ]),
     ...contractions.map((c) => ({ target: c.say, helpHtml: `${esc(c.full)} · <span class="es-line">${esc(c.es)}</span>` })),
-    ...verbs.map((v) => ({ target: simplePastOf(v), help: `Pasado de ${v.inf} (ayer)` })),
-    ...(n >= 2 ? verbs.map((v) => ({ target: perfectOf(v), help: `Present perfect de ${v.inf}` })) : []),
+    ...verbs.map((v) => ({ target: simplePastOf(v), help: t("speakPastHelp", { inf: v.inf }) })),
+    ...(n >= 2 ? verbs.map((v) => ({ target: perfectOf(v), help: t("speakPerfHelp", { inf: v.inf }) })) : []),
   ];
 }
 
@@ -2484,14 +2484,14 @@ function pickSpeak() {
   const hard = shuffle(pool.filter((x) => weak.has(x.target)));
   const leftover = [...weak].filter((t) => !pool.some((x) => x.target === t)).map((t) => ({
     target: t,
-    help: "Te trabaste. Repítela despacio.",
+    help: t("speakStuck"),
   }));
   const only = speakOnlyWeakOn();
   let item = forced;
   if (!item && only) {
     item = hard[0] || leftover[0];
     if (!item) {
-      setSpeakTarget({ target: "I'm fine, thanks.", help: "No hay fallos guardados. Quita “Solo lo que no me entendió” o graba una frase." });
+      setSpeakTarget({ target: "I'm fine, thanks.", help: t("speakNoWeak") });
       renderSpeakWeakHint();
       return;
     }
@@ -3767,6 +3767,10 @@ function applyKidsMode() {
   document.body.classList.toggle("kids-mode", kidsOn());
   const btn = $("#kids-toggle");
   if (btn) btn.setAttribute("aria-pressed", kidsOn() ? "true" : "false");
+  if (kidsOn() && localStorage.getItem("enlab-rate") !== "slow") {
+    localStorage.setItem("enlab-rate", "slow");
+    if (typeof renderRateBar === "function") renderRateBar();
+  }
 }
 
 function applyUiLang() {
@@ -3877,7 +3881,7 @@ function renderPlanEdFocus() {
     return;
   }
   el.hidden = false;
-  el.innerHTML = `-ed del plan hoy: ${verbs.map((v) => `<button type="button" class="say chip" data-say="${esc(simplePastOf(v))}">${esc(v.inf)}</button>`).join(" ")}`;
+  el.innerHTML = `${esc(t("planEdToday"))} ${verbs.map((v) => `<button type="button" class="say chip" data-say="${esc(simplePastOf(v))}">${esc(v.inf)}</button>`).join(" ")}`;
 }
 
 function maybeAutoAdvancePath() {
@@ -4520,20 +4524,20 @@ function renderEmails() {
   }
   window._dailyEmail = em;
   box.innerHTML = `
-    <p class="kicker">${esc(t("email"))} · ${items.length} disponibles</p>
+    <p class="kicker">${esc(t("email"))} · ${esc(t("emailAvail", { n: items.length }))}</p>
     <details class="email-pick" open>
       <summary><strong>${esc(em.subject)}</strong> <span class="muted">· ${esc(em.from)}</span></summary>
       <pre class="email-body">${esc(em.body)}</pre>
       <p class="muted es-line">${esc(em.es)}</p>
       <div class="row">
-        <button type="button" class="btn ghost" data-email-say>Oír en voz alta</button>
-        <button type="button" class="btn sm" data-email-reply>Grabar respuesta</button>
-        <button type="button" class="btn ghost sm" id="email-next">Otro email</button>
+        <button type="button" class="btn ghost" data-email-say>${esc(t("emailHearAloud"))}</button>
+        <button type="button" class="btn sm" data-email-reply>${esc(t("emailRecordReply"))}</button>
+        <button type="button" class="btn ghost sm" id="email-next">${esc(t("emailNext"))}</button>
       </div>
-      <p class="muted">Respuesta modelo: <em>${esc(em.reply)}</em></p>
+      <p class="muted">${esc(t("emailModelReply"))} <em>${esc(em.reply)}</em></p>
     </details>
     <details class="email-all" style="margin-top:10px">
-      <summary class="muted">Ver todos (${items.length})</summary>
+      <summary class="muted">${esc(t("emailSeeAll", { n: items.length }))}</summary>
       <div class="email-grid">${items.map((e) => `
         <button type="button" class="chip ${done.has(e.subject) ? "ok" : ""}" data-email-pick="${esc(e.subject)}">${esc(e.subject)}</button>`).join("")}</div>
     </details>`;
@@ -4553,8 +4557,8 @@ function renderInterviewSim() {
       <p class="muted es-line">${esc(it.es)}</p>
       <p class="muted">${esc(it.hint)}</p>
       <div class="row">
-        <button type="button" class="say" data-say="${esc(it.q)}">Oír pregunta</button>
-        <button type="button" class="btn sm" data-interview-rec="${i}">Grabar respuesta</button>
+        <button type="button" class="say" data-say="${esc(it.q)}">${esc(t("hearQuestion"))}</button>
+        <button type="button" class="btn sm" data-interview-rec="${i}">${esc(t("interviewRec"))}</button>
       </div>
       <p class="status" id="interview-status-${i}"></p>
     </div>`).join("");

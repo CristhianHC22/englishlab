@@ -23,6 +23,9 @@ test("pack counts, unique ids, placement bank", async ({ page }) => {
       "Were I in your position, I'd escalate before the client calls.",
       "Little did we know the API had a hard rate limit.",
       "It's high time we wrote the runbook instead of relying on chat.",
+      "Scarcely had we boarded when the gate closed behind us.",
+      "On no account should we promise a date we can't meet.",
+      "Hardly anyone had read the appendix, yet they voted yes.",
     ];
     return {
       podcasts: podcasts.length,
@@ -32,6 +35,7 @@ test("pack counts, unique ids, placement bank", async ({ page }) => {
       emailTone: emails.filter((e) => e.tone).length,
       placement: (window.ENLAB.placementItems || []).length,
       pairs: (window.ENLAB.minimalPairs || []).length,
+      writing: (window.ENLAB.writingPrompts || []).length,
       branched: roleplays.filter((r) => (r.turns || []).some((t) => (t.bOpts || []).length >= 2)).length,
       podIds: podIds.length,
       podUnique: unique(podIds),
@@ -45,10 +49,11 @@ test("pack counts, unique ids, placement bank", async ({ page }) => {
   expect(snap.roleplays).toBeGreaterThanOrEqual(50);
   expect(snap.dictation).toBeGreaterThanOrEqual(100);
   expect(snap.dictB2).toBe(true);
-  expect(snap.emailTone).toBeGreaterThanOrEqual(12);
-  expect(snap.placement).toBeGreaterThanOrEqual(20);
-  expect(snap.pairs).toBeGreaterThanOrEqual(33);
-  expect(snap.branched).toBeGreaterThanOrEqual(9);
+  expect(snap.emailTone).toBeGreaterThanOrEqual(16);
+  expect(snap.placement).toBeGreaterThanOrEqual(24);
+  expect(snap.pairs).toBeGreaterThanOrEqual(37);
+  expect(snap.branched).toBeGreaterThanOrEqual(13);
+  expect(snap.writing).toBeGreaterThanOrEqual(12);
   expect(snap.podAllHaveId).toBe(true);
   expect(snap.podUnique).toBe(true);
   expect(snap.roleAllHaveId).toBe(true);
@@ -83,12 +88,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v33 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v34 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v33/);
+  expect(sw).toMatch(/enlab-v34/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");

@@ -742,20 +742,6 @@
     };
   }
 
-  /* ── Patch kids mode → slow rate ── */
-  function patchKidsMode() {
-    if (typeof applyKidsMode !== "function") return;
-    const orig = applyKidsMode;
-    window.applyKidsMode = function () {
-      orig();
-      if (kidsOn() && localStorage.getItem("enlab-rate") !== "slow") {
-        localStorage.setItem("enlab-rate", "slow");
-        if (typeof renderRateBar === "function") renderRateBar();
-      }
-    };
-    applyKidsMode();
-  }
-
   /* ── Patch renderQuiz end for cert ── */
   function patchRenderQuiz() {
     if (typeof renderQuiz !== "function") return;
@@ -832,7 +818,7 @@
         }
         if (target) {
           window._duoPending = target;
-          window._speakTarget = { target, help: "Turno duo — di la línea B/A" };
+          window._speakTarget = { target, help: typeof t === "function" ? t("duoTurnHelp") : "Turno duo — di la línea B/A" };
           if (typeof setSpeakTarget === "function") setSpeakTarget(window._speakTarget);
           showTab("hablar");
           document.querySelector("#speak-rec")?.click();
@@ -899,7 +885,6 @@
     if (window._nrBootstrapped) return;
     window._nrBootstrapped = true;
     patchTodayGame();
-    patchKidsMode();
     patchTransferQr();
     patchMakeQuizItems();
     patchRenderQuiz();

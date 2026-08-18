@@ -25,18 +25,18 @@
   }
 
   function textPronScore(said, targetIpa, targetText) {
-    if (!said) return { pct: 0, note: "No se oyó nada", dist: 1 };
+    if (!said) return { pct: 0, note: typeof t === "function" ? t("pronNoHear") : "No se oyó nada", dist: 1 };
     if (typeof speakHeardOk === "function" && speakHeardOk(said, targetText)) {
-      return { pct: 100, note: "Transcripción coincide.", dist: 0 };
+      return { pct: 100, note: typeof t === "function" ? t("pronMatch") : "Transcripción coincide.", dist: 0 };
     }
     const norm = typeof speakVariants === "function"
       ? speakVariants(said).join(" ")
       : said.toLowerCase();
     const dist = phonemeDistance(norm.replace(/\s/g, ""), targetIpa);
     const pct = Math.max(0, Math.round((1 - dist) * 100));
-    const note = pct >= 80 ? "Texto cerca — repite más despacio."
-      : pct >= 50 ? "Se entiende por texto, afina vocal."
-      : "Lejos del objetivo — oye otra vez.";
+    const note = pct >= 80 ? (typeof t === "function" ? t("pronClose") : "Texto cerca — repite más despacio.")
+      : pct >= 50 ? (typeof t === "function" ? t("pronOk") : "Se entiende por texto, afina vocal.")
+      : (typeof t === "function" ? t("pronFar") : "Lejos del objetivo — oye otra vez.");
     return { pct, note, dist };
   }
 
@@ -395,17 +395,17 @@
       </div>
       <div class="writing-grid">
         <div class="card">
-          <h4>Prompt</h4>
+          <h4>${esc(typeof t === "function" ? t("writePrompt") : "Prompt")}</h4>
           <p>${esc(pick.prompt)}</p>
-          <label class="muted">Tu borrador<textarea id="writing-draft" rows="8" placeholder="Write here…"></textarea></label>
-          <button type="button" class="btn sm" id="writing-score">Comparar con modelo</button>
+          <label class="muted">${esc(typeof t === "function" ? t("writeDraft") : "Tu borrador")}<textarea id="writing-draft" rows="8" placeholder="Write here…"></textarea></label>
+          <button type="button" class="btn sm" id="writing-score">${esc(typeof t === "function" ? t("writeScore") : "Comparar con modelo")}</button>
         </div>
         <div class="card">
-          <h4>Modelo</h4>
+          <h4>${esc(typeof t === "function" ? t("writeModel") : "Modelo")}</h4>
           <pre class="email-body">${esc(pick.model)}</pre>
-          <h4>Rúbrica</h4>
+          <h4>${esc(typeof t === "function" ? t("writeRubric") : "Rúbrica")}</h4>
           <ul class="writing-rubric">${pick.checklist.map((c) => `<li data-rubric="${esc(c.id)}">${esc(c.label)} <span class="rubric-ok">○</span></li>`).join("")}</ul>
-          <p class="muted">Hints: ${pick.hints.map((h) => esc(h)).join(", ")}</p>
+          <p class="muted">${esc(typeof t === "function" ? t("writeHints") : "Hints")}: ${pick.hints.map((h) => esc(h)).join(", ")}</p>
         </div>
       </div>
       <p id="writing-result" class="muted"></p>`;
@@ -416,7 +416,7 @@
     const draft = (document.querySelector("#writing-draft")?.value || "").trim();
     const result = document.querySelector("#writing-result");
     if (!pick || !draft) {
-      if (result) result.textContent = "Escribe algo primero.";
+      if (result) result.textContent = typeof t === "function" ? t("writeEmpty") : "Escribe algo primero.";
       return;
     }
     const lower = draft.toLowerCase();
@@ -744,7 +744,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v33";
+  const SW_CACHE = "enlab-v34";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;

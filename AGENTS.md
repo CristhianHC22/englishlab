@@ -12,7 +12,7 @@ Lee esto **antes** de tocar código. El mapa largo y el “por qué” está en 
 - i18n: toda cadena nueva en **ES y EN** (`i18n.js`). `t("clave")` o `t("quizModes.place.t")`.
 - Visual: snapshots **win32 y linux**. Tras CSS/layout: `npm run test:visual:update` y Docker linux (comando en `tests/visual.spec.js`). El job CI visual usa esa misma imagen jammy.
 - No commitear `vapid-private.json`, `push-sub.json`, `node_modules`, `test-results/`.
-- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v33`). También cachear `offline.html`.
+- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v34`). También cachear `offline.html`.
 
 ## Arranque (orden)
 

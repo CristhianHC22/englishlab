@@ -10,7 +10,7 @@ test("Plus: placement bank and CEFR bands", async ({ page }) => {
     b1: window.PLUS.scoreToCefr(14, 20),
     b2: window.PLUS.scoreToCefr(18, 20),
   }));
-  expect(info.n).toBe(20);
+  expect(info.n).toBeGreaterThanOrEqual(24);
   expect(info.a1).toBe("a1");
   expect(info.a2).toBe("a2");
   expect(info.b1).toBe("b1");

@@ -182,6 +182,7 @@ test("kids mode sets slow voice", async ({ page }) => {
     localStorage.setItem("enlab-kids", "0");
   });
   await page.reload();
+  await page.waitForFunction(() => typeof applyKidsMode === "function");
   await page.locator("#kids-toggle").click();
   expect(await page.evaluate(() => localStorage.getItem("enlab-rate"))).toBe("slow");
 });

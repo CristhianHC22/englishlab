@@ -47,17 +47,18 @@
 
   function whyFor(expected) {
     const s = String(expected || "").toLowerCase();
-    if (/th|thin|this|think/.test(s)) return "Los hispanos suelen hacer /t/ o /d/ en lugar de /θ ð/. Lengua entre los dientes.";
-    if (/\bv|\bvery|\bvan/.test(s)) return "/v/ no es /b/: diente sobre labio inferior.";
-    if (/i'm|i am|don't|do not/.test(s)) return "Las contracciones cuentan: I'm = I am.";
-    if (/make|do /.test(s)) return "make a mistake / do homework: no calques hacer.";
-    if (/on monday|in 19|at 3/.test(s)) return "on + día · in + año/mes · at + hora.";
-    return "Oye el modelo despacio y repite en voz alta. El fallo vuelve en SRS.";
+    if (/th|thin|this|think/.test(s)) return tt("errWhyTh");
+    if (/\bv|\bvery|\bvan/.test(s)) return tt("errWhyV");
+    if (/i'm|i am|don't|do not/.test(s)) return tt("errWhyContr");
+    if (/make|do /.test(s)) return tt("errWhyMakeDo");
+    if (/on monday|in 19|at 3/.test(s)) return tt("errWhyPrep");
+    return tt("errWhyDefault");
   }
 
   function makePlacementItems() {
-    const bank = ENLAB.placementItems || [];
-    return bank.slice(0, 20).map((it, i) => ({
+    const bank = [...(ENLAB.placementItems || [])];
+    const picked = (typeof shuffle === "function" ? shuffle(bank) : bank).slice(0, 20);
+    return picked.map((it, i) => ({
       type: "uso",
       q: it.q,
       prompt: it.prompt,
