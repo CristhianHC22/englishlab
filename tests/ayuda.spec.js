@@ -12,6 +12,7 @@ test("Ayuda: classroom pro dashboard", async ({ page }) => {
   await page.locator('[data-tab="ia"]').click();
   await expect(page.locator("#class-pro-panel")).toBeVisible();
   await expect(page.locator("#class-export-csv")).toBeVisible();
+  await expect(page.locator("#student-pdf")).toBeVisible();
   await page.locator("#class-student-name").fill("Test Student");
   await page.locator("#class-add-student").click();
   await expect(page.locator(".class-roster-table tbody tr")).toHaveCount(1);

@@ -403,6 +403,10 @@
             <strong data-i18n="storyQuizMode">Historias SRS</strong>
             <span data-i18n="storyQuizModeHint">Frases desbloqueadas en micro-novelas</span>
           </button>
+          <button type="button" class="mode-pick" data-quiz-mode="place">
+            <strong data-i18n="quizModes.place.t">Test de nivel</strong>
+            <span data-i18n="quizModes.place.s">20 preguntas · propone A1–B2</span>
+          </button>
           <button type="button" class="mode-pick" data-quiz-mode="weekly">
             <strong>Examen semanal</strong>
             <span>12 preguntas mixtas</span>
@@ -432,13 +436,14 @@
           <option value="listen">Escucha larga</option>
           <option value="story">Historias SRS</option>
           <option value="emailtone">Email tono</option>
+          <option value="place">Test de nivel</option>
           <option value="weekly">Examen semanal</option>
           <option value="cert">Examen certificado B1/B2</option>
         </select>
         <div><button class="btn" id="quiz-start" data-i18n="quizStart">¡Jugar!</button></div>
       </div>
       <div id="ear-misses" class="card ear-misses" style="margin-top:12px" hidden></div>
-      <div id="quiz-box" style="margin-top:12px"></div>
+      <div id="quiz-box" style="margin-top:12px" aria-live="polite"></div>
       <div id="cert-print-area" class="print-only" hidden></div>
     </section>
 
@@ -466,11 +471,13 @@
         <div id="shadow-box" class="shadow-box" hidden>
           <p class="muted" data-i18n="shadowHint">Oye → pausa → repite en voz alta.</p>
           <p class="muted"><span data-i18n="shadowTimerLabel">Segundos:</span> <strong id="shadow-timer">30</strong></p>
+          <p class="muted" id="shadow-phrase-status"></p>
           <button type="button" class="btn sm" id="shadow-go" data-i18n="shadowGo">Empezar shadowing</button>
         </div>
+        <canvas id="rec-wave" class="rec-wave" width="320" height="64" hidden aria-hidden="true"></canvas>
         <audio id="speak-playback" controls hidden style="width:100%;margin-top:12px"></audio>
         <div id="voice-history" class="voice-history" hidden></div>
-        <p class="status" id="speak-status"></p>
+        <p class="status" id="speak-status" aria-live="polite"></p>
       </div>
       <div class="card" id="email-card">
         <h3 data-i18n="email">Emails en voz alta</h3>
@@ -526,6 +533,8 @@
       </div>
       <div id="lab-audit" class="card audit-panel" style="margin-top:16px"></div>
       <div id="class-pro-panel" class="card" style="margin-top:16px"></div>
+      <div id="error-journal" class="card" style="margin-top:16px"></div>
+      <div id="perf-panel" class="card" style="margin-top:16px"></div>
       <div id="a11y-bar" class="card a11y-bar" style="margin-top:16px"></div>
     </section>
 

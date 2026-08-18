@@ -468,6 +468,7 @@
         <button type="button" class="btn ghost sm" id="class-import-code">${esc(t("classImport"))}</button>
         <button type="button" class="btn ghost sm" id="class-export-csv">${esc(t("classExportCsv"))}</button>
         <button type="button" class="btn ghost sm" id="class-student-qr">${esc(t("classStudentQr"))}</button>
+        <button type="button" class="btn ghost sm" id="student-pdf">${esc(t("studentPdf"))}</button>
       </div>
       <div id="class-student-qr-box" class="student-qr-box" hidden></div>
       <table class="class-roster-table" style="margin-top:12px;width:100%">
@@ -669,7 +670,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v27";
+  const SW_CACHE = "enlab-v29";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -949,6 +950,7 @@
     renderHoyStoryChip();
     renderA11yBar();
     renderOfflineBadge();
+    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
   }
 
   function bootstrap() {

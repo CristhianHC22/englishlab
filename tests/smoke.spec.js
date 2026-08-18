@@ -42,6 +42,8 @@ test("packs A–R content is wired", async ({ page }) => {
     dialogsA2: (window.ENLAB.dialogsA2Tense || []).length >= 8,
     nr: typeof window.NR?.startCertExam === "function",
     sv: typeof window.SV?.scorePronunciationAsync === "function",
+    plus: typeof window.PLUS?.startPlacement === "function",
+    place: (window.ENLAB.placementItems || []).length >= 20,
     pron: typeof window.PRON?.scoreFormantPair === "function",
     stories: (window.ENLAB.branchStories || []).length >= 20,
     storyDepth: (() => {
@@ -65,6 +67,8 @@ test("packs A–R content is wired", async ({ page }) => {
   expect(ok.dialogsA2).toBe(true);
   expect(ok.nr).toBe(true);
   expect(ok.sv).toBe(true);
+  expect(ok.plus).toBe(true);
+  expect(ok.place).toBe(true);
   expect(ok.stories).toBe(true);
   expect(ok.storyDepth).toBe(true);
   expect(ok.dict100).toBe(true);
@@ -90,6 +94,7 @@ test("quiz modes include dictation, weekly, cert and cond", async ({ page }) => 
   await boot(page);
   await page.locator('[data-tab="quiz"]').click();
   await expect(page.locator('[data-quiz-mode="dict"]')).toBeVisible();
+  await expect(page.locator('[data-quiz-mode="place"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="weekly"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="cert"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="cond"]')).toBeVisible();

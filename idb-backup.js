@@ -16,6 +16,8 @@
     "enlab-pron-log",
     "enlab-writing-done",
     "enlab-push-sub",
+    "enlab-error-log",
+    "enlab-place-result",
   ];
 
   function openDb() {

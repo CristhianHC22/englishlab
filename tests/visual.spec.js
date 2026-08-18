@@ -37,6 +37,13 @@ test.describe("regresión visual — temas", () => {
       await expectViewportShot(page, `oido-${mode.id}`);
     });
 
+    test(`Verbos · ${mode.id}`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: mode.colorScheme });
+      await bootVisual(page, { theme: mode.theme, contrast: mode.contrast });
+      await gotoTab(page, "verbos");
+      await expectViewportShot(page, `verbos-${mode.id}`);
+    });
+
     test(`Juego · ${mode.id}`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: mode.colorScheme });
       await bootVisual(page, { theme: mode.theme, contrast: mode.contrast });

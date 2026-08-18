@@ -61,6 +61,17 @@ async function stabilizeForSnapshot(page) {
         `<span class="week-dot${i === 2 ? " hot" : ""}">${["L", "M", "X", "J", "V", "S", "D"][i]}</span>`,
       ).join("")}</div>`;
     }
+    const chart = document.getElementById("hoy-streak-chart");
+    if (chart) {
+      chart.hidden = false;
+      chart.innerHTML = `<p class="kicker">Últimos 30 días · 0/30 días activos</p><div class="streak-bars">${Array.from({ length: 30 }, () =>
+        `<span class="streak-day"></span>`,
+      ).join("")}</div>`;
+    }
+    const journal = document.getElementById("error-journal");
+    if (journal) { journal.hidden = true; journal.innerHTML = ""; }
+    const perf = document.getElementById("perf-panel");
+    if (perf) { perf.hidden = true; perf.innerHTML = ""; }
     document.querySelectorAll("[data-pwa-install]").forEach((el) => { el.hidden = true; });
     document.getElementById("level-nudge")?.setAttribute("hidden", "");
     document.getElementById("welcome")?.setAttribute("hidden", "");
@@ -95,6 +106,9 @@ async function gotoTab(page, tab) {
   }
   if (tab === "quiz") {
     await page.waitForSelector('[data-quiz-mode="dict"]');
+  }
+  if (tab === "verbos") {
+    await page.waitForSelector("#verb-list .verb");
   }
   if (tab === "hablar") {
     await page.waitForSelector("#roleplay-card");

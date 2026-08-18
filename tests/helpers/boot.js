@@ -11,7 +11,9 @@ async function boot(page) {
       () => (window.ENLAB?.podcasts || []).length >= 40
         && (window.ENLAB?.roleplays || []).length >= 50
         && typeof window.NR?.startCertExam === "function"
-        && typeof window.SV?.scorePronunciationAsync === "function",
+        && typeof window.SV?.scorePronunciationAsync === "function"
+        && typeof window.PLUS?.startPlacement === "function"
+        && (window.ENLAB?.placementItems || []).length >= 20,
       { timeout: 90000 },
     );
   } catch {

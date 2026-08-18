@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone", "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3", "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast", "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal"];
+const PROG_KEYS = ["enlab-stats", "enlab-weak", "enlab-known", "enlab-ear-weak", "enlab-ear-stats", "enlab-uso-weak", "enlab-ed-weak", "enlab-speak-weak", "enlab-speak-only-weak", "enlab-cefr", "enlab-cefr-since", "enlab-nudge-hide", "enlab-ear-warmup", "enlab-session", "enlab-rate", "enlab-log", "enlab-theme", "enlab-hide-es", "enlab-remind-on", "enlab-remind-time", "enlab-kids", "enlab-ui-lang", "enlab-voice-log", "enlab-auto-path", "enlab-repaso", "enlab-srs", "enlab-class-pin", "enlab-weekly-exam", "enlab-weekly-score", "enlab-travel", "enlab-duo-stats", "enlab-cert-done", "enlab-cert-name", "enlab-cert-score", "enlab-podcast-log", "enlab-email-done", "enlab-travel-done", "enlab-chat-tone", "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3", "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast", "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal", "enlab-error-log", "enlab-place-result"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
@@ -111,11 +111,14 @@ function releaseWake() {
 function speak(text, slow = false, opts = {}) {
   if (opts.cancel !== false) window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US";
+  const pref = opts.lang || localStorage.getItem("enlab-accent-pref") || "us";
+  u.lang = pref === "uk" || pref === "en-GB" ? "en-GB" : (opts.lang && /^en-/i.test(opts.lang) ? opts.lang : "en-US");
   const slowVoice = speakRate();
   u.rate = slowVoice === "slow" ? 0.62 : slowVoice === "fast" ? 1.12 : (slow ? 0.72 : 0.92);
   const voices = speechSynthesis.getVoices();
-  const en = voices.find((v) => /en-US/i.test(v.lang) && /Google|Natural|Samantha|Jenny|Aria/i.test(v.name))
+  const want = u.lang;
+  const en = voices.find((v) => new RegExp(want, "i").test(v.lang) && /Google|Natural|Samantha|Jenny|Aria|Daniel/i.test(v.name))
+    || voices.find((v) => new RegExp(want, "i").test(v.lang))
     || voices.find((v) => /en-US/i.test(v.lang));
   if (en) u.voice = en;
   return new Promise((resolve) => {
@@ -1124,7 +1127,7 @@ function renderWeekStrip() {
   const el = $("#week-strip");
   if (!el) return;
   const by = Object.fromEntries(loadLogs().map((r) => [r.date, r]));
-  const names = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const names = [t("weekSun"), t("weekMon"), t("weekTue"), t("weekWed"), t("weekThu"), t("weekFri"), t("weekSat")];
   const days = [];
   for (let i = 6; i >= 0; i -= 1) {
     const d = new Date();
@@ -1132,11 +1135,11 @@ function renderWeekStrip() {
     d.setDate(d.getDate() - i);
     days.push({ key: localDateKey(d), label: names[d.getDay()] });
   }
-  el.innerHTML = `<div class="week-dots" aria-label="Actividad de la semana">${days.map((day) => {
+  el.innerHTML = `<div class="week-dots" role="list" aria-label="${esc(t("weekStripAria"))}">${days.map((day) => {
     const row = by[day.key];
     const cls = row?.complete ? "full" : (row ? "some" : "");
-    const title = row?.complete ? `${day.label}: sesión completa` : (row ? `${day.label}: algo hecho` : `${day.label}: sin práctica`);
-    return `<div class="week-dot ${cls}" title="${esc(title)}"><span>${esc(day.label)}</span></div>`;
+    const title = row?.complete ? t("weekDotFull", { day: day.label }) : (row ? t("weekDotSome", { day: day.label }) : t("weekDotNone", { day: day.label }));
+    return `<div class="week-dot ${cls}" role="listitem" aria-label="${esc(title)}" title="${esc(title)}"><span>${esc(day.label)}</span></div>`;
   }).join("")}</div>`;
 }
 
@@ -1525,14 +1528,14 @@ function renderVerbFilters() {
   const fams = Object.entries(ENLAB.familyNames).map(([k, label]) =>
     `<button class="chip ${FILTERS.fam === k ? "on" : ""}" data-fam="${k}">${esc(label)}</button>`).join("");
   $("#verb-filters").innerHTML = `
-    <button class="chip ${FILTERS.fam === "all" ? "on" : ""}" data-fam="all">Todas (${ENLAB.verbs.length})</button>
+    <button class="chip ${FILTERS.fam === "all" ? "on" : ""}" data-fam="all">${esc(t("verbAll", { n: ENLAB.verbs.length }))}</button>
     ${fams}
-    <button class="chip ${FILTERS.only === "level" ? "on" : ""}" data-only="level">Mazo del nivel (${verbsForLevel().length})</button>
-    <button class="chip ${FILTERS.only === "starter" ? "on" : ""}" data-only="starter">40 frecuentes</button>
-    <button class="chip ${FILTERS.only === "all" ? "on" : ""}" data-only="all">Todos (${ENLAB.verbs.length})</button>
-    <button class="chip ${FILTERS.only === "work" ? "on" : ""}" data-only="work">Trabajo</button>
-    <button class="chip ${FILTERS.only === "weak" ? "on" : ""}" data-only="weak">Débiles</button>
-    <button class="chip ${FILTERS.only === "unknown" ? "on" : ""}" data-only="unknown">Sin fuerte</button>
+    <button class="chip ${FILTERS.only === "level" ? "on" : ""}" data-only="level">${esc(t("verbFilterLevel", { n: verbsForLevel().length }))}</button>
+    <button class="chip ${FILTERS.only === "starter" ? "on" : ""}" data-only="starter">${esc(t("verbFilterStarter"))}</button>
+    <button class="chip ${FILTERS.only === "all" ? "on" : ""}" data-only="all">${esc(t("verbFilterAll", { n: ENLAB.verbs.length }))}</button>
+    <button class="chip ${FILTERS.only === "work" ? "on" : ""}" data-only="work">${esc(t("verbFilterWork"))}</button>
+    <button class="chip ${FILTERS.only === "weak" ? "on" : ""}" data-only="weak">${esc(t("verbFilterWeak"))}</button>
+    <button class="chip ${FILTERS.only === "unknown" ? "on" : ""}" data-only="unknown">${esc(t("verbFilterUnknown"))}</button>
   `;
 }
 
@@ -2032,6 +2035,7 @@ function makeQuizItems() {
   if (quiz.mode === "weekly") return makeWeeklyExamItems();
   if (quiz.mode === "story") return makeStoryItems();
   if (quiz.mode === "emailtone") return makeEmailToneItems();
+  if (quiz.mode === "place") return window.PLUS?.makePlacementItems?.() || [];
   const hideEs = hideEsOn();
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
@@ -2113,7 +2117,7 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story" || quiz.mode === "emailtone";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story" || quiz.mode === "emailtone" || quiz.mode === "place";
     const weekly = quiz.mode === "weekly";
     const cert = quiz.mode === "cert";
     if (cierre) {
@@ -2205,6 +2209,7 @@ function renderQuiz() {
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
       else quiz.fails.push(it.inf);
+      if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: it.type || "type", expected: it.a, said: val, prompt: it.q, why: "" });
       if (it.type === "dict") srsBump("dict", it.inf, ok);
       bump("quiz");
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 900);
@@ -2251,6 +2256,7 @@ function renderQuiz() {
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
       else quiz.fails.push(it.inf);
+      if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: "dict", expected: it.a, said: val, prompt: it.q, why: "" });
       srsBump("dict", it.inf, ok);
       bump("quiz");
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 1100);
@@ -2558,8 +2564,8 @@ function recEls() {
 
 function resetRecButtons() {
   const pairs = [
-    ["#speak-rec", "Grabarme"],
-    ["#hoy-speak-rec", "Grabar B"],
+    ["#speak-rec", typeof t === "function" ? t("speakRec") : "Grabarme"],
+    ["#hoy-speak-rec", typeof t === "function" ? t("hoySpeakRec") : "Grabar B"],
   ];
   pairs.forEach(([sel, idle]) => {
     const b = $(sel);
@@ -2574,6 +2580,7 @@ function setRecStatus(text, cls = "") {
   if (!el) return;
   el.textContent = text;
   el.className = `status ${cls}`.trim();
+  if (!el.hasAttribute("aria-live")) el.setAttribute("aria-live", "polite");
 }
 
 function applySpeakVerdict(said) {
@@ -3186,6 +3193,9 @@ document.addEventListener("click", (e) => {
     } else {
       opt.classList.add("bad");
       quiz.fails.push(it.inf);
+      if (window.PLUS?.logError) {
+        window.PLUS.logError({ mode: it.type, expected: it.a, said: val, prompt: it.q || it.prompt, why: it.why || "" });
+      }
       $$(".choices button").forEach((b) => {
         if (decodeURIComponent(b.dataset.opt) === it.a) b.classList.add("ok");
       });
@@ -3987,21 +3997,29 @@ function renderStreakChart() {
   if (!el) return;
   const st = stats();
   const days = [];
-  for (let i = 29; i >= 0; i -= 1) {
+  for (let i = 89; i >= 0; i -= 1) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = dateKey(d);
-    const day = st.days[key] || {};
-    const score = (day.heard || 0) + (day.quiz || 0) + (day.spoke || 0);
-    days.push({ key, score, hot: score > 0 });
+    const day = (st.days || {})[key] || {};
+    const heard = day.heard || 0;
+    const quizN = day.quiz || 0;
+    const spoke = day.spoke || 0;
+    const score = heard + quizN + spoke;
+    days.push({ key, score, heard, quiz: quizN, spoke, hot: score > 0 });
   }
   const hotN = days.filter((d) => d.hot).length;
+  const max = Math.max(1, ...days.map((d) => d.score));
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("streak"))} · ${hotN}/30 días activos</p>
-    <div class="streak-bars" role="img" aria-label="${hotN} días con práctica en los últimos 30">
-      ${days.map((d) => `<span class="streak-day ${d.hot ? "hot" : ""}" title="${esc(d.key)}: ${d.score} acciones"></span>`).join("")}
-    </div>`;
+    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90</p>
+    <div class="streak-bars streak-90" role="img" aria-label="${hotN} ${esc(t("streak90Aria"))}">
+      ${days.map((d) => {
+        const h = Math.max(d.score ? 20 : 8, Math.round((d.score / max) * 100));
+        return `<span class="streak-day ${d.hot ? "hot" : ""}" style="height:${h}%" title="${esc(d.key)}: ${d.heard} ${t("logHeard")} · ${d.quiz} ${t("logQuiz")} · ${d.spoke} ${t("logVoice")}"></span>`;
+      }).join("")}
+    </div>
+    <p class="muted chart90-legend">${esc(t("chart90Legend"))}</p>`;
 }
 
 function buildTransferPayload() {

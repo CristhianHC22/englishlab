@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const FEATURES = ["./features-nr.js", "./features-sv.js"];
+  const FEATURES = ["./features-nr.js", "./features-sv.js", "./features-plus.js"];
   const DEFERRED = [
     "./pack-m.js",
     "./pack-n.js",
@@ -16,6 +16,7 @@
     "./pack-roleplays-bulk.js",
     "./pack-emails-extra.js",
     "./pack-podcast-series.js",
+    "./pack-plus.js",
   ];
 
   function loadScript(src) {
@@ -59,6 +60,7 @@
       window._enlabBootstrapped = true;
       if (window.NR?.bootstrap) window.NR.bootstrap();
       if (window.SV?.bootstrap) window.SV.bootstrap();
+      if (window.PLUS?.bootstrap) window.PLUS.bootstrap();
     }
     refreshAfterPacks();
     window.dispatchEvent(new CustomEvent("enlab-packs-ready"));
