@@ -276,7 +276,7 @@
     box.hidden = false;
     const renderSeg = () => {
       box.innerHTML = `
-        <p class="kicker">Mini-podcast · ${esc(pod.title)}</p>
+        <p class="kicker">${esc(t("podKicker", { title: pod.title }))}</p>
         <p class="podcast-progress">${segI + 1}/${pod.segments.length}</p>
         <div class="podcast-transcript">${pod.segments.map((s, i) =>
           `<p class="pod-seg ${i === segI ? "on" : ""}"><span class="en">${esc(s.en)}</span><span class="es-line">${esc(s.es)}</span></p>`).join("")}</div>
@@ -412,7 +412,7 @@
     const el = document.querySelector("#duo-now");
     const scoreEl = document.querySelector("#duo-score");
     if (!el) return;
-    if (scoreEl) scoreEl.textContent = `A: ${duoState.scoreA} · B: ${duoState.scoreB}`;
+    if (scoreEl) scoreEl.textContent = t("duoScore", { a: duoState.scoreA, b: duoState.scoreB });
     if (!duoState.active || !duoState.scene) {
       el.innerHTML = `<p class="muted">${esc(t("duoIdle"))}</p>
         <button type="button" class="btn" id="duo-start">${esc(t("duoStart"))}</button>`;
@@ -608,7 +608,7 @@
     });
     const breakdown = Object.entries(byType).map(([k, v]) => `${k}: ${v.n - v.miss}/${v.n}`).join(" · ");
     localStorage.setItem("enlab-cert-score", JSON.stringify({ score, total, pct, pass, at: Date.now(), breakdown }));
-    const name = localStorage.getItem("enlab-cert-name") || "Estudiante";
+    const name = localStorage.getItem("enlab-cert-name") || t("certStudent");
     showCertificate(name, score, total, pct, pass, timeUp, breakdown);
     renderLabAudit();
   }
@@ -622,25 +622,25 @@
     area.innerHTML = `
       <div class="cert-page">
         <h1>English Lab</h1>
-        <p class="cert-sub">Certificado de examen simulado · ${levelLabel}</p>
+        <p class="cert-sub">${esc(t("certSub", { level: levelLabel }))}</p>
         <p class="cert-name">${esc(name)}</p>
-        <p>Puntuación: <strong>${score}/${total}</strong> (${pct}%)${timeUp ? " · Tiempo agotado" : ""}</p>
+        <p>${esc(t("certScoreLine", { score, total, pct }))}${timeUp ? esc(t("certTimeUp")) : ""}</p>
         ${breakdown ? `<p class="muted">${esc(breakdown)}</p>` : ""}
-        <p class="cert-verdict ${pass ? "pass" : "fail"}">${pass ? "APTO — nivel consistente con práctica regular" : "Sigue practicando — repasa débiles y vuelve en una semana"}</p>
+        <p class="cert-verdict ${pass ? "pass" : "fail"}">${esc(pass ? t("certPass") : t("certFail"))}</p>
         <p class="muted">${typeof todayKey === "function" ? todayKey() : ""} · English Lab PWA</p>
       </div>`;
     if (box) {
       box.innerHTML = `
         <div class="card">
-          <p class="kicker">Examen certificado</p>
-          <p>${pass ? "¡Aprobado!" : "No aprobado aún."} ${score}/${total} (${pct}%)</p>
-          ${breakdown ? `<p class="muted">Por habilidad: ${esc(breakdown)}</p>` : ""}
-          <label class="muted">Nombre en certificado
+          <p class="kicker">${esc(t("certKicker"))}</p>
+          <p>${esc(pass ? t("certOk") : t("certNotYet"))} ${score}/${total} (${pct}%)</p>
+          ${breakdown ? `<p class="muted">${esc(t("certBySkill", { list: breakdown }))}</p>` : ""}
+          <label class="muted">${esc(t("certNameLabel"))}
             <input id="cert-name-input" type="text" value="${esc(name)}" maxlength="40" />
           </label>
           <div class="row">
-            <button type="button" class="btn" id="cert-print-btn">Imprimir certificado</button>
-            <button type="button" class="btn ghost" id="cert-retry">Reintentar</button>
+            <button type="button" class="btn" id="cert-print-btn">${esc(t("certPrint"))}</button>
+            <button type="button" class="btn ghost" id="cert-retry">${esc(t("certRetry"))}</button>
           </div>
         </div>`;
       document.querySelector("#cert-name-input")?.addEventListener("change", (e) => {

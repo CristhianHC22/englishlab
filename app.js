@@ -498,7 +498,7 @@ function ygHref(word) {
 
 function ygLink(word, label) {
   const lab = label || (typeof t === "function" ? t("real") : "gente real");
-  return `<a class="yg" href="${ygHref(word)}" target="_blank" rel="noreferrer" title="YouGlish: oír esta palabra dicha por nativos">${esc(lab)}</a>`;
+  return `<a class="yg" href="${ygHref(word)}" target="_blank" rel="noreferrer" title="${esc(typeof t === "function" ? t("ygTitle") : "YouGlish")}">${esc(lab)}</a>`;
 }
 
 function pairRow(p) {
@@ -741,13 +741,13 @@ function renderLevelNudge() {
   if (lvlNum() >= 3 && days < 4 && weakN >= 12) {
     mode = "down";
     copy = lvlNum() >= 4
-      ? "Si se te traba mucho, prueba B1 unos días. B2 es reto, no la meta."
-      : "Si se te traba mucho, prueba A2 unos días. B1 es la meta, no hace falta empezar ahí.";
+      ? t("levelNudgeB2")
+      : t("levelNudgeB1");
   } else if (nxt && nxtMeta && days >= (cur === "b1" ? 10 : 7) && weakN <= 6 && (completes >= 4 || streak >= 4)) {
     mode = "up";
     copy = cur === "b1"
-      ? `Llevas ${days} días en B1 y pocos débiles. B1 es la meta. Si te entienden siempre, prueba B2 un día.`
-      : `Llevas ${days} día(s) en ${meta?.name || cur.toUpperCase()} y casi no tienes débiles. Prueba ${nxtMeta.name} un día.`;
+      ? t("levelNudgeUpB1", { days })
+      : t("levelNudgeUp", { days, name: meta?.name || cur.toUpperCase(), next: nxtMeta.name });
   }
   if (!mode) {
     el.hidden = true;
@@ -755,10 +755,10 @@ function renderLevelNudge() {
     return;
   }
   const action = mode === "up"
-    ? `<button type="button" class="btn sm" data-nudge-to="${esc(nxt)}">Probar ${esc(nxtMeta.name)}</button>`
+    ? `<button type="button" class="btn sm" data-nudge-to="${esc(nxt)}">${esc(t("levelNudgeTry", { name: nxtMeta.name }))}</button>`
     : (cur === "b2"
-      ? `<button type="button" class="btn sm" data-nudge-to="b1">Bajar a B1</button>`
-      : `<button type="button" class="btn sm" data-nudge-to="a2">Probar A2</button>`);
+      ? `<button type="button" class="btn sm" data-nudge-to="b1">${esc(t("levelNudgeDownB1"))}</button>`
+      : `<button type="button" class="btn sm" data-nudge-to="a2">${esc(t("levelNudgeTryA2"))}</button>`);
   el.hidden = false;
   el.innerHTML = `
     <p>${esc(copy)}</p>
@@ -790,19 +790,8 @@ function situationPhrases() {
 }
 
 function situationLabels() {
-  const es = {
-    airport: "Aeropuerto", doctor: "Médico", workChat: "Trabajo", restaurant: "Restaurante",
-    hotel: "Hotel", bank: "Banco", grocery: "Super", apartment: "Depto", uber: "Uber/taxi",
-    pharmacy: "Farmacia", school: "Escuela", gym: "Gimnasio", dentist: "Dentista",
-    postoffice: "Correos", library: "Biblioteca", train: "Tren", coworking: "Coworking",
-    emergency: "Emergencia", landlord: "Arrendador", cinema: "Cine", vet: "Veterinario",
-    police: "Policía", dmv: "DMV", interview: "Entrevista", bus: "Autobús",
-  };
-  const en = ENLAB.ui?.en?.sitLabels || {};
-  if (uiLang() === "en") {
-    return Object.fromEntries(Object.keys(es).map((k) => [k, en[k] || es[k]]));
-  }
-  return es;
+  const keys = Object.keys(ENLAB.ui?.es?.sitLabels || {});
+  return Object.fromEntries(keys.map((k) => [k, t(`sitLabels.${k}`)]));
 }
 
 function renderSituationPhraseList(key) {
@@ -4015,7 +4004,7 @@ function openShadowBox() {
 function runShadowing() {
   const target = window._speakTarget?.target;
   if (!target) {
-    setRecStatus("Elige una frase primero.", "bad");
+    setRecStatus(t("shadowPickFirst"), "bad");
     return;
   }
   clearInterval(shadowTick);
@@ -4521,7 +4510,7 @@ function renderEmails() {
   if (!box) return;
   const items = (ENLAB.emailSpeak || []).filter((e) => (e.min || 1) <= lvlNum());
   if (!items.length) {
-    box.innerHTML = `<p class="muted">Disponible desde A2.</p>`;
+    box.innerHTML = `<p class="muted">${esc(t("a2Only"))}</p>`;
     return;
   }
   const done = new Set(JSON.parse(localStorage.getItem("enlab-email-done") || "[]"));
@@ -4555,7 +4544,7 @@ function renderInterviewSim() {
   if (!box) return;
   const items = (ENLAB.interviewSim || []).filter((x) => (x.min || 1) <= lvlNum());
   if (!items.length) {
-    box.innerHTML = `<p class="muted">${uiLang() === "en" ? "Available from B1." : "Disponible desde B1."}</p>`;
+    box.innerHTML = `<p class="muted">${esc(t("b1Only"))}</p>`;
     return;
   }
   box.innerHTML = items.map((it, i) => `

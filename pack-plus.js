@@ -36,7 +36,11 @@ ENLAB.placementItems = [
   { a: "dance", b: "dahnce", ipaA: "/dæns/", ipaB: "/dɑːns/", sayA: "dance", sayB: "dance", hint: "US /æ/ vs UK /ɑː/ en dance", min: 3 },
   { a: "can't", b: "cahnt", ipaA: "/kænt/", ipaB: "/kɑːnt/", sayA: "can't", sayB: "can't", hint: "US can't /æ/ vs UK /ɑː/", min: 3 },
   { a: "tomato", b: "tomahto", ipaA: "/təˈmeɪtoʊ/", ipaB: "/təˈmɑːtəʊ/", sayA: "tomato", sayB: "tomato", hint: "US /eɪ/ vs UK /ɑː/ en tomato", min: 3 },
-  { a: "schedule", b: "shedule", ipaA: "/ˈskedʒuːl/", ipaB: "/ˈʃedjuːl/", sayA: "schedule", sayB: "schedule", hint: "US /sk/ vs UK /ʃ/ en schedule", min: 3 }
+  { a: "schedule", b: "shedule", ipaA: "/ˈskedʒuːl/", ipaB: "/ˈʃedjuːl/", sayA: "schedule", sayB: "schedule", hint: "US /sk/ vs UK /ʃ/ en schedule", min: 3 },
+  { a: "bath", b: "bahth", ipaA: "/bæθ/", ipaB: "/bɑːθ/", sayA: "bath", sayB: "bath", hint: "US /æ/ vs UK /ɑː/ en bath", min: 3 },
+  { a: "either", b: "eyether", ipaA: "/ˈiðər/", ipaB: "/ˈaɪðə/", sayA: "either", sayB: "either", hint: "US /i/ vs UK /aɪ/ en either", min: 3 },
+  { a: "vitamin", b: "vittamin", ipaA: "/ˈvaɪtəmɪn/", ipaB: "/ˈvɪtəmɪn/", sayA: "vitamin", sayB: "vitamin", hint: "US /aɪ/ vs UK /ɪ/ en vitamin", min: 3 },
+  { a: "garage", b: "garridge", ipaA: "/ɡəˈrɑʒ/", ipaB: "/ˈɡærɑːʒ/", sayA: "garage", sayB: "garage", hint: "US final stress vs UK /ˈɡærɑːʒ/", min: 3 }
 );
 
 (ENLAB.roleplays = ENLAB.roleplays || []).push(
@@ -94,6 +98,50 @@ ENLAB.placementItems = [
       { a: "I can put you on the 9 p.m. or overnight.", b: "The 9 p.m. works if my bag moves with me.", bOpts: ["The 9 p.m. works if my bag moves with me.", "Overnight is fine. Please confirm a hotel.", "I'll take whatever gets me there today."] },
       { a: "Done. Here's your new boarding pass.", b: "Thank you. Which gate should I go to?", bOpts: ["Thank you. Which gate should I go to?", "Could you also send the change by email?", "Is the lounge still available with this ticket?"] },
     ],
+  },
+  {
+    id: "branch-restaurant-bill",
+    min: 2,
+    title: "La cuenta (ramas)",
+    es: "Camarero. Tú eliges cómo pedir la cuenta.",
+    turns: [
+      { a: "How was everything?", b: "Great, thanks. Could we get the check?", bOpts: ["Great, thanks. Could we get the check?", "The salmon was perfect. We'll take the bill.", "Good, but we waited a bit long for dessert."] },
+      { a: "Together or split?", b: "Split it two ways, please.", bOpts: ["Split it two ways, please.", "One bill is fine. I'll get it.", "Can you put the drinks on a separate check?"] },
+      { a: "Card or cash?", b: "Card, please. And could I have a receipt?", bOpts: ["Card, please. And could I have a receipt?", "Cash. Keep the change.", "Contactless if you take it."] },
+    ],
+  },
+  {
+    id: "branch-job-screen",
+    min: 3,
+    title: "Pantalla de empleo (ramas)",
+    es: "Recruiter. Tú eliges el tono de la entrevista corta.",
+    turns: [
+      { a: "Walk me through a recent win.", b: "I cut onboarding time by a week with a clearer checklist.", bOpts: ["I cut onboarding time by a week with a clearer checklist.", "I shipped a messy launch and owned the postmortem.", "I unblocked two teams by writing the API notes."] },
+      { a: "Why this role?", b: "I want to practice English in a real team, not just in class.", bOpts: ["I want to practice English in a real team, not just in class.", "The product is close to what I already ship.", "I'm ready for more client-facing work."] },
+      { a: "Any questions for me?", b: "What does a strong first ninety days look like?", bOpts: ["What does a strong first ninety days look like?", "How do you give feedback on writing?", "What's the mix of meetings versus deep work?"] },
+    ],
+  },
+  {
+    id: "branch-neighbor-noise",
+    min: 2,
+    title: "Vecino ruidoso (ramas)",
+    es: "Pasillo. Tú eliges cómo pedir silencio.",
+    turns: [
+      { a: "Hey — everything okay?", b: "Hi. The music is quite loud after ten. Could you turn it down?", bOpts: ["Hi. The music is quite loud after ten. Could you turn it down?", "Sorry to bother you. I have an early start tomorrow.", "Could we agree on quiet hours after ten?"] },
+      { a: "I didn't realize. Is it that late?", b: "It's half past ten. Headphones would help a lot.", bOpts: ["It's half past ten. Headphones would help a lot.", "Yeah — I start work at seven.", "No rush tonight, but weeknights are hard."] },
+      { a: "Got it. I'll keep it down.", b: "Thanks. I appreciate it.", bOpts: ["Thanks. I appreciate it.", "Thank you. Sleep well.", "Great. Knock if I'm ever too loud too."] },
+    ],
+  },
+  {
+    id: "branch-standup-blocker",
+    min: 3,
+    title: "Standup: bloqueo (ramas)",
+    es: "Daily. Tú eliges cómo reportar el bloqueo.",
+    turns: [
+      { a: "Any blockers?", b: "I'm blocked on the staging key. I pinged IT an hour ago.", bOpts: ["I'm blocked on the staging key. I pinged IT an hour ago.", "QA found a flake. I'm pairing with Ana after this.", "No blocker — I'll ship the draft by noon."] },
+      { a: "Need someone else?", b: "If IT doesn't reply by eleven, I'll need a backup env.", bOpts: ["If IT doesn't reply by eleven, I'll need a backup env.", "A fifteen-minute huddle with backend would unblock me.", "I can continue on docs until the key lands."] },
+      { a: "I'll follow up. Anything else?", b: "That's it. Thanks.", bOpts: ["That's it. Thanks.", "I'll post a note in the channel when I'm unblocked.", "Could you flag it in the standup notes?"] },
+    ],
   }
 );
 
@@ -105,7 +153,15 @@ ENLAB.placementItems = [
   { en: "The issue was flagged by QA, not invented by the client.", min: 4, es: "El problema lo marcó QA, no lo inventó el cliente." },
   { en: "Could you walk me through the numbers one more time?", min: 4, es: "¿Me explicas los números una vez más?" },
   { en: "If I were you, I'd push the deadline rather than ship half-done.", min: 4, es: "Yo en tu lugar movería la fecha en vez de enviar a medias." },
-  { en: "Please keep me in the loop if the scope starts to slip again.", min: 4, es: "Mantenme al tanto si el alcance vuelve a resbalar." }
+  { en: "Please keep me in the loop if the scope starts to slip again.", min: 4, es: "Mantenme al tanto si el alcance vuelve a resbalar." },
+  { en: "Were I in your position, I'd escalate before the client calls.", min: 4, es: "Yo en tu lugar escalaría antes de que llame el cliente." },
+  { en: "The numbers were double-checked, yet the total still doesn't add up.", min: 4, es: "Los números se verificaron dos veces y el total no cuadra." },
+  { en: "I'd sooner miss the party than ship a half-tested build.", min: 4, es: "Prefiero perderme la fiesta a enviar un build a medias." },
+  { en: "Not until legal signs off should we send that wording.", min: 4, es: "Hasta que legal no dé el OK no enviamos ese texto." },
+  { en: "She suggested that we postpone rather than rush the demo.", min: 4, es: "Sugirió posponer en vez de apresurar el demo." },
+  { en: "Little did we know the API had a hard rate limit.", min: 4, es: "Ni nos imaginábamos que la API tenía un límite duro." },
+  { en: "It's high time we wrote the runbook instead of relying on chat.", min: 4, es: "Ya es hora de escribir el runbook en vez de depender del chat." },
+  { en: "Should the vendor slip again, we'll need a fallback supplier.", min: 4, es: "Si el proveedor se retrasa otra vez, hará falta un plan B." }
 );
 
 (ENLAB.emailSpeak = ENLAB.emailSpeak || []).push(
@@ -166,6 +222,66 @@ ENLAB.placementItems = [
     qs: [
       { q: "¿Qué salió bien?", a: "Friday's demo", opts: ["the invoice", "Friday's demo", "the flight"] },
       { q: "¿Quién destacó?", a: "Jordan", opts: ["Jordan", "the client only", "HR"] },
+      { q: "¿Tono del email?", a: "informal", opts: ["formal", "informal", "legal"] },
+    ],
+  },
+  {
+    min: 3,
+    tone: "formal",
+    subject: "Request to reschedule Tuesday's review",
+    from: "You",
+    body: "Dear Ms. Patel,\n\nWould it be possible to move Tuesday's review to Wednesday afternoon? A client workshop overran and I will not have the deck ready. I can send a one-page summary tonight.\n\nKind regards,\nAlex Kim",
+    say: "Dear Ms. Patel. Would it be possible to move Tuesday's review to Wednesday afternoon? A client workshop overran and I will not have the deck ready. I can send a one-page summary tonight. Kind regards, Alex Kim.",
+    reply: "Wednesday at three works. Please send the summary tonight.",
+    es: "Pedir mover la review al miércoles. Resumen esta noche.",
+    qs: [
+      { q: "¿Qué piden mover?", a: "Tuesday's review", opts: ["Tuesday's review", "the flight", "payroll"] },
+      { q: "¿Qué envían esta noche?", a: "a one-page summary", opts: ["the full deck", "a one-page summary", "nothing"] },
+      { q: "¿Tono del email?", a: "formal", opts: ["informal", "formal", "chat"] },
+    ],
+  },
+  {
+    min: 3,
+    tone: "informal",
+    subject: "Docs are in the shared folder",
+    from: "You",
+    body: "Hey,\n\nDropped the Q3 notes in the shared folder. Nothing fancy — just the decisions from Friday. Yell if the link 404s.\n\nAlex",
+    say: "Hey. Dropped the Q three notes in the shared folder. Nothing fancy — just the decisions from Friday. Yell if the link four oh fours. Alex.",
+    reply: "Got them. Thanks!",
+    es: "Aviso informal: notas Q3 en la carpeta.",
+    qs: [
+      { q: "¿Qué subió?", a: "Q3 notes", opts: ["Q3 notes", "invoices", "passwords"] },
+      { q: "¿De qué reunión?", a: "Friday", opts: ["Monday", "Friday", "next month"] },
+      { q: "¿Tono del email?", a: "informal", opts: ["formal", "informal", "legal"] },
+    ],
+  },
+  {
+    min: 4,
+    tone: "formal",
+    subject: "Notice of planned maintenance — Sunday 02:00",
+    from: "Platform",
+    body: "Dear customer,\n\nWe will perform planned maintenance on Sunday from 02:00 to 04:00 UTC. The dashboard may be unavailable. No action is required on your side.\n\nYours faithfully,\nPlatform team",
+    say: "Dear customer. We will perform planned maintenance on Sunday from two a.m. to four a.m. UTC. The dashboard may be unavailable. No action is required on your side. Yours faithfully, Platform team.",
+    reply: "Thank you for the notice. We will warn our on-call.",
+    es: "Aviso formal de mantenimiento domingo 2:00 UTC.",
+    qs: [
+      { q: "¿Qué día?", a: "Sunday", opts: ["Friday", "Sunday", "Monday"] },
+      { q: "¿Qué puede fallar?", a: "the dashboard", opts: ["email only", "the dashboard", "payroll"] },
+      { q: "¿Tono del email?", a: "formal", opts: ["informal", "formal", "slack"] },
+    ],
+  },
+  {
+    min: 3,
+    tone: "informal",
+    subject: "Coffee after the retro?",
+    from: "You",
+    body: "Hey team,\n\nAnyone up for coffee after retro? My treat. I'll grab a table at the usual place around 4:30.\n\nAlex",
+    say: "Hey team. Anyone up for coffee after retro? My treat. I'll grab a table at the usual place around four thirty. Alex.",
+    reply: "I'm in. See you there.",
+    es: "Invitar a café informal después de la retro.",
+    qs: [
+      { q: "¿Cuándo?", a: "after retro", opts: ["before standup", "after retro", "Sunday"] },
+      { q: "¿Quién invita?", a: "Alex", opts: ["the client", "Alex", "HR"] },
       { q: "¿Tono del email?", a: "informal", opts: ["formal", "informal", "legal"] },
     ],
   }

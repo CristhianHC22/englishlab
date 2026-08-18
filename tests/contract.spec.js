@@ -20,6 +20,9 @@ test("pack counts, unique ids, placement bank", async ({ page }) => {
       "Could you walk me through the numbers one more time?",
       "If I were you, I'd push the deadline rather than ship half-done.",
       "Please keep me in the loop if the scope starts to slip again.",
+      "Were I in your position, I'd escalate before the client calls.",
+      "Little did we know the API had a hard rate limit.",
+      "It's high time we wrote the runbook instead of relying on chat.",
     ];
     return {
       podcasts: podcasts.length,
@@ -42,10 +45,10 @@ test("pack counts, unique ids, placement bank", async ({ page }) => {
   expect(snap.roleplays).toBeGreaterThanOrEqual(50);
   expect(snap.dictation).toBeGreaterThanOrEqual(100);
   expect(snap.dictB2).toBe(true);
-  expect(snap.emailTone).toBeGreaterThanOrEqual(8);
+  expect(snap.emailTone).toBeGreaterThanOrEqual(12);
   expect(snap.placement).toBeGreaterThanOrEqual(20);
-  expect(snap.pairs).toBeGreaterThanOrEqual(29);
-  expect(snap.branched).toBeGreaterThanOrEqual(5);
+  expect(snap.pairs).toBeGreaterThanOrEqual(33);
+  expect(snap.branched).toBeGreaterThanOrEqual(9);
   expect(snap.podAllHaveId).toBe(true);
   expect(snap.podUnique).toBe(true);
   expect(snap.roleAllHaveId).toBe(true);
@@ -80,12 +83,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v32 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v33 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v32/);
+  expect(sw).toMatch(/enlab-v33/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");

@@ -744,7 +744,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v32";
+  const SW_CACHE = "enlab-v33";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -829,7 +829,7 @@
         const blob = typeof recState !== "undefined" ? recState.lastBlob : null;
         if (!a || !el || !blob || !window.PRON?.compareAccent) return;
         el.hidden = false;
-        el.textContent = typeof t === "function" ? "Analizando…" : "Analizando…";
+        el.textContent = typeof t === "function" ? t("analyzing") : "Analizando…";
         window.PRON.analyzeFormants(blob).then((m) => {
           const cmp = window.PRON.compareAccent(m, a.us, a.uk);
           if (!cmp) { el.textContent = ""; el.hidden = true; return; }
@@ -848,7 +848,7 @@
       if (!p || !el) return;
       el.hidden = false;
       el.classList.remove("ok");
-      el.textContent = typeof t === "function" ? "Analizando formantes…" : "Analizando formantes…";
+      el.textContent = typeof t === "function" ? t("analyzingFormants") : "Analizando formantes…";
       const blob = typeof recState !== "undefined" ? recState.lastBlob : null;
       const finish = (r) => {
         el.textContent = formatPronScore(r);
