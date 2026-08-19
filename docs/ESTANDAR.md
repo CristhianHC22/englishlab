@@ -538,3 +538,9 @@ Avance v108:
 - **Aula pro**: imprimir hoja plan por alumno; filtro heatmap solo repinta tbody.
 - **PDF alumno**: incluye progreso plan 8 min.
 - Cache SW: `enlab-v86`.
+
+Avance v109:
+
+- **Guía kids**: hints de plan/repaso/cert excluidos; caché incluye modo niño y timer extra.
+- **Performance**: caché panel Rendimiento invalidada al cambiar fricción quiz.
+- Cache SW: `enlab-v87`.

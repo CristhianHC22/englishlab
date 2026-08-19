@@ -6938,6 +6938,7 @@ function applyKidsMode() {
   if (typeof renderOidoResume === "function") renderOidoResume();
   if (typeof renderDailyVerbs === "function") renderDailyVerbs();
   syncPrefsBadge();
+  invalidateYouAreChipsCache();
   if ($("#guide-panel") && !$("#guide-panel").hidden) fillGuide();
   fillYouAre();
 }
@@ -6981,9 +6982,9 @@ function guideEntry(place) {
 
 function guideExtraTimerLine() {
   try {
-    if (sessionStorage.getItem("enlab-hoy-extra-timer") === "1" && timerState().running) {
-      return t("guideHoyDoneExtraTimer");
-    }
+    if (sessionStorage.getItem("enlab-hoy-extra-timer") !== "1") return "";
+    if (remainingNow() <= 0) return "";
+    return t("guideHoyDoneExtraTimer");
   } catch { /* ignore */ }
   return "";
 }
@@ -6999,8 +7000,9 @@ function guideFillEntry() {
   const place = guidePlace();
   const full = guideEntry(place);
   if (!full) return full;
+  const kids = typeof kidsOn === "function" && kidsOn();
   let entry = full;
-  if (typeof kidsOn === "function" && kidsOn()) {
+  if (kids) {
     const lang = uiLang();
     const pack = ENLAB.ui?.[lang]?.guideKids || {};
     const es = ENLAB.ui?.es?.guideKids || {};
@@ -7019,17 +7021,7 @@ function guideFillEntry() {
       }
     }
   }
-  if (place === "hoyDone") {
-    const extra = guideExtraTimerLine();
-    if (extra) {
-      entry = {
-        ...entry,
-        w: entry.w ? `${entry.w} ${extra}` : extra,
-        s: [...(entry.s || []), extra],
-      };
-    }
-  }
-  if (repasoOn()) {
+  if (!kids && repasoOn()) {
     const rep = t("youAreRepaso");
     entry = {
       ...entry,
@@ -7037,7 +7029,7 @@ function guideFillEntry() {
       s: [rep, ...(entry.s || [])].slice(0, 4),
     };
   }
-  if (repasoCoachFilterOn()) {
+  if (!kids && repasoCoachFilterOn()) {
     const pending = coachPlanPendingModes();
     if (pending.length) {
       const totalMin = Math.round(repasoTimerSecs() / 60);
@@ -7051,7 +7043,7 @@ function guideFillEntry() {
       };
     }
   }
-  if (currentTab === "hoy" && repasoOn() && coachPlanStarted() && coachPlanLeft() > 0) {
+  if (!kids && currentTab === "hoy" && repasoOn() && coachPlanStarted() && coachPlanLeft() > 0) {
     const hint = t("guideRepasoPlanTimer", { min: Math.round(repasoTimerSecs() / 60) });
     entry = {
       ...entry,
@@ -7061,7 +7053,7 @@ function guideFillEntry() {
   }
   const hoyPanel = $("#hoy");
   const pathDone = currentTab === "hoy" && hoyPanel?.classList.contains("path-done");
-  if (pathDone && !coachPlanStarted() && coachPlanLeft() >= 3 && !placePlanNudgeOn()) {
+  if (!kids && pathDone && !coachPlanStarted() && coachPlanLeft() >= 3 && !placePlanNudgeOn()) {
     const hint = t("guideCoachPlanPending");
     entry = {
       ...entry,
@@ -7069,7 +7061,7 @@ function guideFillEntry() {
       s: [hint, ...(entry.s || [])].slice(0, 4),
     };
   }
-  if (document.querySelector("#class-task-banner")?.classList.contains("class-task-must")) {
+  if (!kids && document.querySelector("#class-task-banner")?.classList.contains("class-task-must")) {
     const hint = t("guideClassTaskMust");
     entry = {
       ...entry,
@@ -7077,7 +7069,7 @@ function guideFillEntry() {
       s: [hint, ...(entry.s || [])].slice(0, 4),
     };
   }
-  if (currentTab === "hoy" && !coachPlanStarted() && coachPlanLeft() > 0 && !placeNudgeDismissed()) {
+  if (!kids && currentTab === "hoy" && !coachPlanStarted() && coachPlanLeft() > 0 && !placeNudgeDismissed()) {
     const pr = loadPlaceResult();
     if (pr) {
       const pct = pr.score / pr.n;
@@ -7116,7 +7108,7 @@ function guideFillEntry() {
       };
     }
   }
-  if (pathDone && certTimedOutToday() && cierreMissGame() && !coachPlanStarted()) {
+  if (!kids && pathDone && certTimedOutToday() && cierreMissGame() && !coachPlanStarted()) {
     const miss = cierreMissGame();
     const hint = t("guideCertWarmup", { mode: t(`quizModes.${miss.game}.t`) });
     entry = {
@@ -7125,8 +7117,8 @@ function guideFillEntry() {
       s: [hint, ...(entry.s || [])].slice(0, 4),
     };
   }
-  if (place === "quiz-exams" || (currentTab === "quiz" && $("#quiz")?.classList.contains("lab-in")
-    && document.querySelector("#quiz .lab-topic.on")?.dataset?.lab === "quiz-exams")) {
+  if (!kids && (place === "quiz-exams" || (currentTab === "quiz" && $("#quiz")?.classList.contains("lab-in")
+    && document.querySelector("#quiz .lab-topic.on")?.dataset?.lab === "quiz-exams"))) {
     let hint = "";
     if (placePlanNudgeOn()) {
       const pr = loadPlaceResult();
@@ -7149,6 +7141,19 @@ function guideFillEntry() {
         s: [hint, ...(entry.s || [])].slice(0, 4),
       };
     }
+  }
+  if (place === "hoyDone") {
+    const extra = guideExtraTimerLine();
+    if (extra) {
+      entry = {
+        ...entry,
+        w: entry.w ? `${entry.w} ${extra}` : extra,
+        s: [...(entry.s || []), extra],
+      };
+    }
+  }
+  if (kids) {
+    entry.s = (entry.s || []).slice(0, 2);
   }
   return entry;
 }
@@ -7293,10 +7298,16 @@ let _lastGuideKeysKey = "";
 function guideFillEntryCached() {
   const hoy = $("#hoy");
   const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const extraTimer = sessionStorage.getItem("enlab-hoy-extra-timer") === "1";
   const key = [
     currentTab,
     guidePlace(),
     pathDone,
+    kids ? "1" : "0",
+    extraTimer ? "1" : "0",
+    timerState().running ? "1" : "0",
+    Math.ceil(remainingNow()),
     repasoOn(),
     coachPlanProgress(),
     coachPlanFlowOn(),

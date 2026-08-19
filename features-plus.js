@@ -783,7 +783,10 @@
     const planDone = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
     const planTotal = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
     const planLeft = typeof coachPlanLeft === "function" ? coachPlanLeft() : 0;
-    const hintKey = `${window.ENLAB_LOADER?.DEFERRED?.length || 0}|${planDone}|${planLeft}|${uiLang?.() || "es"}`;
+    let ux = {};
+    try { ux = typeof loadQuizUx === "function" ? loadQuizUx() : JSON.parse(localStorage.getItem("enlab-quiz-ux") || "{}") || {}; } catch { ux = {}; }
+    const uxKey = Object.keys(ux).sort().map((k) => `${k}:${Number(ux[k]?.sessions || 0)}:${Number(ux[k]?.abandoned || 0)}`).join("|");
+    const hintKey = `${window.ENLAB_LOADER?.DEFERRED?.length || 0}|${planDone}|${planLeft}|${uiLang?.() || "es"}|${uxKey}`;
     if (hintKey === window._perfHintKey && host.innerHTML) return;
     window._perfHintKey = hintKey;
     const n = window.ENLAB_LOADER?.DEFERRED?.length || 0;
@@ -807,8 +810,6 @@
         : tt("perfPlanProgress", { done: planDone, total: planTotal, left: planLeft });
       lines.push(`<p class="muted perf-plan-row">${esc(planLabel)}</p>`);
     }
-    let ux = {};
-    try { ux = typeof loadQuizUx === "function" ? loadQuizUx() : JSON.parse(localStorage.getItem("enlab-quiz-ux") || "{}") || {}; } catch { ux = {}; }
     const topDrop = typeof topQuizFriction === "function"
       ? topQuizFriction(3)
       : Object.entries(ux)
