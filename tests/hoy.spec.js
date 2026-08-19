@@ -1,9 +1,10 @@
 const { test, expect } = require("@playwright/test");
-const { boot } = require("./helpers/boot");
+const { boot, openHoyExtras } = require("./helpers/boot");
 
 test("Hoy: path, situations, class task, offline badge", async ({ page }) => {
   await boot(page);
   await expect(page.locator("#hoy-path")).toBeVisible();
+  await openHoyExtras(page);
   await expect(page.locator("#situations-panel")).toBeVisible();
   await expect(page.locator("#offline-badge")).toBeVisible();
   await page.locator(".hoy-next").first().click();

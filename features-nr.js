@@ -228,10 +228,12 @@
     const on = travelOn();
     document.body.classList.toggle("travel-mode", on);
     if (toggle) setPressed(toggle, on);
+    if (typeof syncPrefsBadge === "function") syncPrefsBadge();
     if (!mapEl) return;
     const map = travelMapToday();
     if (!map) { mapEl.hidden = true; return; }
-    mapEl.hidden = false;
+    mapEl.hidden = !on;
+    if (!on) return;
     const key = typeof todayKey === "function" ? todayKey() : "";
     let done = [];
     try { done = (JSON.parse(localStorage.getItem("enlab-travel-done") || "{}")[key]) || []; } catch { done = []; }
@@ -347,6 +349,7 @@
     }));
     window.quiz = { i: 0, score: 0, items, fails: [], mode: "listen", host: "#quiz-box" };
     if (typeof showTab === "function") showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("listen");
     if (typeof renderQuiz === "function") renderQuiz();
     document.querySelector("#quiz-box")?.scrollIntoView({ behavior: "smooth" });
   }
@@ -470,6 +473,7 @@
       host: "#quiz-box",
     };
     showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("listen");
     renderQuiz();
     quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -657,6 +661,7 @@
     if (typeof recState !== "undefined" && recState.rec?.state === "recording") stopRecording(false);
     quiz = { i: 0, score: 0, items: makeCertExamItems(), fails: [], mode: "cert", host: "#quiz-box" };
     showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("cert");
     const bar = document.querySelector("#cert-timer-bar");
     if (bar) bar.hidden = false;
     startCertTimer();
@@ -849,7 +854,8 @@
       if (e.target.closest("#cert-start-btn")) startCertExam();
       if (e.target.closest("[data-hoy-game='podcast']")) {
         showTab("vocales");
-        document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth" });
+        if (typeof openOidoTopic === "function") openOidoTopic("oido-podcasts");
+        else document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest("[data-hoy-game='travel']")) {
         if (!travelOn()) toggleTravel();
@@ -857,6 +863,7 @@
       }
       if (e.target.closest("[data-hoy-game='chat']")) {
         showTab("hablar");
+        if (typeof openLabRoom === "function") openLabRoom("chat-work-card");
         document.querySelector("#chat-work-card")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest("[data-hoy-game='cert']")) startCertExam();

@@ -1,6 +1,6 @@
 # Arquitectura y memoria del Lab
 
-Este archivo es la memoria del proyecto: **qué se construyó, por qué, y qué no hay que deshacer**. Complementa [AGENTS.md](../AGENTS.md).
+Este archivo es la memoria del proyecto: **qué se construyó, por qué, y qué no hay que deshacer**. Complementa [AGENTS.md](../AGENTS.md). Cómo se organizan las **pantallas** (6 pestañas, hub → sala, Guía) está en [ESTANDAR.md](ESTANDAR.md).
 
 English Lab es una PWA de una sola página. No hay build: el navegador carga scripts en orden. El “framework” es `app.js` + módulos que cuelgan de `window`.
 
@@ -89,12 +89,14 @@ No hay usuario en la nube. Aula pro = PIN local + roster + QR de transfer.
 5. **Panel “Rendimiento”** — cuenta packs diferidos, KB de JS y cuántos vinieron de cache; no es Lighthouse.
 6. **Tarea de clase** — se **resalta** al abrir Hoy, no se auto-lanza (evita romper tests y secuestrar la sesión).
 7. **Fuentes** — stack del sistema (`Segoe UI` / `Trebuchet` / `system-ui`). Sin Google Fonts. SW: navegación red-primero, fallback `index.html` → `offline.html`. El job visual de CI usa la imagen jammy de Playwright.
+8. **Marco de pantallas** — Oír/Juego/Hablar/Ayuda usan el mismo `.lab-hub` / `openLabRoom`. No reintroducir `.oido-card` ni un `openFooTopic` por superficie. Guía ≠ pestaña Ayuda. Detalle: [ESTANDAR.md](ESTANDAR.md).
 
 ## Cómo añadir algo nuevo
 
 1. ¿Es **contenido** (frases, podcasts, role-plays)? → `pack-*.js` diferido, empujar a `ENLAB.*`.
 2. ¿Es **UI que puede esperar** al primer frame? → `features-*.js` + `bootstrap`.
 3. ¿Es **camino / quiz / rec / SRS**? → `app.js` nativo + i18n ES/EN + test.
-4. ¿Cambia el layout de una pestaña? → snapshots visuales win + linux.
-5. ¿Cambia un JS cacheado? → bump `enlab-vNN`.
-6. Mantén la auditoría en 26 filas o actualiza **también** los tests de recuento (solo si el producto gana una fila de verdad).
+4. ¿Es un **panel más en una pestaña**? → [ESTANDAR.md](ESTANDAR.md): `.lab-topic[data-lab]` + ítem de hub + `guide["id"]` ES/EN. No 7.ª pestaña. Tests con `openLabRoom`.
+5. ¿Cambia el layout de una pestaña? → snapshots visuales win + linux.
+6. ¿Cambia un JS cacheado? → bump `enlab-vNN`.
+7. Mantén la auditoría en 26 filas o actualiza **también** los tests de recuento (solo si el producto gana una fila de verdad).

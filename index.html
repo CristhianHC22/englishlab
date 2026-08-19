@@ -32,13 +32,21 @@
   </div>
   <div class="wrap">
     <header class="hero">
-      <div>
-        <div class="kicker" data-i18n="heroKicker">English Lab · de A1 a B2</div>
-        <h1>English Lab</h1>
+      <div class="hero-top">
+        <div>
+          <div class="kicker" data-i18n="heroKicker">English Lab · de A1 a B2</div>
+          <h1>English Lab</h1>
+        </div>
+        <div class="hero-tools">
+          <button type="button" class="chip" id="guide-toggle" aria-expanded="false" aria-controls="guide-panel" data-i18n="guideBtn">Guía</button>
+          <button type="button" class="chip" id="prefs-toggle" aria-expanded="false" aria-controls="prefs-panel" data-i18n="prefs">Ajustes</button>
+        </div>
+      </div>
+      <div class="level-bar" role="group" aria-label="Nivel" id="level-bar" data-i18n-aria="levelAria"></div>
+      <p class="muted hero-blurb" id="level-blurb"></p>
+      <div id="level-nudge" class="level-nudge" hidden></div>
+      <div id="prefs-panel" class="prefs-panel" hidden>
         <p class="lede" id="level-lede" data-i18n="heroLede">Pulsa las palabras para oírlas. 15 minutos al día. Empieza en fácil (A1) y sube cuando ya no te trabe.</p>
-        <div class="level-bar" role="group" aria-label="Nivel" id="level-bar" data-i18n-aria="levelAria"></div>
-        <p class="muted" id="level-blurb"></p>
-        <div id="level-nudge" class="level-nudge" hidden></div>
         <div class="hero-controls">
           <div class="ctrl-group" role="group" aria-label="Velocidad de la voz" data-i18n-aria="voiceLabel">
             <span class="ctrl-label" data-i18n="voiceLabel">Voz:</span>
@@ -59,8 +67,8 @@
             <button type="button" class="chip" data-pwa-install hidden data-i18n="installApp">Instalar app</button>
           </div>
         </div>
-        <p id="kids-banner" class="kids-banner" hidden data-i18n="kidsBanner">Modo niño activo: letra más grande, voz lenta y menos paneles.</p>
       </div>
+      <p id="kids-banner" class="kids-banner" hidden data-i18n="kidsBanner">Modo niño activo: letra más grande, voz lenta y menos paneles.</p>
     </header>
 
     <nav class="tabs" aria-label="Secciones" data-i18n-aria="navAria">
@@ -72,19 +80,35 @@
       <button data-tab="ia">Ayuda</button>
     </nav>
 
+    <aside id="guide-panel" class="guide-panel" hidden>
+      <div class="guide-panel-head">
+        <p class="kicker" data-i18n="guideKicker">Para qué sirve</p>
+        <button type="button" class="chip sm" id="guide-gotit" data-i18n="guideGotIt">Entendido</button>
+      </div>
+      <h2 id="guide-title"></h2>
+      <p class="muted" id="guide-why"></p>
+      <ol id="guide-steps"></ol>
+      <div id="guide-map" class="guide-map" hidden></div>
+    </aside>
+
     <section id="hoy" class="panel active">
-      <div class="card" style="margin-bottom:14px">
-        <p class="kicker" data-i18n="hoyMission">Misión del día</p>
-        <h2 data-i18n="hoyTitle">15 minutos de oído</h2>
-        <p class="muted" id="home-stats"></p>
-        <p id="day-theme"></p>
-        <div id="travel-map" class="card travel-map" hidden></div>
-        <div id="situations-panel" class="card situations-panel" hidden></div>
-        <div id="podcast-today" class="card" hidden></div>
+      <div class="card hoy-mission">
+        <div class="hoy-mission-head">
+          <div>
+            <p class="kicker" data-i18n="hoyMission">Misión del día</p>
+            <h2 data-i18n="hoyTitle">15 minutos de oído</h2>
+            <p class="muted" id="home-stats"></p>
+            <p id="day-theme"></p>
+          </div>
+          <div class="timer-box">
+            <div id="hoy-clock">15:00</div>
+            <button type="button" class="btn" id="hoy-timer-btn" data-i18n="hoyTimerStart">Empezar 15 min</button>
+          </div>
+        </div>
         <div id="class-task-banner" class="class-task-banner" hidden></div>
         <div id="hoy-story-chip" class="hoy-story-chip" hidden></div>
+        <div id="travel-map" class="card travel-map" hidden></div>
         <div id="hoy-game" class="hoy-game" hidden></div>
-        <p class="muted" id="hoy-hint" data-i18n="hoyHint">La rutina cambia con el nivel.</p>
         <div id="hoy-path" class="hoy-path">
           <p id="hoy-path-copy" class="muted" data-i18n="hoyPathCopy">Un botón te lleva por la sesión en orden.</p>
           <div class="row hoy-path-actions">
@@ -94,20 +118,19 @@
             <button type="button" class="btn ghost sm" id="repaso-exit" hidden data-i18n="repasoExit">Salir de repaso</button>
           </div>
         </div>
-        <div id="hoy-streak-chart" class="streak-chart" hidden></div>
+        <div id="hoy-check"></div>
+        <div id="week-strip" class="week-strip"></div>
         <div id="week-report" class="week-report" hidden></div>
         <div id="due-today" class="due-today" hidden></div>
-        <div id="week-strip" class="week-strip"></div>
-        <div class="session-head">
-          <div>
-            <p class="muted" style="margin:12px 0 6px" data-i18n="hoySessionNote">Se marca solo, en el orden del camino: oír pares, oír verbos, grabar el diálogo, 3 preguntas.</p>
-            <div id="hoy-check"></div>
-          </div>
-          <div class="timer-box">
-            <div id="hoy-clock">15:00</div>
-            <button type="button" class="btn" id="hoy-timer-btn" data-i18n="hoyTimerStart">Empezar 15 min</button>
-          </div>
-        </div>
+        <div id="hoy-review" class="hoy-review" hidden></div>
+      </div>
+      <details class="fold hoy-extras" id="hoy-extras">
+        <summary data-i18n="hoyExtras">Más para hoy</summary>
+        <p class="muted" id="hoy-hint" data-i18n="hoyHint">La rutina cambia con el nivel.</p>
+        <p class="muted" data-i18n="hoySessionNote">Se marca solo, en el orden del camino: oír pares, oír verbos, grabar el diálogo, 3 preguntas.</p>
+        <div id="situations-panel" class="card situations-panel" hidden></div>
+        <div id="podcast-today" class="card" hidden></div>
+        <div id="hoy-streak-chart" class="streak-chart" hidden></div>
         <div class="remind-box">
           <label class="remind-label"><span data-i18n="remindLabel">Avisarme a</span>
             <input id="remind-time" type="time" value="18:00" />
@@ -118,7 +141,6 @@
           <p class="muted" id="remind-status" data-i18n="remindStatus">Elige una hora. Chrome avisa en este aparato; no hay servidor. La pestaña (o la app) tiene que seguir abierta.</p>
         </div>
         <p class="muted keys-hint" data-i18n="keysHintHoy">Teclado en Hoy: espacio oye el siguiente par. 1–5 saltan al paso del camino. En las 3 preguntas, 1 2 3 eligen.</p>
-        <div id="hoy-review" class="hoy-review" hidden></div>
         <details class="fold" id="transfer-box">
           <summary data-i18n="transfer">Código para otro PC</summary>
           <p class="muted" data-i18n="transferHint">Copia el código o escanea el QR. Pégalo en Importar en el otro aparato.</p>
@@ -161,11 +183,9 @@
           </div>
           <p class="muted" data-i18n="backupHint">Se guarda en este navegador, en este aparato. Exportar sirve si cambias de computadora.</p>
         </details>
-      </div>
-      <div id="daily-tip" class="card lesson" style="margin-bottom:16px" hidden></div>
-
-      <details class="card lesson" style="margin-bottom:16px">
-        <summary data-i18n="weakStrongTitle">Qué significan débil y fuerte</summary>
+        <div id="daily-tip" class="card lesson" hidden></div>
+        <details class="fold" id="weak-strong-box">
+          <summary data-i18n="weakStrongTitle">Qué significan débil y fuerte</summary>
         <p>No hay verbos “débiles” o “fuertes” en la gramática inglesa. <strong>Tú</strong> marcas cómo se te dan:</p>
         <div class="mini-table">
           <div>
@@ -193,6 +213,7 @@
             <div class="muted">Eso es <em>otra cosa</em>: en inglés las palabritas <em>to, of, can, the</em> se pronuncian flojas. No tiene que ver con el botón <em>Débil</em> de los verbos.</div>
           </div>
         </div>
+        </details>
       </details>
       <article class="step-card" id="hoy-step-1">
         <div class="step-head">
@@ -258,84 +279,112 @@
     </section>
 
     <section id="vocales" class="panel">
-      <div class="card">
+      <div class="card lab-keep">
         <h2 data-i18n="oidoTitle">Oír: por qué cambia cada vocal</h2>
-        <p data-i18n="oidoIntro">Pulsa para oír. Empieza por las reglas. El mapa y los tips están más abajo. Meta: B1.</p>
+        <p data-i18n="oidoIntro">Elige un tema. Pulsa para oír. Empieza por las reglas.</p>
         <p>
           <button type="button" class="btn" id="start-ear-from-oido" data-i18n="oidoPlayEar">Jugar: ¿cap o cape?</button>
           <button type="button" class="btn ghost" data-start-quiz="ed" data-i18n="oidoPlayEd">Jugar: liked / played / wanted</button>
         </p>
-        <nav class="oido-toc" id="oido-toc" aria-label="En esta página" data-i18n-aria="oidoTocAria"></nav>
       </div>
-      <div id="vowel-intro"></div>
-      <h3 id="oido-decidir" data-i18n="oidoDecidir">Cómo decidir</h3>
-      <div id="vowel-decide" class="grid"></div>
-      <h3 id="oido-reglas" data-i18n="oidoReglas">Las reglas, con audio</h3>
-      <div id="vowel-rules" class="oido-slot"></div>
-      <h3 id="oido-clave" data-i18n="oidoClave">Clave de la transcripción</h3>
-      <div id="vowel-key" class="card oido-slot"></div>
-      <h3 id="oido-mapa" data-i18n="oidoMapa">Mapa por letra (clic = escuchar)</h3>
-      <div id="vowel-maps" class="grid grid-2 oido-slot"></div>
-      <h3 id="oido-contrastes" data-i18n="oidoContrastes">Contrastes</h3>
-      <div id="vowel-pairs" class="grid grid-3 oido-slot"></div>
-      <h3 id="oido-trampas" data-i18n="oidoTrampas">Trampas de hispanohablante</h3>
-      <div id="vowel-traps" class="grid grid-2 oido-slot"></div>
-      <div id="block-roles">
-        <h3 id="oido-roles" data-i18n="oidoRoles">Misma palabra: verbo, sustantivo o adjetivo</h3>
-        <p class="muted" data-i18n="oidoRolesHint">Se escribe igual, pero el trabajo en la frase cambia. Oye la oración completa.</p>
-        <div id="roles-list" class="oido-slot"></div>
+      <nav class="lab-hub" id="oido-toc" aria-label="Temas de Oír" data-i18n-aria="oidoTocAria"></nav>
+      <div id="oido-room-bar" class="lab-room-bar">
+        <button type="button" class="chip lab-back" id="oido-back" data-i18n="oidoBack">Todos los temas</button>
+        <h3 id="oido-room-title" class="lab-room-title"></h3>
       </div>
-      <div id="block-b1-stress" hidden>
-      <h3 id="oido-acento" data-i18n="oidoAcento">Acento tónico de palabra</h3>
-      <p class="muted" data-i18n="oidoAcentoHint">Oye la oración. gente real = YouGlish.</p>
-      <div id="stress-list" class="grid grid-2 oido-slot"></div>
-      </div>
-      <div id="block-b1-ough">
-      <h3 id="oido-ough" data-i18n="oidoOugh">ough — misma escritura, muchos sonidos</h3>
-      <div id="ough-list" class="row oido-slot" style="gap:8px;flex-wrap:wrap"></div>
-      </div>
-      <div id="block-a2-extra">
-      <h3 id="oido-mudas" data-i18n="oidoMudas">Letras y sílabas que no se dicen</h3>
-      <p class="muted" data-i18n="oidoMudasHint">sometimes → sám-taimz. Abajo: E muda, sílabas que se comen, letras mudas.</p>
-      <div id="silent-list" class="oido-slot"></div>
-      <h3 id="oido-contra" data-i18n="oidoContra">Contracciones</h3>
-      <div id="contraction-list" class="grid grid-3 oido-slot"></div>
-      </div>
-      <div id="block-endings">
-        <h3 id="oido-endings" data-i18n="oidoEndings">Terminaciones, C/G y el golpe</h3>
-        <p class="muted" data-i18n="oidoEndingsHint">-tion no es ción. El -ed de liked / played / wanted está en Juego.</p>
-        <p><button type="button" class="btn" id="start-ed-from-oido" data-i18n="oidoPlayEd2">Jugar: liked, played, wanted</button></p>
-        <div id="endings-list" class="oido-slot"></div>
-      </div>
-      <div id="block-rhythm">
-        <h3 id="oido-ritmo" data-i18n="oidoRitmo">Ritmo y habla conectada</h3>
-        <div id="rhythm-list" class="oido-slot"></div>
-      </div>
-      <div id="block-chunks">
-      <h3 id="oido-chunks" data-i18n="oidoChunks">Calcos y pares de uso</h3>
-      <p class="muted" data-i18n="oidoChunksHint">Esto no es fonética: calcos del español. Pulsa para oír la versión buena.</p>
-      <p><button type="button" class="btn" id="start-uso-from-oido" data-i18n="oidoPlayUso">Jugar: make/do y Did you…?</button></p>
-      <div id="chunks-list" class="oido-slot"></div>
-      </div>
-      <div id="block-b-tips">
-        <h3 id="oido-tips" data-i18n="oidoTips">Tips B1 / B2 — lo que suele faltar</h3>
-        <p class="muted" data-i18n="oidoTipsHint">Lo que más delata a un hispanohablante. Pulsa para oír.</p>
-        <div id="tips-list" class="oido-slot"></div>
-      </div>
-      <div id="podcast-block" class="card" style="margin-top:16px">
-        <h3 id="oido-podcasts" data-i18n="podcast">Mini-podcasts (~60 s)</h3>
-        <p class="muted" data-i18n="podcastHint">Transcripción segmentada. Oyes frase a frase — ideal para shadowing.</p>
-        <div id="podcast-list" class="grid grid-2"></div>
-        <div id="podcast-player" hidden></div>
-      </div>
-      <div id="pron-panel" class="card" style="margin-top:16px"></div>
-      <div id="stories-panel" class="card" style="margin-top:16px"></div>
+      <article class="lab-topic" data-lab="oido-decidir" data-paint="intro,decidir">
+        <div id="vowel-intro"></div>
+        <h3 id="oido-decidir" data-i18n="oidoDecidir">Cómo decidir</h3>
+        <div id="vowel-decide" class="grid"></div>
+      </article>
+      <article class="lab-topic" data-lab="oido-reglas" data-paint="reglas">
+        <h3 id="oido-reglas" data-i18n="oidoReglas">Las reglas, con audio</h3>
+        <div id="vowel-rules" class="oido-slot"></div>
+      </article>
+      <article class="lab-topic" data-lab="oido-mapa" data-paint="clave,mapa">
+        <h3 id="oido-clave" data-i18n="oidoClave">Clave de la transcripción</h3>
+        <div id="vowel-key" class="card oido-slot"></div>
+        <h3 id="oido-mapa" data-i18n="oidoMapa">Mapa por letra (clic = escuchar)</h3>
+        <div id="vowel-maps" class="grid grid-2 oido-slot"></div>
+      </article>
+      <article class="lab-topic" data-lab="oido-contrastes" data-paint="contrastes,trampas">
+        <h3 id="oido-contrastes" data-i18n="oidoContrastes">Contrastes</h3>
+        <div id="vowel-pairs" class="grid grid-3 oido-slot"></div>
+        <h3 id="oido-trampas" data-i18n="oidoTrampas">Trampas de hispanohablante</h3>
+        <div id="vowel-traps" class="grid grid-2 oido-slot"></div>
+      </article>
+      <article class="lab-topic" data-lab="oido-roles" data-paint="roles,stress,ough">
+        <div id="block-roles">
+          <h3 id="oido-roles" data-i18n="oidoRoles">Misma palabra: verbo, sustantivo o adjetivo</h3>
+          <p class="muted" data-i18n="oidoRolesHint">Se escribe igual, pero el trabajo en la frase cambia. Oye la oración completa.</p>
+          <div id="roles-list" class="oido-slot"></div>
+        </div>
+        <div id="block-b1-stress" hidden>
+          <h3 id="oido-acento" data-i18n="oidoAcento">Acento tónico de palabra</h3>
+          <p class="muted" data-i18n="oidoAcentoHint">Oye la oración. gente real = YouGlish.</p>
+          <div id="stress-list" class="grid grid-2 oido-slot"></div>
+        </div>
+        <div id="block-b1-ough">
+          <h3 id="oido-ough" data-i18n="oidoOugh">ough — misma escritura, muchos sonidos</h3>
+          <div id="ough-list" class="row oido-slot" style="gap:8px;flex-wrap:wrap"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="oido-mudas" data-paint="silent,contra,endings">
+        <div id="block-a2-extra">
+          <h3 id="oido-mudas" data-i18n="oidoMudas">Letras y sílabas que no se dicen</h3>
+          <p class="muted" data-i18n="oidoMudasHint">sometimes → sám-taimz. Abajo: E muda, sílabas que se comen, letras mudas.</p>
+          <div id="silent-list" class="oido-slot"></div>
+          <h3 id="oido-contra" data-i18n="oidoContra">Contracciones</h3>
+          <div id="contraction-list" class="grid grid-3 oido-slot"></div>
+        </div>
+        <div id="block-endings">
+          <h3 id="oido-endings" data-i18n="oidoEndings">Terminaciones, C/G y el golpe</h3>
+          <p class="muted" data-i18n="oidoEndingsHint">-tion no es ción. El -ed de liked / played / wanted está en Juego.</p>
+          <p><button type="button" class="btn" id="start-ed-from-oido" data-i18n="oidoPlayEd2">Jugar: liked, played, wanted</button></p>
+          <div id="endings-list" class="oido-slot"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="oido-ritmo" data-paint="rhythm">
+        <div id="block-rhythm">
+          <h3 id="oido-ritmo" data-i18n="oidoRitmo">Ritmo y habla conectada</h3>
+          <div id="rhythm-list" class="oido-slot"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="oido-chunks" data-paint="chunks">
+        <div id="block-chunks">
+          <h3 id="oido-chunks" data-i18n="oidoChunks">Calcos y pares de uso</h3>
+          <p class="muted" data-i18n="oidoChunksHint">Esto no es fonética: calcos del español. Pulsa para oír la versión buena.</p>
+          <p><button type="button" class="btn" id="start-uso-from-oido" data-i18n="oidoPlayUso">Jugar: make/do y Did you…?</button></p>
+          <div id="chunks-list" class="oido-slot"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="oido-tips" data-paint="tips">
+        <div id="block-b-tips">
+          <h3 id="oido-tips" data-i18n="oidoTips">Tips B1 / B2 — lo que suele faltar</h3>
+          <p class="muted" data-i18n="oidoTipsHint">Lo que más delata a un hispanohablante. Pulsa para oír.</p>
+          <div id="tips-list" class="oido-slot"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="oido-podcasts">
+        <div id="podcast-block" class="card">
+          <h3 id="oido-podcasts" data-i18n="podcast">Mini-podcasts (~60 s)</h3>
+          <p class="muted" data-i18n="podcastHint">Transcripción segmentada. Oyes frase a frase — ideal para shadowing.</p>
+          <div id="podcast-list" class="grid grid-2"></div>
+          <div id="podcast-player" hidden></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="pron-panel">
+        <div id="pron-panel" class="card"></div>
+      </article>
+      <article class="lab-topic" data-lab="stories-panel">
+        <div id="stories-panel" class="card"></div>
+      </article>
     </section>
 
     <section id="verbos" class="panel">
       <div class="card">
         <h2 data-i18n="verbosTitle">Verbos</h2>
-        <p class="muted" data-i18n="verbosHint">A1: 15 esenciales + regulares. A2: vida diaria. B1: 40 frecuentes. B2: los 193. I + pasado = ayer; I have… = experiencia.</p>
+        <p class="muted" data-i18n="verbosHint">Busca. Débil = se te traba. I + pasado = ayer; I have… = experiencia.</p>
         <input id="verb-search" type="search" data-i18n-placeholder="verbSearchPh" placeholder="Busca: go, ir, thought, escribir, I have…" />
         <div id="verb-filters" class="row" style="margin-top:10px"></div>
         <p class="muted" id="verb-count"></p>
@@ -345,10 +394,17 @@
     </section>
 
     <section id="quiz" class="panel">
-      <div class="card">
+      <div class="card lab-hub-head">
         <h2 data-i18n="quizTitle">Elige un juego</h2>
-        <p class="muted" data-i18n="quizHint">Al terminar un round se marca en Hoy. Teclas 1/2 en oído; espacio = oír otra vez.</p>
-        <label class="muted" id="quiz-starter-label"><input type="checkbox" id="quiz-starter" checked> <span data-i18n="quizStarter">Solo verbos de mi nivel</span></label>
+        <p class="muted" data-i18n="quizHint">Elige un grupo. Un round cuenta en Hoy. Teclas 1/2 en oído; espacio = oír otra vez.</p>
+      </div>
+      <nav class="lab-hub" id="quiz-hub" aria-label="Tipos de juego" data-i18n-aria="labQuizAria"></nav>
+      <div class="lab-room-bar">
+        <button type="button" class="chip lab-back" data-i18n="labBackQuiz">Todos los juegos</button>
+        <h3 class="lab-room-title"></h3>
+      </div>
+      <article class="lab-topic" data-lab="quiz-verbs">
+        <h3 data-i18n="quizGroupVerbs">Verbos</h3>
         <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
           <button type="button" class="mode-pick on" data-quiz-mode="choice">
             <strong>Verbos</strong>
@@ -358,14 +414,15 @@
             <strong>Escribir</strong>
             <span>Tú pones el pasado</span>
           </button>
-          <button type="button" class="mode-pick" data-quiz-mode="uso">
-            <strong>Uso</strong>
-            <span>Calcos, make/do, Did you…?</span>
-          </button>
           <button type="button" class="mode-pick" data-quiz-mode="ed">
             <strong>-ed</strong>
             <span>liked [t] / played [d] / wanted [id]</span>
           </button>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="quiz-ear">
+        <h3 data-i18n="quizGroupEar">Oído</h3>
+        <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
           <button type="button" class="mode-pick" data-quiz-mode="ear">
             <strong>Oído</strong>
             <span>¿Qué palabra oíste?</span>
@@ -373,6 +430,23 @@
           <button type="button" class="mode-pick" data-quiz-mode="exam">
             <strong>Examen</strong>
             <span>Oyes primero. Luego ves las dos.</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="dict">
+            <strong>Dictado</strong>
+            <span>Oyes y escribes</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="listen">
+            <strong>Escucha</strong>
+            <span>Un párrafo y 3 preguntas</span>
+          </button>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="quiz-uso">
+        <h3 data-i18n="quizGroupUso">Uso</h3>
+        <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
+          <button type="button" class="mode-pick" data-quiz-mode="uso">
+            <strong>Uso</strong>
+            <span>Calcos, make/do, Did you…?</span>
           </button>
           <button type="button" class="mode-pick" data-quiz-mode="art">
             <strong>a / an / the</strong>
@@ -390,14 +464,6 @@
             <strong>If / said</strong>
             <span>Condicionales y reported</span>
           </button>
-          <button type="button" class="mode-pick" data-quiz-mode="dict">
-            <strong>Dictado</strong>
-            <span>Oyes y escribes</span>
-          </button>
-          <button type="button" class="mode-pick" data-quiz-mode="listen">
-            <strong>Escucha</strong>
-            <span>Un párrafo y 3 preguntas</span>
-          </button>
           <button type="button" class="mode-pick" data-quiz-mode="emailtone">
             <strong data-i18n="quizModes.emailtone.t">Email tono</strong>
             <span data-i18n="quizModes.emailtone.s">Formal vs informal</span>
@@ -406,6 +472,11 @@
             <strong data-i18n="storyQuizMode">Historias SRS</strong>
             <span data-i18n="storyQuizModeHint">Frases desbloqueadas en micro-novelas</span>
           </button>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="quiz-exams">
+        <h3 data-i18n="quizGroupExams">Exámenes</h3>
+        <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
           <button type="button" class="mode-pick" data-quiz-mode="place">
             <strong data-i18n="quizModes.place.t">Test de nivel</strong>
             <span data-i18n="quizModes.place.s">20 preguntas · propone A1–B2</span>
@@ -419,6 +490,9 @@
             <span>30 min · 24 preguntas · imprimible</span>
           </button>
         </div>
+      </article>
+      <div id="quiz-go" class="card">
+        <label class="muted" id="quiz-starter-label"><input type="checkbox" id="quiz-starter" checked> <span data-i18n="quizStarter">Solo verbos de mi nivel</span></label>
         <div id="cert-timer-bar" class="cert-timer-bar" hidden>
           <span class="muted" data-i18n="certTimeLeft">Tiempo restante:</span>
           <strong id="cert-timer">30:00</strong>
@@ -451,7 +525,7 @@
     </section>
 
     <section id="hablar" class="panel">
-      <div class="card">
+      <div class="card lab-keep">
         <h2 data-i18n="hablarTitle">Di esto</h2>
         <p class="muted" data-i18n="hablarHint">Oye el modelo y pulsa Grabarme: graba y comprueba a la vez.</p>
         <p class="muted" id="speak-weak-hint" hidden></p>
@@ -482,63 +556,108 @@
         <div id="voice-history" class="voice-history" hidden></div>
         <p class="status" id="speak-status" aria-live="polite"></p>
       </div>
-      <div class="card" id="email-card">
-        <h3 data-i18n="email">Emails en voz alta</h3>
-        <p class="muted" data-i18n="emailHint">Oye el correo como lo diría alguien. Luego graba tu respuesta corta.</p>
-        <div id="email-list"></div>
+      <nav class="lab-hub" id="hablar-hub" aria-label="Prácticas de Hablar" data-i18n-aria="labHablarAria"></nav>
+      <div class="lab-room-bar">
+        <button type="button" class="chip lab-back" data-i18n="labBack">Todas las prácticas</button>
+        <h3 class="lab-room-title"></h3>
       </div>
-      <div class="card" id="roleplay-card">
-        <h3 data-i18n="role">Role-play (2 min)</h3>
-        <p class="muted" data-i18n="roleHint">La app dice A. Tú grabas B. Tres giros. No hace falta perfecto.</p>
-        <div id="roleplay-list"></div>
-        <div id="roleplay-now" class="roleplay-now" hidden></div>
-      </div>
-      <div class="card" id="interview-sim-card">
-        <h3 data-i18n="interview">Simulacro entrevista</h3>
-        <p class="muted" data-i18n="interviewHint">Oye la pregunta. Graba tu respuesta (30–60 s). Fluidez, no perfección.</p>
-        <div id="star-box" class="star-box"></div>
-        <div id="interview-sim-list"></div>
-      </div>
-      <div class="card" id="phrasals-work-card" hidden>
-        <h3 data-i18n="phrasals">Phrasals de trabajo</h3>
-        <div id="phrasals-work-list"></div>
-      </div>
-      <div class="card" id="chat-work-card">
-        <h3 data-i18n="chat">Slack / Teams (50 mensajes)</h3>
-        <p class="muted" data-i18n="chatHint">Tono formal e informal. Oye el mensaje y graba tu respuesta.</p>
-        <label class="muted"><span data-i18n="chatFilter">Filtrar:</span>
-          <select id="chat-tone-filter">
-            <option value="all" data-i18n="chatAll">Todos</option>
-            <option value="informal" data-i18n="chatInformal">Informal (Slack)</option>
-            <option value="formal" data-i18n="chatFormal">Formal (Teams/email)</option>
-          </select>
-        </label>
-        <div id="chat-work-list" class="grid" style="margin-top:12px"></div>
-      </div>
-      <div class="card" id="duo-card">
-        <h3 data-i18n="duo">Duo · 2 jugadores</h3>
-        <p class="muted" data-i18n="duoHint">Mismo dispositivo. Turnos alternos A/B en role-plays o diálogos.</p>
-        <p class="duo-score muted" id="duo-score">A: 0 · B: 0</p>
-        <div id="duo-now"></div>
-      </div>
-      <div id="writing-panel" class="card"></div>
+      <article class="lab-topic" data-lab="email-card">
+        <div class="card" id="email-card">
+          <h3 data-i18n="email">Emails en voz alta</h3>
+          <p class="muted" data-i18n="emailHint">Oye el correo como lo diría alguien. Luego graba tu respuesta corta.</p>
+          <div id="email-list"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="roleplay-card">
+        <div class="card" id="roleplay-card">
+          <h3 data-i18n="role">Role-play (2 min)</h3>
+          <p class="muted" data-i18n="roleHint">La app dice A. Tú grabas B. Tres giros. No hace falta perfecto.</p>
+          <div id="roleplay-list"></div>
+          <div id="roleplay-now" class="roleplay-now" hidden></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="interview-sim-card">
+        <div class="card" id="interview-sim-card">
+          <h3 data-i18n="interview">Simulacro entrevista</h3>
+          <p class="muted" data-i18n="interviewHint">Oye la pregunta. Graba tu respuesta (30–60 s). Fluidez, no perfección.</p>
+          <div id="star-box" class="star-box"></div>
+          <div id="interview-sim-list"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="phrasals-work-card">
+        <div class="card" id="phrasals-work-card" hidden>
+          <h3 data-i18n="phrasals">Phrasals de trabajo</h3>
+          <div id="phrasals-work-list"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="chat-work-card">
+        <div class="card" id="chat-work-card">
+          <h3 data-i18n="chat">Slack / Teams (50 mensajes)</h3>
+          <p class="muted" data-i18n="chatHint">Tono formal e informal. Oye el mensaje y graba tu respuesta.</p>
+          <label class="muted"><span data-i18n="chatFilter">Filtrar:</span>
+            <select id="chat-tone-filter">
+              <option value="all" data-i18n="chatAll">Todos</option>
+              <option value="informal" data-i18n="chatInformal">Informal (Slack)</option>
+              <option value="formal" data-i18n="chatFormal">Formal (Teams/email)</option>
+            </select>
+          </label>
+          <div id="chat-work-list" class="grid" style="margin-top:12px"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="duo-card">
+        <div class="card" id="duo-card">
+          <h3 data-i18n="duo">Duo · 2 jugadores</h3>
+          <p class="muted" data-i18n="duoHint">Mismo dispositivo. Turnos alternos A/B en role-plays o diálogos.</p>
+          <p class="duo-score muted" id="duo-score">A: 0 · B: 0</p>
+          <div id="duo-now"></div>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="writing-panel">
+        <h3 class="lab-topic-name" data-i18n="writing">Writing con rúbrica</h3>
+        <div id="writing-panel" class="card"></div>
+      </article>
     </section>
 
     <section id="ia" class="panel">
-      <div class="card">
+      <div class="card lab-hub-head">
         <h2 data-i18n="iaTitle">Ayuda de una IA (gratis)</h2>
-        <p data-i18n="iaHint">Copia un texto y pégalo en ChatGPT, Claude o Gemini. Dile tu nivel.</p>
+        <p data-i18n="iaHint">Guía (arriba) explica cada pantalla. Aquí son herramientas. Los prompts se copian; el lab no envía nada.</p>
       </div>
-      <div id="ai-prompts" class="grid" style="margin-top:12px"></div>
-      <div class="card" style="margin-top:16px">
-        <h3 data-i18n="plan21">Plan de 21 días (15 min)</h3>
-        <ol id="plan-list"></ol>
+      <nav class="lab-hub" id="ia-hub" aria-label="Herramientas de Ayuda" data-i18n-aria="labAyudaAria"></nav>
+      <div class="lab-room-bar">
+        <button type="button" class="chip lab-back" data-i18n="labBackAyuda">Todas las herramientas</button>
+        <h3 class="lab-room-title"></h3>
       </div>
-      <div id="lab-audit" class="card audit-panel" style="margin-top:16px"></div>
-      <div id="class-pro-panel" class="card" style="margin-top:16px"></div>
-      <div id="error-journal" class="card" style="margin-top:16px"></div>
-      <div id="perf-panel" class="card" style="margin-top:16px"></div>
-      <div id="a11y-bar" class="card a11y-bar" style="margin-top:16px"></div>
+      <article class="lab-topic" data-lab="ai-prompts">
+        <h3 data-i18n="labPrompts">Prompts para IA</h3>
+        <div id="ai-prompts" class="grid"></div>
+      </article>
+      <article class="lab-topic" data-lab="plan-list">
+        <div class="card">
+          <h3 data-i18n="plan21">Plan de 21 días (15 min)</h3>
+          <ol id="plan-list"></ol>
+        </div>
+      </article>
+      <article class="lab-topic" data-lab="lab-audit">
+        <h3 class="lab-topic-name" data-i18n="audit">Auditoría A–Z</h3>
+        <div id="lab-audit" class="card audit-panel"></div>
+      </article>
+      <article class="lab-topic" data-lab="class-pro-panel">
+        <h3 class="lab-topic-name" data-i18n="classPro">Aula pro — dashboard</h3>
+        <div id="class-pro-panel" class="card"></div>
+      </article>
+      <article class="lab-topic" data-lab="error-journal">
+        <h3 class="lab-topic-name" data-i18n="journalTitle">Diario de errores</h3>
+        <div id="error-journal" class="card"></div>
+      </article>
+      <article class="lab-topic" data-lab="perf-panel">
+        <h3 class="lab-topic-name" data-i18n="perfTitle">Rendimiento</h3>
+        <div id="perf-panel" class="card"></div>
+      </article>
+      <article class="lab-topic" data-lab="a11y-bar">
+        <h3 class="lab-topic-name" data-i18n="a11y">Accesibilidad</h3>
+        <div id="a11y-bar" class="card a11y-bar"></div>
+      </article>
     </section>
 
     <footer data-i18n="footer">

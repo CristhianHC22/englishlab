@@ -14,9 +14,10 @@ async function blockExternalFonts(page) {
 async function bootVisual(page, { theme = "light", contrast = false } = {}) {
   await blockExternalFonts(page);
   await page.goto("/");
-  await page.evaluate(({ theme, contrast }) => {
+  await page.evaluate(async ({ theme, contrast }) => {
     localStorage.setItem("enlab-welcome-v2", "1");
     localStorage.setItem("enlab-onboard-v3", "1");
+    localStorage.setItem("enlab-guide-quiet", "1");
     localStorage.setItem("enlab-theme", theme);
     localStorage.setItem("enlab-a11y-contrast", contrast ? "1" : "0");
     localStorage.setItem("enlab-a11y-motion", "0");
@@ -27,6 +28,12 @@ async function bootVisual(page, { theme = "light", contrast = false } = {}) {
       "enlab-stats",
       JSON.stringify({ streak: 3, last: "2026-01-15", days: { "2026-01-15": { quiz: 2, heard: 5, spoke: 1 } } }),
     );
+    const regs = await navigator.serviceWorker?.getRegistrations?.() || [];
+    await Promise.all(regs.map((r) => r.unregister()));
+    if (typeof caches !== "undefined") {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
   }, { theme, contrast });
   await page.reload();
   await page.waitForFunction(
@@ -75,6 +82,8 @@ async function stabilizeForSnapshot(page) {
     document.querySelectorAll("[data-pwa-install]").forEach((el) => { el.hidden = true; });
     document.getElementById("level-nudge")?.setAttribute("hidden", "");
     document.getElementById("welcome")?.setAttribute("hidden", "");
+    const guide = document.getElementById("guide-panel");
+    if (guide) { guide.hidden = true; guide.setAttribute("hidden", ""); }
   });
 }
 
@@ -102,20 +111,20 @@ async function gotoTab(page, tab) {
   await page.locator(`[data-tab="${tab}"]`).click();
   await page.locator(`#${tab}.panel.active`).waitFor({ state: "visible" });
   if (tab === "vocales") {
-    await page.waitForSelector("#pron-panel .pron-pair");
+    await page.waitForSelector("#oido-toc .lab-card");
   }
   if (tab === "quiz") {
-    await page.waitForSelector('[data-quiz-mode="dict"]');
+    await page.waitForSelector("#quiz-hub .lab-card");
   }
   if (tab === "verbos") {
     await page.waitForSelector("#verb-list .verb");
   }
   if (tab === "hablar") {
-    await page.waitForSelector("#roleplay-card");
+    await page.waitForSelector("#hablar-hub .lab-card");
+    await page.waitForSelector("#speak-target");
   }
   if (tab === "ia") {
-    await page.waitForSelector("#a11y-bar .chip");
-    await page.waitForSelector(".audit-table tbody tr");
+    await page.waitForSelector("#ia-hub .lab-card");
   }
 }
 

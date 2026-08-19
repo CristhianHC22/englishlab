@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { boot } = require("./helpers/boot");
+const { boot, revealInFolds } = require("./helpers/boot");
 
 test("pack counts, unique ids, placement bank", async ({ page }) => {
   await boot(page);
@@ -88,12 +88,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v35 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v41 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v35/);
+  expect(sw).toMatch(/enlab-v41/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -105,12 +105,12 @@ test("index has no remote fonts; SW v35 + offline fallback", async ({ request })
 test("PIN blocks export and does not unlock the session", async ({ page }) => {
   await boot(page);
   page.on("dialog", (d) => d.dismiss());
-  await page.locator("#class-box").locator("summary").click();
+  await revealInFolds(page, "#class-pin");
   await page.locator("#class-pin").fill("1234");
   await page.locator("#class-pin-save").click();
   await expect(page.locator("#class-pin-status")).toContainText(/PIN/i);
   await page.evaluate(() => sessionStorage.removeItem("enlab-class-ok"));
-  await page.locator("#prog-export").evaluate((el) => el.closest("details")?.setAttribute("open", ""));
+  await revealInFolds(page, "#prog-export");
   await page.locator("#prog-export").click();
   const unlocked = await page.evaluate(() => sessionStorage.getItem("enlab-class-ok"));
   expect(unlocked).toBeNull();

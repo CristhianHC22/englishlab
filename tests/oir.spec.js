@@ -1,9 +1,9 @@
 const { test, expect } = require("@playwright/test");
-const { boot } = require("./helpers/boot");
+const { boot, openOidoRoom } = require("./helpers/boot");
 
 test("Oír: pronunciation panel", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "pron-panel");
   await expect(page.locator("#pron-panel")).toBeVisible();
   await expect(page.locator(".pron-pair").first()).toBeVisible();
   await expect(page.locator("#pron-panel")).toContainText(/ship|sheep/i);
@@ -43,7 +43,7 @@ test("Oír: formant scoring module", async ({ page }) => {
 
 test("Oír: branching stories", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "stories-panel");
   await expect(page.locator("#stories-panel")).toBeVisible();
   await page.locator("[data-story]").first().click();
   await expect(page.locator("#story-now")).toBeVisible();
@@ -55,7 +55,7 @@ test("Oír: branching stories", async ({ page }) => {
 test("Oír: story vocab unlocks SRS", async ({ page }) => {
   await boot(page);
   await page.waitForFunction(() => (window.ENLAB?.branchStories || []).length >= 20);
-  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "stories-panel");
   await page.locator('[data-story="coffee-wrong"]').click();
   await page.locator(".story-choice").first().click();
   await page.locator(".story-choice").first().click();
@@ -105,6 +105,7 @@ test("Oír: 40 podcasts", async ({ page }) => {
   const n = await page.evaluate(() => (window.ENLAB.podcasts || []).length);
   expect(n).toBe(40);
   await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "oido-podcasts");
   await expect(page.locator("#podcast-list .podcast-card").first()).toBeVisible();
 });
 
@@ -128,15 +129,16 @@ test("Oír: podcasts hand-written (en/es, no templates)", async ({ page }) => {
 test("Oír: lazy rules maps roles", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="vocales"]').click();
-  await expect(page.locator("#vowel-intro .card")).toBeVisible();
+  await expect(page.locator("#oido-toc .lab-card").first()).toBeVisible();
   await expect(page.locator("#vowel-rules .card")).toHaveCount(0);
   await expect(page.locator("#vowel-maps .card")).toHaveCount(0);
   await expect(page.locator("#roles-list .role-word")).toHaveCount(0);
-  await page.evaluate(() => new Promise((r) => setTimeout(r, 180)));
-  await page.locator("#oido-reglas").evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await page.locator('#oido-toc [data-jump="oido-reglas"]').click();
   await expect(page.locator("#vowel-rules .card").first()).toBeVisible();
+  await page.locator("#oido-back").click();
   await page.locator('#oido-toc [data-jump="oido-mapa"]').click();
   await expect(page.locator("#vowel-maps .card").first()).toBeVisible();
+  await page.locator("#oido-back").click();
   await page.locator('#oido-toc [data-jump="oido-roles"]').click();
   await expect(page.locator("#roles-list .role-word").first()).toBeVisible();
 });

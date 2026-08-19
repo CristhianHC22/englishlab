@@ -93,6 +93,7 @@ function applyHideEs() {
   const on = hideEsOn();
   document.documentElement.classList.toggle("hide-es", on);
   $$("[data-hide-es]").forEach((b) => setPressed(b, on));
+  syncPrefsBadge();
 }
 
 function buzz(ok) {
@@ -405,6 +406,8 @@ function showTab(id) {
     }).catch(() => {});
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
+  syncGuide();
+  maybeOfferGuide();
 }
 
 const tabPaintHooks = [];
@@ -447,6 +450,7 @@ function paintTab(id) {
     renderVerbs();
     dirty.verbs = false;
   }
+  if (id === "quiz") renderQuizHub();
   if (id === "hablar" && dirty.hablar) {
     if (dirty.speak) {
       renderSpeak();
@@ -460,10 +464,12 @@ function paintTab(id) {
     renderEmails();
     dirty.hablar = false;
   }
+  if (id === "hablar") renderHablarHub();
   if (id === "ia" && dirty.ai) {
     renderAI();
     dirty.ai = false;
   }
+  if (id === "ia") renderAyudaHub();
   tabPaintHooks.forEach((fn) => { try { fn(id); } catch { /* hook */ } });
 }
 
@@ -666,7 +672,10 @@ function renderLevelBar() {
   `).join("");
   const meta = ENLAB.cefr[cur];
   const blurb = $("#level-blurb");
-  if (blurb && meta) blurb.textContent = `${meta.goal} ${meta.next}`;
+  if (blurb && meta) {
+    blurb.textContent = `${meta.goal} ${meta.next}`;
+    blurb.title = `${meta.goal} ${meta.next}`;
+  }
   renderLevelNudge();
 }
 
@@ -1029,6 +1038,11 @@ function pathHint(step) {
 function renderHoyPath() {
   ensureHoyPathDay();
   const path = hoyPath();
+  const hoy = $("#hoy");
+  if (hoy) {
+    hoy.classList.toggle("path-on", hoyPathI >= 0);
+    hoy.classList.toggle("path-done", hoyPathI >= path.length);
+  }
   const copy = $("#hoy-path-copy");
   const i = hoyPathI;
   const last = path.length - 1;
@@ -1057,9 +1071,15 @@ function goHoyStep(i) {
   persistHoyPath();
   $$(".step-card").forEach((c) => c.classList.remove("path-now", "flash"));
   paintOidoByJump((path[i].sel || "").replace("#", ""));
+  openOidoTopic((path[i].sel || "").replace("#", ""));
   const el = $(path[i].sel);
+  if (el && el.style.display !== "none") el.classList.add("path-now", "flash");
+  const hoy = $("#hoy");
+  if (hoy) {
+    hoy.classList.add("path-on");
+    hoy.classList.remove("path-done");
+  }
   if (el && el.style.display !== "none") {
-    el.classList.add("path-now", "flash");
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => el.classList.remove("flash"), 1200);
   }
@@ -1084,7 +1104,7 @@ function startHoyGame() {
   }
   if (g.game === "podcast" && window.NR) {
     showTab("vocales");
-    document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    openOidoTopic("oido-podcasts");
     return true;
   }
   if (g.game === "travel" && window.NR) {
@@ -1095,6 +1115,7 @@ function startHoyGame() {
   }
   if (g.game === "chat" && window.NR) {
     showTab("hablar");
+    if (typeof openLabRoom === "function") openLabRoom("chat-work-card");
     document.querySelector("#chat-work-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
   }
@@ -2028,6 +2049,7 @@ function startWeeklyExam() {
   if (recState.rec && recState.rec.state === "recording") stopRecording(false);
   quiz = { i: 0, score: 0, items: makeWeeklyExamItems(), fails: [], mode: "weekly", host: "#quiz-box" };
   showTab("quiz");
+  if (typeof openQuizRoom === "function") openQuizRoom("weekly");
   renderQuiz();
   quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -2362,6 +2384,7 @@ function renderQuiz() {
 
 function startQuiz() {
   const mode = $("#quiz-mode")?.value || "choice";
+  if (typeof openQuizRoom === "function") openQuizRoom(mode);
   if (mode === "cert" && window.NR?.startCertExam) return window.NR.startCertExam();
   if (mode === "place" && window.PLUS?.startPlacement) return window.PLUS.startPlacement();
   quiz = { i: 0, score: 0, items: [], fails: [], mode, host: "#quiz-box" };
@@ -2925,15 +2948,28 @@ function playEarSequence(it, warmup) {
 
 document.addEventListener("click", (e) => {
   const tab = e.target.closest("[data-tab]");
-  if (tab) showTab(tab.dataset.tab);
+  if (tab) {
+    const id = tab.dataset.tab;
+    if (currentTab === id) closeLabRoom(document.getElementById(id));
+    showTab(id);
+  }
 
-  const jump = e.target.closest("[data-jump]");
+  const jump = e.target.closest("[data-lab-jump], [data-jump]");
   if (jump) {
     e.preventDefault();
-    showTab("vocales");
-    paintOidoByJump(jump.dataset.jump);
-    const el = document.getElementById(jump.dataset.jump);
-    if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    const id = jump.dataset.labJump || jump.dataset.jump;
+    if (typeof openLabRoom === "function" && openLabRoom(id)) {
+      jump.closest(".panel")?.querySelector(".lab-room-bar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (jump.dataset.jump) {
+      showTab("vocales");
+      paintOidoByJump(jump.dataset.jump);
+      const el = document.getElementById(jump.dataset.jump);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
+  }
+
+  if (e.target.closest(".lab-back")) {
+    closeLabRoom(e.target.closest(".panel"));
   }
 
   if (e.target.closest("[data-dialog-play]")) {
@@ -3384,28 +3420,148 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function renderOidoToc() {
+function oidoHubItems() {
   const n = lvlNum();
-  const items = [
-    { id: "oido-decidir", key: "oidoTocDecidir", min: 1 },
-    { id: "oido-reglas", key: "oidoTocReglas", min: 1 },
-    { id: "oido-clave", key: "oidoTocClave", min: 1 },
-    { id: "oido-mapa", key: "oidoTocMapa", min: 1 },
-    { id: "oido-contrastes", key: "oidoTocContrastes", min: 1 },
-    { id: "oido-trampas", key: "oidoTocTrampas", min: 1 },
-    { id: "oido-mudas", key: "oidoTocMudas", min: 2 },
-    { id: "oido-contra", key: "oidoTocContra", min: 2 },
-    { id: "oido-endings", key: "oidoTocEndings", min: 2 },
-    { id: "oido-roles", key: "oidoTocRoles", min: 2 },
-    { id: "oido-acento", key: "oidoTocAcento", min: 3 },
-    { id: "oido-ough", key: "oidoTocOugh", min: 3 },
-    { id: "oido-ritmo", key: "oidoTocRitmo", min: 3 },
-    { id: "oido-chunks", key: "oidoTocChunks", min: 1 },
-    { id: "oido-tips", key: "oidoTocTips", min: 3 },
-  ].filter((i) => n >= i.min);
-  const nav = $("#oido-toc");
+  const kids = typeof kidsOn === "function" && kidsOn();
+  return [
+    { jump: "oido-decidir", key: "oidoTocDecidir", blurb: "oidoBlurbDecidir", group: "oidoGroupVowels", min: 1 },
+    { jump: "oido-reglas", key: "oidoTocReglas", blurb: "oidoBlurbReglas", group: "oidoGroupVowels", min: 1 },
+    { jump: "oido-mapa", key: "oidoTocMapa", blurb: "oidoBlurbMapa", group: "oidoGroupVowels", min: 1 },
+    { jump: "oido-contrastes", key: "oidoTocContrastes", blurb: "oidoBlurbContrastes", group: "oidoGroupContrast", min: 1 },
+    { jump: "oido-roles", key: "oidoTocRoles", blurb: "oidoBlurbRoles", group: "oidoGroupContrast", min: 2 },
+    { jump: "oido-mudas", key: "oidoTocMudas", blurb: "oidoBlurbMudas", group: "oidoGroupSpeech", min: 2 },
+    { jump: "oido-ritmo", key: "oidoTocRitmo", blurb: "oidoBlurbRhythm", group: "oidoGroupSpeech", min: 3 },
+    { jump: "oido-chunks", key: "oidoTocChunks", blurb: "oidoBlurbChunks", group: "oidoGroupSpeech", min: 1, kidsHide: true },
+    { jump: "oido-tips", key: "oidoTocTips", blurb: "oidoBlurbTips", group: "oidoGroupSpeech", min: 3, kidsHide: true },
+    { jump: "oido-podcasts", key: "podcast", blurb: "oidoBlurbPodcasts", group: "oidoGroupPractice", min: 1 },
+    { jump: "pron-panel", key: "pron", blurb: "oidoBlurbPron", group: "oidoGroupPractice", min: 1 },
+    { jump: "stories-panel", key: "stories", blurb: "oidoBlurbStories", group: "oidoGroupPractice", min: 1 },
+  ].filter((i) => n >= i.min && !(kids && i.kidsHide));
+}
+
+/* Marco único: catálogo → una sala. Ver docs/ESTANDAR.md.
+   Hub: .lab-hub + renderLabHub. Sala: .lab-topic[data-lab] + openLabRoom.
+   Guía: ENLAB.ui.*.guide[place] = { t, w, s[] }. */
+function renderOidoToc() {
+  renderLabHub("oido-toc", oidoHubItems());
+}
+
+function renderLabHub(navId, items) {
+  const nav = document.getElementById(navId);
   if (!nav) return;
-  nav.innerHTML = items.map((i) => `<a href="#${i.id}" data-jump="${i.id}">${esc(t(i.key))}</a>`).join("");
+  const groups = [];
+  items.forEach((i) => {
+    const gkey = i.group || "";
+    const last = groups[groups.length - 1];
+    if (!last || last.key !== gkey) groups.push({ key: gkey, items: [i] });
+    else last.items.push(i);
+  });
+  nav.innerHTML = groups.map((g) => `
+    <div class="lab-hub-group">
+      ${g.key ? `<p class="kicker">${esc(t(g.key))}</p>` : ""}
+      <div class="lab-hub-grid">
+        ${g.items.map((i) => `
+          <button type="button" class="lab-card" data-lab-jump="${esc(i.jump)}" data-jump="${esc(i.jump)}">
+            <strong>${esc(t(i.key))}</strong>
+            <span class="muted">${esc(t(i.blurb))}</span>
+          </button>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function quizHubItems() {
+  return [
+    { jump: "quiz-verbs", key: "quizGroupVerbs", blurb: "quizBlurbVerbs" },
+    { jump: "quiz-ear", key: "quizGroupEar", blurb: "quizBlurbEar" },
+    { jump: "quiz-uso", key: "quizGroupUso", blurb: "quizBlurbUso" },
+    { jump: "quiz-exams", key: "quizGroupExams", blurb: "quizBlurbExams" },
+  ];
+}
+
+function hablarHubItems() {
+  const kids = kidsOn();
+  const phrasals = $("#phrasals-work-card") && !$("#phrasals-work-card").hidden;
+  return [
+    { jump: "roleplay-card", key: "role", blurb: "labBlurbRole" },
+    { jump: "interview-sim-card", key: "interview", blurb: "labBlurbInterview" },
+    { jump: "email-card", key: "email", blurb: "labBlurbEmail" },
+    { jump: "chat-work-card", key: "chat", blurb: "labBlurbChat" },
+    { jump: "writing-panel", key: "writing", blurb: "labBlurbWriting" },
+    ...(phrasals ? [{ jump: "phrasals-work-card", key: "phrasals", blurb: "labBlurbPhrasals" }] : []),
+    ...(!kids ? [{ jump: "duo-card", key: "duo", blurb: "labBlurbDuo" }] : []),
+  ];
+}
+
+function ayudaHubItems() {
+  const kids = kidsOn();
+  return [
+    { jump: "ai-prompts", key: "labPrompts", blurb: "labBlurbPrompts", group: "labGroupHelp" },
+    { jump: "plan-list", key: "plan21", blurb: "labBlurbPlan", group: "labGroupHelp" },
+    { jump: "a11y-bar", key: "a11y", blurb: "labBlurbA11y", group: "labGroupYou" },
+    { jump: "error-journal", key: "journalTitle", blurb: "labBlurbJournal", group: "labGroupYou" },
+    { jump: "class-pro-panel", key: "classPro", blurb: "labBlurbClass", group: "labGroupClass" },
+    ...(!kids ? [{ jump: "lab-audit", key: "audit", blurb: "labBlurbAudit", group: "labGroupClass" }] : []),
+    { jump: "perf-panel", key: "perfTitle", blurb: "labBlurbPerf", group: "labGroupClass" },
+  ];
+}
+
+function renderQuizHub() { renderLabHub("quiz-hub", quizHubItems()); }
+function renderHablarHub() { renderLabHub("hablar-hub", hablarHubItems()); }
+function renderAyudaHub() { renderLabHub("ia-hub", ayudaHubItems()); }
+
+function quizRoomFor(mode) {
+  const map = {
+    choice: "quiz-verbs", type: "quiz-verbs", ed: "quiz-verbs",
+    ear: "quiz-ear", exam: "quiz-ear", dict: "quiz-ear", listen: "quiz-ear",
+    uso: "quiz-uso", art: "quiz-uso", prep: "quiz-uso", phrasal: "quiz-uso",
+    cond: "quiz-uso", emailtone: "quiz-uso", story: "quiz-uso",
+    place: "quiz-exams", weekly: "quiz-exams", cert: "quiz-exams",
+  };
+  return map[mode] || "quiz-verbs";
+}
+
+function openQuizRoom(mode) {
+  return openLabRoom(quizRoomFor(mode));
+}
+
+function closeLabRoom(panel) {
+  if (typeof panel === "string") panel = document.getElementById(panel);
+  if (!panel) return;
+  panel.classList.remove("lab-in");
+  panel.querySelectorAll(".lab-topic").forEach((el) => el.classList.remove("on"));
+  syncGuide();
+}
+
+function closeOidoTopic() {
+  closeLabRoom($("#vocales"));
+}
+
+function openLabRoom(jumpId) {
+  if (!jumpId) return false;
+  const raw = String(jumpId).replace(/^#/, "");
+  const target = document.getElementById(raw)
+    || document.querySelector(`[data-lab="${CSS.escape(raw)}"]`);
+  const topic = target?.classList?.contains("lab-topic")
+    ? target
+    : target?.closest(".lab-topic");
+  if (!topic) return false;
+  const panel = topic.closest(".panel");
+  if (!panel) return false;
+  if (typeof showTab === "function" && currentTab !== panel.id) showTab(panel.id);
+  panel.classList.add("lab-in");
+  panel.querySelectorAll(".lab-topic").forEach((el) => el.classList.toggle("on", el === topic));
+  const titleEl = panel.querySelector(".lab-room-title");
+  if (titleEl) titleEl.textContent = topic.querySelector("h3")?.textContent || "";
+  if (panel.id === "vocales") {
+    String(topic.dataset.paint || "").split(",").forEach((id) => { if (id) paintOidoSection(id); });
+    paintOidoByJump(raw);
+  }
+  syncGuide();
+  return true;
+}
+
+function openOidoTopic(jumpId) {
+  return openLabRoom(jumpId);
 }
 
 function playDailyPairs() {
@@ -3754,8 +3910,9 @@ function applyQuizModeI18n() {
     if (span && sub) span.textContent = sub;
   });
   const aria = t("quizModesAria");
-  const picks = document.querySelector(".mode-picks");
-  if (picks && aria) picks.setAttribute("aria-label", aria);
+  $$(".mode-picks").forEach((picks) => {
+    if (aria) picks.setAttribute("aria-label", aria);
+  });
 }
 
 function kidsOn() {
@@ -3776,6 +3933,142 @@ function applyKidsMode() {
     localStorage.setItem("enlab-rate", "slow");
   }
   if (typeof renderRateBar === "function") renderRateBar();
+  if (typeof renderOidoToc === "function") renderOidoToc();
+  if (typeof renderQuizHub === "function") renderQuizHub();
+  if (typeof renderHablarHub === "function") renderHablarHub();
+  if (typeof renderAyudaHub === "function") renderAyudaHub();
+  syncPrefsBadge();
+}
+
+function setPrefsOpen(on) {
+  const panel = $("#prefs-panel");
+  const btn = $("#prefs-toggle");
+  if (on) {
+    const gp = $("#guide-panel");
+    if (gp) gp.hidden = true;
+    $("#guide-toggle")?.setAttribute("aria-expanded", "false");
+    setPressed($("#guide-toggle"), false);
+  }
+  if (panel) panel.hidden = !on;
+  if (btn) {
+    btn.setAttribute("aria-expanded", on ? "true" : "false");
+    setPressed(btn, on);
+  }
+}
+
+function guidePlace() {
+  const panel = document.getElementById(currentTab);
+  const topic = panel?.querySelector(".lab-topic.on");
+  if (topic) return topic.dataset.lab || topic.dataset.oido || currentTab;
+  return currentTab;
+}
+
+function guideEntry(place) {
+  const lang = uiLang();
+  const pack = ENLAB.ui?.[lang]?.guide || {};
+  const es = ENLAB.ui?.es?.guide || {};
+  if (pack[place]) return pack[place];
+  if (es[place]) return es[place];
+  const oido = place.startsWith("oido-") || place === "pron-panel" || place === "stories-panel";
+  if (oido) return pack.oidoRoom || es.oidoRoom;
+  return pack[currentTab] || es[currentTab] || pack.hoy || es.hoy;
+}
+
+function guideSeen() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-guide-seen") || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function markGuideSeen(place) {
+  const s = guideSeen();
+  if (!s.includes(place)) {
+    s.push(place);
+    localStorage.setItem("enlab-guide-seen", JSON.stringify(s));
+  }
+}
+
+function fillGuide() {
+  const entry = guideEntry(guidePlace());
+  if (!entry) return;
+  const title = $("#guide-title");
+  const why = $("#guide-why");
+  const steps = $("#guide-steps");
+  if (title) title.textContent = entry.t || "";
+  if (why) why.textContent = entry.w || "";
+  if (steps) {
+    const list = Array.isArray(entry.s) ? entry.s : [];
+    steps.innerHTML = list.map((line) => `<li>${esc(line)}</li>`).join("");
+  }
+  fillGuideMap();
+}
+
+function fillGuideMap() {
+  const box = $("#guide-map");
+  if (!box) return;
+  const panel = document.getElementById(currentTab);
+  const inRoom = panel?.classList.contains("lab-in");
+  if (inRoom) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  const cards = [...(panel?.querySelectorAll(".lab-card") || [])];
+  if (cards.length < 2 || cards.length > 8) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `<p class="kicker">${esc(t("guideCards"))}</p>`
+    + cards.map((c) => {
+      const name = c.querySelector("strong")?.textContent || "";
+      const blurb = c.querySelector(".muted")?.textContent || "";
+      return `<p><strong>${esc(name)}</strong> — ${esc(blurb)}</p>`;
+    }).join("");
+}
+
+function setGuideOpen(on) {
+  const panel = $("#guide-panel");
+  const btn = $("#guide-toggle");
+  if (on) {
+    const pp = $("#prefs-panel");
+    if (pp) pp.hidden = true;
+    $("#prefs-toggle")?.setAttribute("aria-expanded", "false");
+    setPressed($("#prefs-toggle"), false);
+  }
+  if (panel) panel.hidden = !on;
+  if (btn) {
+    btn.setAttribute("aria-expanded", on ? "true" : "false");
+    setPressed(btn, on);
+  }
+  if (on) {
+    fillGuide();
+    markGuideSeen(currentTab);
+  }
+}
+
+function syncGuide() {
+  const panel = $("#guide-panel");
+  if (panel && !panel.hidden) fillGuide();
+}
+
+function maybeOfferGuide() {
+  if (localStorage.getItem("enlab-guide-quiet") === "1") return;
+  const welcome = $("#welcome");
+  if (welcome && !welcome.hidden) return;
+  if (guideSeen().includes(currentTab)) return;
+  setGuideOpen(true);
+}
+
+function syncPrefsBadge() {
+  const btn = $("#prefs-toggle");
+  if (!btn) return;
+  const active = kidsOn() || hideEsOn() || uiLang() === "en" || localStorage.getItem("enlab-travel") === "1";
+  btn.classList.toggle("has-on", active);
 }
 
 function applyUiLang() {
@@ -3827,6 +4120,9 @@ function applyUiLangBody() {
   applyQuizModeI18n();
   const map = {
     "#ui-lang-toggle": "uiLang", "#kids-toggle": "kids", "#travel-toggle": "travel",
+    "#prefs-toggle": "prefs",
+    "#guide-toggle": "guideBtn",
+    "#guide-gotit": "guideGotIt",
     "#repaso-btn": "repaso", "#repaso-quiz-btn": "quizWeak", "#repaso-exit": "repasoExit",
     "#remind-push-test": "pushTest", "#quiz-start": "quizStart", "#speak-listen": "speakListen", "#speak-rec": "speakRec",
     "#speak-next": "speakNext", "#shadow-go": "shadowGo", "#transfer-copy": "transferCopy",
@@ -3834,6 +4130,7 @@ function applyUiLangBody() {
     "#class-pin-clear": "classPinClear", "#class-print": "classPrint",
     "#prog-export": "export", "#prog-import": "import", "#play-daily-pairs": "step1Play",
     "#cert-start-btn": "certStart", "#speak-shadow": "shadow", "#speak-hoy": "speakHoy",
+    "#oido-back": "oidoBack",
     "#start-ear-from-oido": "oidoPlayEar", "#start-ed-from-oido": "oidoPlayEd2",
     "#start-uso-from-oido": "oidoPlayUso", "#welcome-go": "startPath",
   };
@@ -3843,6 +4140,9 @@ function applyUiLangBody() {
   });
   if ($("#speak-rec")?.classList.contains("rec-on")) $("#speak-rec").textContent = t("speakRecordStop");
   if ($("#hoy-speak-rec")?.classList.contains("rec-on")) $("#hoy-speak-rec").textContent = t("speakRecordStop");
+  const prefsOpen = $("#prefs-panel") && !$("#prefs-panel").hidden;
+  setPressed($("#prefs-toggle"), prefsOpen);
+  $("#prefs-toggle")?.setAttribute("aria-expanded", prefsOpen ? "true" : "false");
   setPressed($("#kids-toggle"), kidsOn());
   const kidsBanner = $("#kids-banner");
   if (kidsBanner) kidsBanner.hidden = !kidsOn();
@@ -3867,6 +4167,9 @@ function applyUiLangBody() {
   if (typeof renderPodcastToday === "function") renderPodcastToday();
   if (typeof renderVerbs === "function" && currentTab === "verbos") renderVerbs();
   if (typeof renderOidoToc === "function" && currentTab === "vocales") renderOidoToc();
+  if (typeof renderQuizHub === "function") renderQuizHub();
+  if (typeof renderHablarHub === "function") renderHablarHub();
+  if (typeof renderAyudaHub === "function") renderAyudaHub();
   if (typeof renderRemind === "function") renderRemind();
   if (typeof renderClock === "function") renderClock();
   if (typeof renderWeekReport === "function") renderWeekReport();
@@ -3877,6 +4180,11 @@ function applyUiLangBody() {
   if (currentTab === "hablar") paintTab("hablar");
   if (window.NR?.renderLabAudit && currentTab === "ia") window.NR.renderLabAudit();
   if (window.SV?.refreshPanels && currentTab === "ia") window.SV.refreshPanels();
+  syncPrefsBadge();
+  const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
+  setPressed($("#guide-toggle"), guideOpen);
+  $("#guide-toggle")?.setAttribute("aria-expanded", guideOpen ? "true" : "false");
+  if (guideOpen) fillGuide();
 }
 
 function dateKey(d) {
@@ -4268,6 +4576,7 @@ function startStoryQuiz() {
   const sel = $("#quiz-mode");
   if (sel) sel.value = "story";
   syncQuizModePicks();
+  if (typeof openQuizRoom === "function") openQuizRoom("story");
   renderQuiz();
   quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -4751,6 +5060,20 @@ $("#welcome-go")?.addEventListener("click", () => {
   localStorage.setItem("enlab-onboard-v3", "1");
   const el = $("#welcome");
   if (el) el.hidden = true;
+  maybeOfferGuide();
+});
+
+$("#prefs-toggle")?.addEventListener("click", () => {
+  setPrefsOpen($("#prefs-panel")?.hidden);
+});
+
+$("#guide-toggle")?.addEventListener("click", () => {
+  setGuideOpen($("#guide-panel")?.hidden);
+});
+
+$("#guide-gotit")?.addEventListener("click", () => {
+  markGuideSeen(currentTab);
+  setGuideOpen(false);
 });
 
 $("#kids-toggle")?.addEventListener("click", () => {

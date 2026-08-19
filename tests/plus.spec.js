@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { boot } = require("./helpers/boot");
+const { boot, openHoyExtras, openQuizMode, openLabRoom } = require("./helpers/boot");
 
 test("Plus: placement bank and CEFR bands", async ({ page }) => {
   await boot(page);
@@ -19,8 +19,7 @@ test("Plus: placement bank and CEFR bands", async ({ page }) => {
 
 test("Plus: level test starts 20-item quiz", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="quiz"]').click();
-  await page.locator('[data-quiz-mode="place"]').click();
+  await openQuizMode(page, "place");
   await page.locator("#quiz-start").click();
   await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
   await expect(page.locator("#quiz-box .choices button")).toHaveCount(3);
@@ -33,10 +32,12 @@ test("Plus: error journal and Anki export in Ayuda", async ({ page }) => {
     window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
   });
   await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
   await expect(page.locator("#error-journal")).toContainText(/are/i);
   await expect(page.locator("#journal-anki")).toBeVisible();
   await expect(page.locator("#journal-csv")).toBeVisible();
   await expect(page.locator("#week-sheet-print")).toBeVisible();
+  await openLabRoom(page, "perf-panel", "ia");
   await expect(page.locator("#perf-panel")).toContainText(/paquete|pack/i);
   await expect(page.locator("#perf-panel")).toContainText(/KB/i);
 });
@@ -73,6 +74,7 @@ test("Plus: accent pref is en-GB when uk", async ({ page }) => {
 
 test("Plus: 90-day chart on Hoy", async ({ page }) => {
   await boot(page);
+  await openHoyExtras(page);
   await expect(page.locator("#hoy-streak-chart")).toBeVisible();
   await expect(page.locator("#hoy-streak-chart .streak-90")).toBeVisible();
 });

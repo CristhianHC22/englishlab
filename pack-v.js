@@ -1,7 +1,36 @@
 /* Lote V: writing con rúbrica — emails, Slack, cover letters */
 window.ENLAB = window.ENLAB || {};
 
-ENLAB.writingPrompts = [
+(ENLAB.writingPrompts = ENLAB.writingPrompts || []).push(
+  {
+    id: "email-sorry-a1",
+    type: "email",
+    title: "I can't come",
+    min: 1,
+    prompt: "Write a short email: you can't go to class tomorrow. Say sorry.",
+    model: "Hi,\n\nI'm sorry, I can't come to class tomorrow. See you next week.\n\n[Name]",
+    checklist: [
+      { id: "tone", label: "Tone: polite", weight: 2 },
+      { id: "length", label: "Length: 1–3 sentences", weight: 1 },
+      { id: "connectors", label: "sorry / can't come", weight: 2 },
+      { id: "action", label: "Says you will see them later", weight: 1 },
+    ],
+    hints: ["sorry", "can't come", "see you"],
+  },
+  {
+    id: "slack-late-a1",
+    type: "slack",
+    title: "5 minutes late",
+    min: 1,
+    prompt: "Slack: you are 5 minutes late.",
+    model: "Hi — I'm 5 minutes late. Sorry!",
+    checklist: [
+      { id: "tone", label: "Tone: short and clear", weight: 2 },
+      { id: "length", label: "Length: 1 sentence", weight: 1 },
+      { id: "connectors", label: "late / sorry", weight: 2 },
+    ],
+    hints: ["late", "sorry"],
+  },
   {
     id: "email-late",
     type: "email",
@@ -122,4 +151,4 @@ ENLAB.writingPrompts = [
     ],
     hints: ["shout-out", "because of", "shipped"],
   },
-];
+);

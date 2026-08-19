@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { boot } = require("./helpers/boot");
+const { boot, openPrefs, openHoyExtras, revealInFolds, openOidoRoom, openLabRoom, openQuizMode } = require("./helpers/boot");
 
 test("loads Hoy path and tabs", async ({ page }) => {
   await boot(page);
@@ -7,12 +7,12 @@ test("loads Hoy path and tabs", async ({ page }) => {
   await expect(page.locator(".hoy-next").first()).toBeVisible();
   await page.locator('[data-tab="hablar"]').click();
   await expect(page.locator("#hablar.panel.active")).toBeVisible();
-  await expect(page.locator("#interview-sim-card")).toBeVisible();
-  await expect(page.locator("#roleplay-card")).toBeVisible();
-  await expect(page.locator("#email-card")).toBeVisible();
-  await expect(page.locator("#chat-work-card")).toBeVisible();
-  await expect(page.locator("#duo-card")).toBeVisible();
-  await expect(page.locator("#phrasals-work-card")).toBeVisible();
+  await expect(page.locator("#speak-target")).toBeVisible();
+  await expect(page.locator("#hablar-hub [data-lab-jump='interview-sim-card']")).toBeVisible();
+  await expect(page.locator("#hablar-hub [data-lab-jump='roleplay-card']")).toBeVisible();
+  await expect(page.locator("#hablar-hub [data-lab-jump='email-card']")).toBeVisible();
+  await expect(page.locator("#hablar-hub [data-lab-jump='chat-work-card']")).toBeVisible();
+  await expect(page.locator("#hablar-hub [data-lab-jump='duo-card']")).toBeVisible();
 });
 
 test("English UI toggle", async ({ page }) => {
@@ -77,6 +77,7 @@ test("packs A–R content is wired", async ({ page }) => {
 
 test("situations panel on Hoy", async ({ page }) => {
   await boot(page);
+  await openHoyExtras(page);
   await expect(page.locator("#situations-panel")).toBeVisible();
   await expect(page.locator("#situation-phrases .chip").first()).toBeVisible();
   await page.locator("[data-sit-key='restaurant']").click();
@@ -93,12 +94,17 @@ test("Hoy path starts and shows pairs", async ({ page }) => {
 test("quiz modes include dictation, weekly, cert and cond", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="quiz"]').click();
+  await expect(page.locator("#quiz-hub [data-lab-jump='quiz-ear']")).toBeVisible();
+  await expect(page.locator("#quiz-hub [data-lab-jump='quiz-exams']")).toBeVisible();
+  await expect(page.locator("#quiz-hub [data-lab-jump='quiz-uso']")).toBeVisible();
+  await openQuizMode(page, "dict");
   await expect(page.locator('[data-quiz-mode="dict"]')).toBeVisible();
+  await openQuizMode(page, "place");
   await expect(page.locator('[data-quiz-mode="place"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="weekly"]')).toBeVisible();
   await expect(page.locator('[data-quiz-mode="cert"]')).toBeVisible();
+  await openQuizMode(page, "cond");
   await expect(page.locator('[data-quiz-mode="cond"]')).toBeVisible();
-  await page.locator('[data-quiz-mode="cond"]').click();
   await page.locator("#quiz-start").click();
   await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
 });
@@ -111,16 +117,14 @@ test("Hoy shadowing button on pairs step", async ({ page }) => {
 
 test("quiz email tone mode", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="quiz"]').click();
-  await expect(page.locator('[data-quiz-mode="emailtone"]')).toBeVisible();
-  await page.locator('[data-quiz-mode="emailtone"]').click();
+  await openQuizMode(page, "emailtone");
   await page.locator("#quiz-start").click();
   await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
 });
 
 test("podcast series blocks in Oír", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "oido-podcasts");
   await expect(page.locator(".podcast-series").first()).toBeVisible();
   await expect(page.locator("[data-series-quiz]").first()).toBeVisible();
 });
@@ -136,7 +140,7 @@ test("transfer code roundtrip", async ({ page }) => {
     () => window._enlabBootstrapped === true && (window.ENLAB?.roleplays || []).length >= 50,
     { timeout: 90000 },
   );
-  await page.locator("#transfer-box").locator("summary").click();
+  await revealInFolds(page, "#transfer-code");
   const code = await page.locator("#transfer-code").inputValue();
   expect(code.length).toBeGreaterThan(20);
   await page.evaluate(() => {
@@ -158,6 +162,7 @@ test("weekly exam button on Hoy", async ({ page }) => {
 
 test("travel mode adds body class", async ({ page }) => {
   await boot(page);
+  await openPrefs(page);
   await page.locator("#travel-toggle").click();
   await expect(page.locator("#travel-map")).toBeVisible();
   await expect(page.locator("body")).toHaveClass(/travel-mode/);
@@ -165,13 +170,13 @@ test("travel mode adds body class", async ({ page }) => {
 
 test("podcasts in Oír tab", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "oido-podcasts");
   await expect(page.locator("#podcast-list .podcast-card").first()).toBeVisible();
 });
 
 test("lab audit A–R in Ayuda", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "lab-audit", "ia");
   await expect(page.locator(".audit-table tbody tr")).toHaveCount(26);
 });
 
@@ -183,6 +188,7 @@ test("kids mode sets slow voice", async ({ page }) => {
     if (typeof applyKidsMode === "function") applyKidsMode();
     if (typeof renderRateBar === "function") renderRateBar();
   });
+  await openPrefs(page);
   await page.locator("#kids-toggle").click();
   expect(await page.evaluate(() => localStorage.getItem("enlab-rate"))).toBe("slow");
   await expect(page.locator("#kids-toggle")).toHaveAttribute("aria-pressed", "true");
@@ -205,7 +211,7 @@ test("repaso mode filters weak and shows quiz btn", async ({ page }) => {
 
 test("duo mode starts", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="hablar"]').click();
+  await openLabRoom(page, "duo-card", "hablar");
   await page.locator("#duo-start").click();
   await expect(page.locator("#duo-now p.kicker")).toBeVisible();
 });
@@ -214,7 +220,7 @@ test("STAR draft box in interview", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => localStorage.setItem("enlab-cefr", "b1"));
   await page.reload();
-  await page.locator('[data-tab="hablar"]').click();
+  await openLabRoom(page, "interview-sim-card", "hablar");
   await expect(page.locator(".star-draft")).toBeVisible();
 });
 
@@ -244,14 +250,14 @@ test("pharmacy and school situations exist", async ({ page }) => {
   expect(ok.ph).toBe(true);
   expect(ok.sc).toBe(true);
   expect(ok.sitN).toBe(true);
+  await openHoyExtras(page);
   await page.locator("[data-sit-key='pharmacy']").click();
   await expect(page.locator("#situation-phrases")).toContainText(/prescription|ibuprofen/i);
 });
 
 test("listen quiz starts with a passage", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="quiz"]').click();
-  await page.locator('[data-quiz-mode="listen"]').click();
+  await openQuizMode(page, "listen");
   await page.locator("#quiz-start").click();
   await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
   await expect(page.locator("#listen-next-pass")).toBeVisible();
@@ -260,7 +266,7 @@ test("listen quiz starts with a passage", async ({ page }) => {
 test("classroom PIN blocks level change", async ({ page }) => {
   await boot(page);
   page.on("dialog", (d) => d.dismiss());
-  await page.locator("#class-box").locator("summary").click();
+  await revealInFolds(page, "#class-pin");
   await page.locator("#class-pin").fill("1234");
   await page.locator("#class-pin-save").click();
   await expect(page.locator("#class-pin-status")).toContainText(/PIN/i);
@@ -272,13 +278,14 @@ test("classroom PIN blocks level change", async ({ page }) => {
 
 test("chat tone filter shows formal", async ({ page }) => {
   await boot(page);
-  await page.locator('[data-tab="hablar"]').click();
+  await openLabRoom(page, "chat-work-card", "hablar");
   await page.locator("#chat-tone-filter").selectOption("formal");
   await expect(page.locator(".chat-msg.formal").first()).toBeVisible();
 });
 
 test("podcast of the day on Hoy", async ({ page }) => {
   await boot(page);
+  await openHoyExtras(page);
   await expect(page.locator("#podcast-today")).toBeVisible();
   await expect(page.locator("#podcast-today [data-podcast]")).toBeVisible();
 });

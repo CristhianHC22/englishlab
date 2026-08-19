@@ -383,11 +383,28 @@
   /* ── Render: Writing rubric (Lote V) ── */
   function renderWritingPanel() {
     const host = document.querySelector("#writing-panel");
-    if (!host || !ENLAB.writingPrompts) return;
-    const done = new Set(JSON.parse(localStorage.getItem("enlab-writing-done") || "[]"));
-    const prompts = ENLAB.writingPrompts.filter((p) => (p.min || 1) <= (typeof lvlNum === "function" ? lvlNum() : 2));
-    const pick = window._writingPick || prompts[0];
+    if (!host) return;
+    const all = (ENLAB.writingPrompts || []).filter((p) => p && p.prompt);
+    if (!all.length) {
+      host.innerHTML = "";
+      return;
+    }
+    const lvl = typeof lvlNum === "function" ? lvlNum() : 3;
+    let prompts = all.filter((p) => (p.min || 1) <= lvl);
+    if (!prompts.length) {
+      const lo = Math.min(...all.map((p) => p.min || 1));
+      prompts = all.filter((p) => (p.min || 1) === lo);
+    }
+    const pick = prompts.find((p) => p.id && p.id === window._writingPick?.id) || prompts[0];
+    if (!pick) {
+      host.innerHTML = "";
+      return;
+    }
     window._writingPick = pick;
+    const checklist = Array.isArray(pick.checklist) ? pick.checklist : [];
+    const hints = Array.isArray(pick.hints) ? pick.hints : [];
+    let done = new Set();
+    try { done = new Set(JSON.parse(localStorage.getItem("enlab-writing-done") || "[]")); } catch { /* ignore */ }
     host.innerHTML = `
       <p class="kicker">${esc(typeof t === "function" ? t("writing") : "Writing con rúbrica")}</p>
       <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
@@ -402,10 +419,10 @@
         </div>
         <div class="card">
           <h4>${esc(typeof t === "function" ? t("writeModel") : "Modelo")}</h4>
-          <pre class="email-body">${esc(pick.model)}</pre>
+          <pre class="email-body">${esc(pick.model || "")}</pre>
           <h4>${esc(typeof t === "function" ? t("writeRubric") : "Rúbrica")}</h4>
-          <ul class="writing-rubric">${pick.checklist.map((c) => `<li data-rubric="${esc(c.id)}">${esc(c.label)} <span class="rubric-ok">○</span></li>`).join("")}</ul>
-          <p class="muted">${esc(typeof t === "function" ? t("writeHints") : "Hints")}: ${pick.hints.map((h) => esc(h)).join(", ")}</p>
+          <ul class="writing-rubric">${checklist.map((c) => `<li data-rubric="${esc(c.id)}">${esc(c.label)} <span class="rubric-ok">○</span></li>`).join("")}</ul>
+          <p class="muted">${esc(typeof t === "function" ? t("writeHints") : "Hints")}: ${hints.map((h) => esc(h)).join(", ")}</p>
         </div>
       </div>
       <p id="writing-result" class="muted"></p>`;
@@ -423,21 +440,22 @@
     const words = draft.split(/\s+/).filter(Boolean).length;
     let total = 0;
     let max = 0;
-    pick.checklist.forEach((c) => {
+    const list = Array.isArray(pick.checklist) ? pick.checklist : [];
+    list.forEach((c) => {
       max += c.weight;
       let ok = false;
       if (c.id === "length") ok = words >= 15 && words <= 120;
       else if (c.id === "tone") ok = /thank|please|sorry|dear|hi|hey|best|regards|sincerely/i.test(draft);
-      else if (c.id === "connectors") ok = pick.hints.some((h) => lower.includes(h.toLowerCase()));
+      else if (c.id === "connectors") ok = (pick.hints || []).some((h) => lower.includes(h.toLowerCase()));
       else if (c.id === "action" || c.id === "ask" || c.id === "cta") ok = /\?|please|could|would|can/i.test(draft);
       else if (c.id === "context" || c.id === "specific" || c.id === "fit") ok = words >= 20;
       else if (c.id === "cover") ok = /@|\bcover\b|backup|urgent/i.test(draft);
-      else ok = pick.hints.some((h) => lower.includes(h.toLowerCase()));
+      else ok = (pick.hints || []).some((h) => lower.includes(h.toLowerCase()));
       total += ok ? c.weight : 0;
       const li = document.querySelector(`[data-rubric="${c.id}"] .rubric-ok`);
       if (li) li.textContent = ok ? "✓" : "○";
     });
-    const pct = Math.round((total / max) * 100);
+    const pct = max ? Math.round((total / max) * 100) : 0;
     if (result) result.textContent = `Rúbrica: ${pct}% · ${words} palabras`;
     if (pct >= 60) {
       const done = new Set(JSON.parse(localStorage.getItem("enlab-writing-done") || "[]"));
@@ -659,17 +677,20 @@
     }
     if (task === "podcast") {
       showTab("vocales");
-      document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth" });
+      if (typeof openOidoTopic === "function") openOidoTopic("oido-podcasts");
+      else document.querySelector("#podcast-block")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
     if (task === "pron") {
       showTab("vocales");
-      document.querySelector("#pron-panel")?.scrollIntoView({ behavior: "smooth" });
+      if (typeof openOidoTopic === "function") openOidoTopic("pron-panel");
+      else document.querySelector("#pron-panel")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
     if (task === "story") {
       showTab("vocales");
-      document.querySelector("#stories-panel")?.scrollIntoView({ behavior: "smooth" });
+      if (typeof openOidoTopic === "function") openOidoTopic("stories-panel");
+      else document.querySelector("#stories-panel")?.scrollIntoView({ behavior: "smooth" });
     }
   }
 
@@ -727,7 +748,7 @@
       badge = document.createElement("p");
       badge.id = "offline-badge";
       badge.className = "offline-badge muted";
-      document.querySelector(".hero")?.appendChild(badge);
+      document.querySelector(".hero-tools")?.appendChild(badge);
     }
     const online = navigator.onLine;
     caches?.keys?.().then((keys) => {
@@ -744,7 +765,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v35";
+  const SW_CACHE = "enlab-v41";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1018,16 +1039,17 @@
   }
 
   function refreshPanels() {
-    if (!ENLAB.minimalPairs?.length) return;
-    renderPronPanel();
-    renderStoriesPanel();
-    renderWritingPanel();
-    renderClassPro();
-    renderClassTaskBanner();
-    renderHoyStoryChip();
-    renderA11yBar();
-    renderOfflineBadge();
-    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
+    [
+      renderPronPanel,
+      renderStoriesPanel,
+      renderWritingPanel,
+      renderClassPro,
+      renderClassTaskBanner,
+      renderHoyStoryChip,
+      renderA11yBar,
+      renderOfflineBadge,
+    ].forEach((fn) => { try { fn(); } catch (err) { console.warn(err); } });
+    try { window.PLUS?.renderErrorJournal?.(); } catch (err) { console.warn(err); }
   }
 
   function bootstrap() {

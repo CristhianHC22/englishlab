@@ -82,6 +82,7 @@
     if (typeof stopRecording === "function" && recState?.rec?.state === "recording") stopRecording(false);
     quiz = { i: 0, score: 0, items: makePlacementItems(), fails: [], mode: "place", host: "#quiz-box" };
     if (typeof showTab === "function") showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("place");
     if (typeof renderQuiz === "function") renderQuiz();
   }
 

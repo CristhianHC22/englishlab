@@ -5,7 +5,7 @@ alwaysApply: true
 
 # English Lab
 
-PWA vanilla en la raíz del repo. Lee `AGENTS.md` y `docs/ARQUITECTURA.md` antes de refactorizar.
+PWA vanilla en la raíz del repo. Lee `AGENTS.md`, `docs/ARQUITECTURA.md` y `docs/ESTANDAR.md` antes de refactorizar o añadir un menú.
 
 - Sin bundler, React o TS. Contenido nuevo → `pack-*.js` diferido. UI tardía → `features-*.js`. Núcleo → `app.js`.
 - No envuelvas `paintTab`. Usa `onTabPaint` / `onHomePaint`.
@@ -13,4 +13,5 @@ PWA vanilla en la raíz del repo. Lee `AGENTS.md` y `docs/ARQUITECTURA.md` antes
 - Cadenas de UI: ES y EN en `i18n.js`, vía `t()`.
 - Visual: actualizar snapshots **win32 y linux** (Docker en el comentario de `tests/visual.spec.js`).
 - Cache SW: mismo `enlab-vNN` en `sw.js` y `features-sv.js`.
+- **6 pestañas.** Hub → sala (`.lab-*`, `openLabRoom`). Guía explica la pantalla; Ayuda = herramientas. Receta en `docs/ESTANDAR.md`.
 - No commitear `vapid-private.json`, `push-sub.json`, `node_modules`, `test-results/`.
