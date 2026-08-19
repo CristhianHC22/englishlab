@@ -544,3 +544,9 @@ Avance v109:
 - **Guía kids**: hints de plan/repaso/cert excluidos; caché incluye modo niño y timer extra.
 - **Performance**: caché panel Rendimiento invalidada al cambiar fricción quiz.
 - Cache SW: `enlab-v87`.
+
+Avance v109 (cont.):
+
+- **Quickmix hot**: caché diaria incluye firma de fricción (no queda stale tras seed en tests).
+- **Tests**: filtro heatmap vía chip; auto-quickmix al abrir sala exámenes.
+- Cache SW: `enlab-v88`.

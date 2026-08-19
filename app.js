@@ -936,22 +936,35 @@ function quickmixFrictionHigh() {
   return !!(top && top.sessions >= 2 && top.drop >= 40);
 }
 
-let _quickmixHotCache = { day: "", hot: false };
+let _quickmixHotCache = { day: "", sig: "", hot: false };
 
 function invalidateQuickmixHotCache() {
-  _quickmixHotCache.day = "";
+  _quickmixHotCache = { day: "", sig: "", hot: false };
+}
+
+function quickmixFrictionDailySig(minDays = 3) {
+  let sig = "";
+  for (let i = 0; i < minDays; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    sig += `${dateKey(d)}:${dayFrictionHigh(dateKey(d)) ? 1 : 0}|`;
+  }
+  return sig;
 }
 
 function quickmixFrictionStreak(minDays = 3) {
   const today = todayKey();
-  if (minDays === 3 && _quickmixHotCache.day === today) return _quickmixHotCache.hot;
+  const sig = quickmixFrictionDailySig(minDays);
+  if (minDays === 3 && _quickmixHotCache.day === today && _quickmixHotCache.sig === sig) {
+    return _quickmixHotCache.hot;
+  }
   let hot = true;
   for (let i = 0; i < minDays; i += 1) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     if (!dayFrictionHigh(dateKey(d))) { hot = false; break; }
   }
-  if (minDays === 3) _quickmixHotCache = { day: today, hot };
+  if (minDays === 3) _quickmixHotCache = { day: today, sig, hot };
   return hot;
 }
 

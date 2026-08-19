@@ -882,7 +882,7 @@ test("Quickmix auto-selected opening exams after hot streak", async ({ page }) =
     if (sel) sel.value = "weekly";
   });
   await page.locator('nav.tabs [data-tab="quiz"]').click();
-  await openQuizMode(page, "weekly");
+  await openLabRoom(page, "quiz-exams", "quiz");
   await expect(page.locator("#quiz-mode")).toHaveValue("quickmix");
 });
 

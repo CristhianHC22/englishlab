@@ -144,7 +144,7 @@ test("Hablar: heatmap row filters roster", async ({ page }) => {
     ]));
     if (window.SV?.renderClassPro) window.SV.renderClassPro();
   });
-  await page.locator(".class-plan-heat-row[data-plan-heat-filter='pending']").click();
+  await page.locator('.class-plan-heat-filters [data-plan-heat-filter="pending"]').click();
   await expect(page.locator(".class-roster-table tbody")).toContainText("Ana");
   await expect(page.locator(".class-roster-table tbody")).not.toContainText("Luis");
 });
