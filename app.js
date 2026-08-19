@@ -11,6 +11,7 @@ let verbLimit = 24;
 let hoyPairI = 0;
 let hoyPathI = -1;
 let hoyPathDay = "";
+let jumpNote = "";
 const dirty = { vowels: true, verbs: true, speak: true, ai: true, hablar: true, hoy: true };
 const oidoPainted = new Set();
 let oidoObserver = null;
@@ -96,8 +97,15 @@ function applyHideEs() {
   syncPrefsBadge();
 }
 
+function prefersReducedMotion() {
+  try { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+}
+
 function buzz(ok) {
-  try { navigator.vibrate?.(ok ? [30, 50, 30] : [90]); } catch { /* ignore */ }
+  try {
+    if (prefersReducedMotion()) return;
+    navigator.vibrate?.(ok ? [30, 50, 30] : [90]);
+  } catch { /* ignore */ }
 }
 
 let wakeLock = null;
@@ -113,6 +121,10 @@ function releaseWake() {
 }
 
 function speak(text, slow = false, opts = {}) {
+  if (typeof speechSynthesis === "undefined") {
+    showVoiceWarn("tts");
+    return Promise.resolve();
+  }
   if (opts.cancel !== false) window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const pref = opts.lang || localStorage.getItem("enlab-accent-pref") || "us";
@@ -127,10 +139,52 @@ function speak(text, slow = false, opts = {}) {
   if (en) u.voice = en;
   return new Promise((resolve) => {
     u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onerror = (e) => {
+      const err = e && e.error;
+      if (err && err !== "interrupted" && err !== "canceled") showVoiceWarn("tts");
+      resolve();
+    };
     speechSynthesis.speak(u);
   });
 }
+
+function showVoiceWarn(kind) {
+  const el = $("#voice-warn");
+  const text = $("#voice-warn-text");
+  if (!el) return;
+  const msg = kind === "mic" ? t("speakMicDenied") : t("speakTtsBlocked");
+  if (text) text.textContent = msg;
+  else el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(showVoiceWarn._t);
+  showVoiceWarn._t = setTimeout(() => { el.hidden = true; }, 16000);
+}
+
+function hideVoiceWarn() {
+  const el = $("#voice-warn");
+  if (el) el.hidden = true;
+  clearTimeout(showVoiceWarn._t);
+}
+
+function syncNetWarn() {
+  const el = $("#net-warn");
+  const off = navigator.onLine === false;
+  document.body.classList.toggle("is-offline", off);
+  if (!el) return;
+  el.hidden = !off;
+  if (off) el.textContent = t("netWarn");
+}
+
+function setSpeakPhase(phase) {
+  $$(".speak-steps [data-speak-phase]").forEach((el) => {
+    el.classList.toggle("on", el.dataset.speakPhase === phase);
+  });
+  $("#speak-listen")?.classList.toggle("next-act", phase === "hear");
+  $("#speak-rec")?.classList.toggle("next-act", phase === "rec");
+}
+
+window.addEventListener("offline", syncNetWarn);
+window.addEventListener("online", () => { syncNetWarn(); });
 speechSynthesis.onvoiceschanged = () => {};
 
 async function speakQueue(words, slow = true) {
@@ -180,6 +234,14 @@ function todayKey() {
 
 function localDateKey(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function daysAgo(day) {
+  if (!day || typeof day !== "string") return 0;
+  const a = Date.parse(`${day}T12:00:00`);
+  const b = Date.parse(`${todayKey()}T12:00:00`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.round((b - a) / 86400000);
 }
 
 function loadSet(key) {
@@ -391,6 +453,11 @@ function renderHomeStats() {
 }
 
 function showTab(id) {
+  if (currentTab === "hoy" && id !== "hoy") persistCierreNow();
+  if (currentTab === "quiz" && id !== "quiz") {
+    persistWeeklyNow();
+    window.PLUS?.persistPlaceNow?.();
+  }
   currentTab = id;
   clearEarTimers();
   $$(".panel").forEach((p) => p.classList.toggle("active", p.id === id));
@@ -441,10 +508,13 @@ function fireRecording(phase) {
 }
 
 function paintTab(id) {
-  if (id === "vocales" && dirty.vowels) {
-    renderOidoToc();
-    renderVowels();
-    dirty.vowels = false;
+  if (id === "vocales") {
+    if (dirty.vowels) {
+      renderOidoToc();
+      renderVowels();
+      dirty.vowels = false;
+    }
+    renderOidoResume();
   }
   if (id === "verbos" && dirty.verbs) {
     verbLimit = 24;
@@ -816,26 +886,74 @@ function renderSituationPhraseList(key) {
 let sitShadowTimer = null;
 let hoyShadowTimer = null;
 
+function stopHoyPairShadow() {
+  clearTimeout(hoyShadowTimer);
+  hoyShadowTimer = null;
+}
+
+function paintShadowAgain(el, attrs) {
+  if (!el) return;
+  el.innerHTML = `${esc(t("sitShadowDone"))} <button type="button" class="chip sm"${attrs ? ` ${attrs}` : ""}>${esc(t("sitShadowAgain"))}</button>`;
+}
+
+let hoyShadowI = 0;
+let hoyShadowStopped = false;
+
+function paintHoyShadowNow(n, total) {
+  const el = $("#hoy-shadow-status");
+  if (!el) return;
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const nextBtn = kids ? "" : `<button type="button" class="chip sm" data-hoy-shadow-next>${esc(t("sitShadowNext"))}</button>`;
+  el.innerHTML = `${esc(t("sitShadowNow", { n, total }))}
+    ${nextBtn}
+    <button type="button" class="chip sm" data-hoy-shadow-stop>${esc(t("sitShadowStop"))}</button>`;
+}
+
+function stopHoyPairShadowAndCue() {
+  stopHoyPairShadow();
+  hoyShadowStopped = true;
+  const list = (window._dailyPairs || []).slice(0, 4);
+  const p = list[hoyShadowI];
+  if (p) markSession("pairs", `${p.short}|${p.long}`);
+  const el = $("#hoy-shadow-status");
+  if (el) el.textContent = t("sitShadowStopped");
+  cueHoyNext();
+}
+
+function loopHoyPairShadow() {
+  const list = (window._dailyPairs || []).slice(0, 4);
+  if (!list.length) return;
+  if (hoyShadowI >= list.length) {
+    if (typeof kidsOn === "function" && kidsOn() && hoyShadowStopped) {
+      const el = $("#hoy-shadow-status");
+      if (el) el.textContent = t("sitShadowStopped");
+      return;
+    }
+    paintShadowAgain($("#hoy-shadow-status"), "data-hoy-shadow-again");
+    cueHoyNext();
+    return;
+  }
+  $$("#daily-pairs .say").forEach((b) => b.classList.remove("next-act"));
+  $$("#daily-pairs .card")[hoyShadowI]?.querySelector(".say")?.classList.add("next-act");
+  const p = list[hoyShadowI];
+  paintHoyShadowNow(hoyShadowI + 1, list.length);
+  speak(p.long || p.short, true);
+  hoyShadowTimer = setTimeout(loopHoyPairShadow, 4500);
+}
+
 function runHoyPairShadow() {
   const pairs = window._dailyPairs || [];
   if (!pairs.length) return;
-  clearTimeout(hoyShadowTimer);
-  let i = 0;
-  const list = pairs.slice(0, 4);
-  const step = () => {
-    if (i >= list.length) {
-      const el = $("#hoy-shadow-status");
-      if (el) el.textContent = t("sitShadowDone");
-      return;
-    }
-    const p = list[i];
-    i += 1;
-    const el = $("#hoy-shadow-status");
-    if (el) el.textContent = t("sitShadowNow", { n: i, total: list.length });
-    speak(p.long || p.short, true);
-    hoyShadowTimer = setTimeout(step, 4500);
-  };
-  step();
+  stopHoyPairShadow();
+  hoyShadowStopped = false;
+  hoyShadowI = 0;
+  loopHoyPairShadow();
+}
+
+function advanceHoyPairShadow() {
+  stopHoyPairShadow();
+  hoyShadowI += 1;
+  loopHoyPairShadow();
 }
 
 function runSituationShadow(key) {
@@ -846,8 +964,7 @@ function runSituationShadow(key) {
   let i = 0;
   const step = () => {
     if (i >= list.length) {
-      const el = $("#sit-shadow-status");
-      if (el) el.textContent = typeof t === "function" ? t("sitShadowDone") : "Shadowing terminado.";
+      paintShadowAgain($("#sit-shadow-status"), `data-sit-shadow="${esc(key)}"`);
       return;
     }
     const p = list[i];
@@ -899,12 +1016,37 @@ function renderPodcastToday() {
   }
   const [Y, M, D] = todayKey().split("-").map(Number);
   const p = list[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % list.length];
+  let now = null;
+  try { now = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null"); } catch { now = null; }
+  const mid = now?.id === p.id && now.day === todayKey() && now.seg > 0 && now.seg < (p.segments || []).length;
+  const goLabel = mid
+    ? t("podcastResume", { n: now.seg + 1, total: (p.segments || []).length })
+    : t("podcastListen");
+  const segAttr = mid ? ` data-pod-seg="${esc(String(now.seg))}"` : "";
+  let otherBanner = "";
+  if (now?.id && now.id !== p.id && now.day === todayKey()) {
+    const other = list.find((x) => x.id === now.id);
+    if (other) {
+      const segs = other.segments || [];
+      const midOther = now.seg > 0 && now.seg < segs.length;
+      const otherLabel = midOther
+        ? t("podcastResume", { n: now.seg + 1, total: segs.length })
+        : t("podcastListen");
+      const otherSeg = midOther ? ` data-pod-seg="${esc(String(now.seg))}"` : "";
+      otherBanner = `
+        <div class="podcast-other-resume">
+          <p class="kicker">${esc(t("podcastResumeKicker"))}</p>
+          <p class="muted">${esc(other.title)}</p>
+          <button type="button" class="btn sm" data-podcast="${esc(other.id)}"${otherSeg}>${esc(otherLabel)}</button>
+        </div>`;
+    }
+  }
   el.hidden = false;
-  el.innerHTML = `
+  el.innerHTML = `${otherBanner}
     <p class="kicker">${esc(t("podcast"))} · ${esc(t("podcastOfDay"))}</p>
     <p><strong>${esc(p.title)}</strong> · ${esc(p.duration || "~60 s")}</p>
     <p class="muted">${esc(t("podcastSegCount", { n: (p.segments || []).length }))}</p>
-    <button type="button" class="btn sm" data-podcast="${esc(p.id)}">${esc(t("podcastListen"))}</button>`;
+    <button type="button" class="btn sm" data-podcast="${esc(p.id)}"${segAttr}>${esc(goLabel)}</button>`;
 }
 
 function phraseBank() {
@@ -950,8 +1092,9 @@ function renderHome(force) {
   const daily = todaysDeck();
   const dailyPairs = pairsForToday().slice(0, 4);
   window._dailyPairs = dailyPairs;
-  $("#daily-verbs").innerHTML = daily.map((v) => verbCard(v, true)).join("");
+  renderDailyVerbs(daily);
   $("#daily-pairs").innerHTML = dailyPairs.map(pairRow).join("");
+  cueFirstPairHear();
   const dailyRole = $("#daily-role");
   if (dailyRole) {
     const roles = rolesForLevel();
@@ -970,6 +1113,10 @@ function renderHome(force) {
   renderDueToday();
   renderSituations();
   renderPodcastToday();
+  renderCierreToday();
+  renderWeeklyToday();
+  window.PLUS?.renderPlaceToday?.();
+  window.NR?.renderDuoToday?.();
   renderTransferCode();
   upsertLog();
   renderClock();
@@ -993,6 +1140,38 @@ function renderHoyGame() {
     <p class="kicker">${esc(t("hoyGameKicker"))}</p>
     <p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button>${extra}</p>
     <p class="muted">${esc(g.hint)} ${esc(t("hoyGameAlso"))}</p>`;
+}
+
+function renderDailyVerbs(daily) {
+  const box = $("#daily-verbs");
+  if (!box) return;
+  const deck = daily || (typeof todaysDeck === "function" ? todaysDeck() : []);
+  const v = typeof verbOfDay === "function" ? verbOfDay() : deck[0];
+  if (!v) {
+    box.innerHTML = "";
+    return;
+  }
+  const rest = deck.filter((x) => x.inf !== v.inf).slice(0, 9);
+  const weak = weakSet().has(v.inf);
+  const known = knownSet().has(v.inf);
+  const why = weak ? t("verbTodayWeak") : t("verbTodayPath");
+  const heard = sessionData().verbs.includes(v.inf);
+  const extra = (typeof kidsOn === "function" && kidsOn()) || !rest.length
+    ? ""
+    : `<details class="fold daily-verbs-more"><summary>${esc(t("hoyVerbsMore", { n: rest.length }))}</summary>${rest.map((x) => verbCard(x, true)).join("")}</details>`;
+  box.innerHTML = `<div data-track="verb" data-verb="${esc(v.inf)}">
+    <p class="kicker">${esc(t("verbTodayKicker"))}</p>
+    <p class="quiz-q">${esc(v.inf)}</p>
+    <p class="muted"><span class="es-line">${esc(v.es)}</span> · ${esc(v.past)} / ${esc(v.pp)}</p>
+    <p class="muted">${esc(why)}</p>
+    <div class="row">
+      <button type="button" class="say${heard ? "" : " next-act"}" data-say="${esc(v.inf)}">${esc(t("verbPresent"))}</button>
+      <button type="button" class="say" data-say="${esc(speakForms(v))}">${esc(t("verbForms"))}</button>
+      <button type="button" class="btn ghost sm" data-weak="${esc(v.inf)}">${weak ? esc(t("verbWeakOff")) : esc(t("verbWeak"))}</button>
+      <button type="button" class="btn ghost sm" data-known="${esc(v.inf)}">${known ? esc(t("verbStrongOff")) : esc(t("verbStrong"))}</button>
+      <button type="button" class="btn ghost sm" data-go-tab="verbos">${esc(t("hoyVerbsList"))}</button>
+    </div>
+  </div>${extra}`;
 }
 
 function ensureHoyPathDay() {
@@ -1021,7 +1200,7 @@ function hoyPath() {
   steps.push({ id: "dialog", sel: "#hoy-step-4", label: t("pathStepDialog") });
   const planI = dayTheme().i - 1;
   if (planI >= 17 && planI <= 20 && lvlNum() >= 2) {
-    steps.push({ id: "flap", sel: "#block-rhythm", label: t("pathStepFlap") });
+    steps.push({ id: "flap", sel: "#hoy-step-flap", label: t("pathStepFlap") });
   }
   steps.push({ id: "cierre", sel: "#hoy-step-cierre", label: t("pathStepCierre") });
   return steps;
@@ -1036,8 +1215,40 @@ function pathHint(step) {
   return "";
 }
 
+function syncFlapStepVisibility() {
+  const flap = $("#hoy-step-flap");
+  if (!flap) return;
+  const show = hoyPath().some((s) => s.id === "flap");
+  flap.hidden = !show;
+}
+
+function reconcileHoyPathI() {
+  const path = hoyPath();
+  if (hoyPathI < 0 || hoyPathI >= path.length) return;
+  const id = sessionStorage.getItem("enlab-hoy-step-id");
+  if (!id) {
+    sessionStorage.setItem("enlab-hoy-step-id", path[hoyPathI].id);
+    return;
+  }
+  const at = path.findIndex((s) => s.id === id);
+  if (at >= 0) {
+    if (at !== hoyPathI) {
+      hoyPathI = at;
+      persistHoyPath();
+    }
+    return;
+  }
+  hoyPathI = Math.min(hoyPathI, path.length);
+  persistHoyPath();
+  if (hoyPathI >= 0 && hoyPathI < path.length) {
+    sessionStorage.setItem("enlab-hoy-step-id", path[hoyPathI].id);
+  }
+}
+
 function renderHoyPath() {
   ensureHoyPathDay();
+  syncFlapStepVisibility();
+  reconcileHoyPathI();
   const path = hoyPath();
   const hoy = $("#hoy");
   if (hoy) {
@@ -1060,8 +1271,51 @@ function renderHoyPath() {
     text = g.game ? t("pathDoneGame") : t("pathDoneExplore");
     label = t("pathRepeat");
   }
+  if (i >= 0 && i <= last && path[i].id === "cierre"
+    && quiz?.mode === "cierre" && quiz.items?.length && quiz.i < quiz.items.length) {
+    label = t("cierreStay");
+  }
   if (copy) copy.textContent = text;
   $$(".hoy-next").forEach((b) => { b.textContent = label; });
+  $$(".hoy-path-foot .hoy-next").forEach((b) => b.classList.remove("next-act"));
+  if (i >= 0 && i <= last) {
+    const s = sessionData();
+    if (path[i].id === "verbs") {
+      const v = typeof verbOfDay === "function" ? verbOfDay() : null;
+      if (v && s.verbs.includes(v.inf)) cueHoyNext();
+    }
+    if (path[i].id === "pairs" && s.pairs.length) cueHoyNext();
+    if (path[i].id === "dialog" && s.phrases.length) cueHoyNext();
+    if (path[i].id === "flap" && sessionStorage.getItem(`enlab-flap-${todayKey()}`)) cueHoyNext();
+  }
+  const doneBox = $("#hoy-done");
+  const doneCopy = $("#hoy-done-copy");
+  if (doneBox) {
+    const done = hoy?.classList.contains("path-done");
+    doneBox.hidden = !done;
+    if (done && doneCopy) doneCopy.textContent = t("hoyDoneCopy");
+    const r = loadCierreResult();
+    const cierreLine = $("#hoy-done-cierre");
+    if (cierreLine) {
+      cierreLine.hidden = !(done && r);
+      if (done && r) cierreLine.textContent = t("hoyDoneCierre", { score: r.score, n: r.n });
+    }
+    const verbsBtn = $("#hoy-done-verbs");
+    if (verbsBtn) verbsBtn.hidden = !(done && r?.verbFail);
+    const earBtn = $("#hoy-done-ear");
+    if (earBtn) earBtn.hidden = !(done && r?.earFail);
+    const usoBtn = $("#hoy-done-uso");
+    if (usoBtn) usoBtn.hidden = !(done && r?.useFail);
+    syncHoyDoneTimer();
+    renderHoyDoneMid();
+    if (window.SV?.renderHoyStoryChip) window.SV.renderHoyStoryChip();
+    const streakEl = $("#hoy-done-streak");
+    if (streakEl) {
+      const n = (typeof stats === "function" ? stats() : {}).streak || 0;
+      streakEl.hidden = !done;
+      if (done) streakEl.textContent = t("hoyDoneStreak", { n });
+    }
+  }
   syncSessionFocus();
   fillYouAre();
 }
@@ -1074,16 +1328,142 @@ function syncSessionFocus() {
   document.body.classList.toggle("session-focus", !!on);
 }
 
-function goHoyStep(i) {
+function cueHoyNext() {
+  const foot = document.querySelector(".hoy-path-foot .hoy-next");
+  if (!foot || foot.hidden) return;
+  foot.classList.add("next-act");
+}
+
+function cueFirstPairHear() {
+  if (sessionData().pairs.length) return;
+  $("#daily-pairs .say")?.classList.add("next-act");
+}
+
+function finishHoyPath() {
+  hoyPathI = hoyPath().length;
+  persistHoyPath();
+  $$(".step-card").forEach((c) => c.classList.remove("path-now"));
+  pauseTimer();
+  renderHoyPath();
+  if (typeof renderQuizNow === "function") renderQuizNow();
+}
+
+function cierreFailOf(types) {
+  const fails = quiz.fails || [];
+  return (quiz.items || []).find((it) => fails.includes(it.inf) && types.includes(it.type))?.inf || "";
+}
+
+function saveCierreResult() {
+  try {
+    const verbFail = cierreFailOf(["choice", "type"]);
+    const earFail = cierreFailOf(["ear"]);
+    const useFail = (quiz.items || []).find((it) =>
+      (quiz.fails || []).includes(it.inf)
+      && it.type !== "ear" && it.type !== "choice" && it.type !== "type"
+    )?.inf || "";
+    sessionStorage.setItem("enlab-cierre-result", JSON.stringify({
+      day: todayKey(),
+      score: quiz.score,
+      n: (quiz.items || []).length,
+      fails: (quiz.fails || []).length,
+      verbFail,
+      earFail,
+      useFail,
+    }));
+  } catch { /* ignore */ }
+}
+
+function loadCierreResult() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-cierre-result") || "null");
+    if (raw?.day === todayKey() && typeof raw.score === "number") return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function loadCierreNow() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-cierre-now") || "null");
+    if (raw?.day !== todayKey()) return null;
+    if (sessionData().quizDone) return null;
+    if (Array.isArray(raw.items) && raw.i > 0 && raw.i < raw.items.length) return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function persistCierreNow() {
+  if (quiz?.mode !== "cierre" || !quiz.items?.length || quiz.i <= 0 || quiz.i >= quiz.items.length) return;
+  try {
+    sessionStorage.setItem("enlab-cierre-now", JSON.stringify({
+      day: todayKey(),
+      i: quiz.i,
+      score: quiz.score || 0,
+      fails: quiz.fails || [],
+      items: quiz.items,
+    }));
+  } catch { /* ignore */ }
+  renderCierreToday();
+}
+
+function clearCierreNow() {
+  sessionStorage.removeItem("enlab-cierre-now");
+}
+
+function renderCierreToday() {
+  const el = $("#cierre-today");
+  if (!el) return;
+  if (typeof kidsOn === "function" && kidsOn()) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const now = loadCierreNow();
+  if (!now) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("cierreResumeKicker"))}</p>
+    <p class="muted">${esc(t("cierreResumeHint"))}</p>
+    <button type="button" class="btn sm" data-cierre-resume>${esc(t("cierreResume", { i: now.i + 1, total: now.items.length }))}</button>`;
+  renderHoyDoneMid();
+}
+
+function oidoLastTitle() {
+  try {
+    const last = JSON.parse(localStorage.getItem("enlab-oido-last") || "null");
+    if (!last?.id) return "";
+    const inHub = typeof oidoHubItems === "function" && oidoHubItems().some((i) => i.jump === last.id);
+    if (!inHub) return "";
+    const topic = document.querySelector(`[data-lab="${CSS.escape(last.id)}"]`);
+    const fromDom = topic?.querySelector("h3")?.textContent?.trim() || topic?.querySelector("strong")?.textContent?.trim();
+    if (fromDom) return fromDom;
+    const item = oidoHubItems().find((i) => i.jump === last.id);
+    return item ? t(item.key) : "";
+  } catch { return ""; }
+}
+
+function goHoyStep(i, opts) {
   const path = hoyPath();
   if (i < 0 || i >= path.length) return;
+  if (path[i]?.id !== "pairs") stopHoyPairShadow();
+  if (path[i]?.id !== "pairs") hoyShadowStopped = false;
   if (recState.rec && recState.rec.state === "recording") stopRecording(false);
+  $$(".hoy-path-foot .hoy-next").forEach((b) => b.classList.remove("next-act"));
   hoyPathI = i;
   persistHoyPath();
+  try { sessionStorage.setItem("enlab-hoy-step-id", path[i].id); } catch { /* ignore */ }
   $$(".step-card").forEach((c) => c.classList.remove("path-now", "flash"));
-  paintOidoByJump((path[i].sel || "").replace("#", ""));
-  openOidoTopic((path[i].sel || "").replace("#", ""));
+  const jump = (path[i].sel || "").replace("#", "");
   const el = $(path[i].sel);
+  if (el?.closest("#hoy")) {
+    if (path[i].id === "flap") paintOidoRhythm();
+  } else {
+    paintOidoByJump(jump);
+    openOidoTopic(jump);
+  }
   if (el && el.style.display !== "none") el.classList.add("path-now", "flash");
   const hoy = $("#hoy");
   if (hoy) {
@@ -1094,8 +1474,18 @@ function goHoyStep(i) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => el.classList.remove("flash"), 1200);
   }
-  if (path[i].id === "cierre") startCierreQuiz();
+  if (path[i].id === "cierre") {
+    if (opts?.cierreResume) startCierreQuiz({ resume: true });
+    else startCierreQuiz();
+  }
   renderHoyPath();
+}
+
+function markQuizFromHoy(on) {
+  try {
+    if (on) sessionStorage.setItem("enlab-quiz-from-hoy", "1");
+    else sessionStorage.removeItem("enlab-quiz-from-hoy");
+  } catch { /* ignore */ }
 }
 
 function startHoyGame() {
@@ -1106,10 +1496,12 @@ function startHoyGame() {
   persistHoyPath();
   renderHoyPath();
   if (g.game === "weekly") {
+    markQuizFromHoy(true);
     startWeeklyExam();
     return true;
   }
   if (g.game === "cert" && window.NR?.startCertExam) {
+    markQuizFromHoy(true);
     NR.startCertExam();
     return true;
   }
@@ -1130,6 +1522,7 @@ function startHoyGame() {
     document.querySelector("#chat-work-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
   }
+  markQuizFromHoy(true);
   const sel = $("#quiz-mode");
   if (sel && g.game) sel.value = g.game;
   syncQuizModePicks();
@@ -1155,11 +1548,12 @@ function advanceHoyPath() {
       quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    if (sessionData().quizDone) {
+      finishHoyPath();
+      return;
+    }
     if (startHoyGame()) return;
-    hoyPathI = path.length;
-    persistHoyPath();
-    $$(".step-card").forEach((c) => c.classList.remove("path-now"));
-    renderHoyPath();
+    finishHoyPath();
     return;
   }
   goHoyStep(0);
@@ -1302,7 +1696,7 @@ function oidoSections() {
     { id: "silent", host: "#silent-list", jump: ["oido-mudas", "block-a2-extra"], render: paintOidoSilent },
     { id: "contra", host: "#contraction-list", jump: ["oido-contra"], render: paintOidoContra },
     { id: "endings", host: "#endings-list", jump: ["oido-endings", "block-endings"], render: paintOidoEndings },
-    { id: "rhythm", host: "#rhythm-list", jump: ["oido-ritmo", "block-rhythm"], render: paintOidoRhythm },
+    { id: "rhythm", host: "#rhythm-list", jump: ["oido-ritmo", "block-rhythm", "hoy-step-flap"], render: paintOidoRhythm },
     { id: "chunks", host: "#chunks-list", jump: ["oido-chunks", "block-chunks"], render: paintOidoChunks },
     { id: "tips", host: "#tips-list", jump: ["oido-tips", "block-b-tips"], render: paintOidoTips },
   ];
@@ -1418,15 +1812,28 @@ function paintOidoEndings() {
   renderGroupCards($("#endings-list"), ENLAB.tailTalk, lvlNum());
 }
 
+function cueFirstRhythmHear() {
+  const path = typeof hoyPath === "function" ? hoyPath() : [];
+  const i = typeof hoyPathI === "number" ? hoyPathI : -1;
+  if (path[i]?.id !== "flap") return;
+  try {
+    if (sessionStorage.getItem(`enlab-flap-${todayKey()}`)) return;
+  } catch { /* ignore */ }
+  ($("#hoy-rhythm-list .say") || $("#rhythm-list .say"))?.classList.add("next-act");
+}
+
 function paintOidoRhythm() {
-  const el = $("#rhythm-list");
-  if (!el) return;
-  el.innerHTML = (ENLAB.rhythm || []).filter((r) => (r.min || 3) <= lvlNum()).map((r) => `
+  const html = (ENLAB.rhythm || []).filter((r) => (r.min || 3) <= lvlNum()).map((r) => `
     <div class="card lesson" style="margin-bottom:12px">
       <h3>${esc(r.title)}</h3>
       <p>${esc(r.body)}</p>
       <div class="row">${sayWords(r.listen)}</div>
     </div>`).join("");
+  const el = $("#rhythm-list");
+  if (el) el.innerHTML = html;
+  const hoy = $("#hoy-rhythm-list");
+  if (hoy) hoy.innerHTML = html;
+  cueFirstRhythmHear();
 }
 
 function paintOidoChunks() {
@@ -1588,7 +1995,7 @@ function renderVerbs() {
   const list = filteredVerbs();
   const slice = list.slice(0, verbLimit);
   box.innerHTML = slice.map((v) => verbCard(v)).join("")
-    || "<p>No hay coincidencias.</p>";
+    || `<p class="muted">${esc(FILTERS.only === "weak" ? t("verbWeakEmpty") : t("verbNone"))}</p>`;
   if (slice.length && slice.length < list.length) {
     box.insertAdjacentHTML("beforeend",
       `<p style="margin:14px 0 0"><button type="button" class="btn" data-verb-more>Ver más (${list.length - slice.length})</button></p>`);
@@ -1598,6 +2005,47 @@ function renderVerbs() {
     total: list.length,
     all: ENLAB.verbs.length,
   });
+  renderVerbToday();
+}
+
+function verbOfDay() {
+  const theme = typeof dayTheme === "function" ? dayTheme() : {};
+  const find = (inf) => (ENLAB.verbs || []).find((v) => v.inf === inf);
+  const missed = typeof loadCierreResult === "function" ? loadCierreResult()?.verbFail : "";
+  if (missed) {
+    const hit = find(missed);
+    if (hit) return hit;
+  }
+  const themed = (theme.infs || []).map(find).filter(Boolean);
+  const weak = [...weakSet()].map(find).filter(Boolean);
+  const themedWeak = themed.find((v) => weakSet().has(v.inf));
+  const level = typeof verbsForLevel === "function" ? verbsForLevel() : [];
+  return themedWeak || themed[0] || weak[0] || level[0] || (ENLAB.verbs || [])[0] || null;
+}
+
+function renderVerbToday() {
+  const el = $("#verb-today");
+  if (!el) return;
+  const v = verbOfDay();
+  if (!v) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  const weak = weakSet().has(v.inf);
+  const known = knownSet().has(v.inf);
+  const fromCierre = typeof loadCierreResult === "function" && loadCierreResult()?.verbFail === v.inf;
+  const why = fromCierre ? t("verbTodayMiss") : (weak ? t("verbTodayWeak") : t("verbTodayPath"));
+  el.innerHTML = `<p class="kicker">${esc(fromCierre ? t("hoyDoneVerbs") : t("verbTodayKicker"))}</p>
+    <p class="quiz-q">${esc(v.inf)}</p>
+    <p class="muted"><span class="es-line">${esc(v.es)}</span> · ${esc(v.past)} / ${esc(v.pp)}</p>
+    <p class="muted">${esc(why)}</p>
+    <div class="row">
+      <button type="button" class="say" data-say="${esc(v.inf)}">${esc(t("verbPresent"))}</button>
+      <button type="button" class="say" data-say="${esc(speakForms(v))}">${esc(t("verbForms"))}</button>
+      <button type="button" class="btn ghost sm" data-weak="${esc(v.inf)}">${weak ? esc(t("verbWeakOff")) : esc(t("verbWeak"))}</button>
+      <button type="button" class="btn ghost sm" data-known="${esc(v.inf)}">${known ? esc(t("verbStrongOff")) : esc(t("verbStrong"))}</button>
+    </div>`;
 }
 
 function uniqueOpts(correct, pool) {
@@ -1998,6 +2446,164 @@ function markWeeklyExamDone(score, total) {
   localStorage.setItem("enlab-weekly-score", JSON.stringify({ week: weekStartKey(), score, total, at: todayKey() }));
 }
 
+function weeklyMidChipHtml() {
+  pruneWeeklyNow();
+  const now = loadWeeklyNow();
+  if (now) {
+    return `<button type="button" class="btn sm" data-weekly-resume>${esc(t("weeklyResume", { i: now.i + 1, total: now.items.length }))}</button>`;
+  }
+  const stale = loadWeeklyStale();
+  if (stale) return `<span class="muted">${esc(t("weeklyStaleHint", { i: stale.i + 1, total: stale.total }))}</span>`;
+  return "";
+}
+
+function hoyMidSessionChipsHtml() {
+  const parts = [];
+  const c = loadCierreNow();
+  if (c) parts.push(`<button type="button" class="btn sm" data-cierre-resume>${esc(t("cierreResume", { i: c.i + 1, total: c.items.length }))}</button>`);
+  const w = loadWeeklyNow();
+  if (w) parts.push(`<button type="button" class="btn sm" data-weekly-resume>${esc(t("weeklyResume", { i: w.i + 1, total: w.items.length }))}</button>`);
+  const p = window.PLUS?.loadPlaceNow?.();
+  if (p) parts.push(`<button type="button" class="btn sm" data-place-resume>${esc(t("placeResume", { i: p.i + 1, total: p.items.length }))}</button>`);
+  return parts.join(" ");
+}
+
+function renderHoyDoneMid() {
+  const el = $("#hoy-done-mid");
+  if (!el) return;
+  const done = $("#hoy")?.classList.contains("path-done");
+  const chips = done ? hoyMidSessionChipsHtml() : "";
+  el.hidden = !chips;
+  el.innerHTML = chips;
+}
+
+function renderWeeklyQuizResume() {
+  const el = $("#weekly-quiz-resume");
+  if (!el) return;
+  if (typeof kidsOn === "function" && kidsOn()) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  pruneWeeklyNow();
+  const now = loadWeeklyNow();
+  const stale = !now ? loadWeeklyStale() : null;
+  if (!now) {
+    el.hidden = true;
+    el.innerHTML = stale ? `<p class="muted">${esc(t("weeklyStaleHint", { i: stale.i + 1, total: stale.total }))}</p>` : "";
+    el.hidden = !stale;
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="muted">${esc(t("weeklyResumeHint"))}</p>
+    ${weeklyMidChipHtml()}`;
+}
+
+function hoyMidSessionLine() {
+  const c = loadCierreNow();
+  if (c) return t("cierreResume", { i: c.i + 1, total: c.items.length });
+  const w = loadWeeklyNow();
+  if (w) return t("weeklyResume", { i: w.i + 1, total: w.items.length });
+  const p = window.PLUS?.loadPlaceNow?.();
+  if (p) return t("placeResume", { i: p.i + 1, total: p.items.length });
+  return "";
+}
+
+function loadWeeklyNow() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-weekly-now") || "null");
+    if (raw?.week !== weekStartKey()) return null;
+    if (weeklyExamDone()) return null;
+    if (Array.isArray(raw.items) && raw.i > 0 && raw.i < raw.items.length) return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function pruneWeeklyNow() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-weekly-now") || "null");
+    if (!raw?.week || raw.week === weekStartKey()) return;
+    sessionStorage.setItem("enlab-weekly-stale", JSON.stringify({
+      week: raw.week,
+      i: raw.i || 0,
+      total: raw.items?.length || 12,
+    }));
+    sessionStorage.removeItem("enlab-weekly-now");
+  } catch { /* ignore */ }
+}
+
+function loadWeeklyStale() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-weekly-stale") || "null");
+    if (!raw?.week || raw.week === weekStartKey()) {
+      if (raw?.week === weekStartKey()) sessionStorage.removeItem("enlab-weekly-stale");
+      return null;
+    }
+    return raw;
+  } catch { return null; }
+}
+
+function clearWeeklyStale() {
+  sessionStorage.removeItem("enlab-weekly-stale");
+}
+
+function persistWeeklyNow() {
+  if (quiz?.mode !== "weekly" || !quiz.items?.length || quiz.i <= 0 || quiz.i >= quiz.items.length) return;
+  try {
+    sessionStorage.setItem("enlab-weekly-now", JSON.stringify({
+      week: weekStartKey(),
+      i: quiz.i,
+      score: quiz.score || 0,
+      fails: quiz.fails || [],
+      items: quiz.items,
+    }));
+  } catch { /* ignore */ }
+  renderWeeklyToday();
+  if (typeof renderWeekReport === "function") renderWeekReport();
+  renderWeeklyQuizResume();
+}
+
+function clearWeeklyNow() {
+  sessionStorage.removeItem("enlab-weekly-now");
+}
+
+function renderWeeklyToday() {
+  const el = $("#weekly-today");
+  if (!el) return;
+  if (typeof kidsOn === "function" && kidsOn()) {
+    el.hidden = true;
+    el.innerHTML = "";
+    renderWeeklyQuizResume();
+    return;
+  }
+  pruneWeeklyNow();
+  const now = loadWeeklyNow();
+  const stale = !now ? loadWeeklyStale() : null;
+  if (stale) {
+    el.hidden = false;
+    el.innerHTML = `<p class="muted">${esc(t("weeklyStaleHint", { i: stale.i + 1, total: stale.total }))}</p>`;
+    if (typeof renderWeekReport === "function") renderWeekReport();
+    renderWeeklyQuizResume();
+    return;
+  }
+  if (!now) {
+    el.hidden = true;
+    el.innerHTML = "";
+    if (typeof renderWeekReport === "function") renderWeekReport();
+    renderWeeklyQuizResume();
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("weeklyResumeKicker"))}</p>
+    <p class="muted">${esc(t("weeklyResumeHint"))}</p>
+    ${weeklyMidChipHtml()}`;
+  if (typeof renderWeekReport === "function") renderWeekReport();
+  renderWeeklyQuizResume();
+  renderHoyDoneMid();
+}
+
 function weeklyScoreText() {
   try {
     const raw = JSON.parse(localStorage.getItem("enlab-weekly-score") || "null");
@@ -2056,9 +2662,17 @@ function makeWeeklyExamItems() {
   return items.filter(Boolean).slice(0, 12);
 }
 
-function startWeeklyExam() {
+function startWeeklyExam(opts) {
   if (recState.rec && recState.rec.state === "recording") stopRecording(false);
-  quiz = { i: 0, score: 0, items: makeWeeklyExamItems(), fails: [], mode: "weekly", host: "#quiz-box" };
+  const resume = opts?.resume ? loadWeeklyNow() : null;
+  if (resume) {
+    quiz = { i: resume.i, score: resume.score || 0, items: resume.items, fails: resume.fails || [], mode: "weekly", host: "#quiz-box" };
+  } else {
+    clearWeeklyNow();
+    clearWeeklyStale();
+    renderWeeklyToday();
+    quiz = { i: 0, score: 0, items: makeWeeklyExamItems(), fails: [], mode: "weekly", host: "#quiz-box" };
+  }
   showTab("quiz");
   if (typeof openQuizRoom === "function") openQuizRoom("weekly");
   renderQuiz();
@@ -2154,10 +2768,108 @@ function quizBox() {
   return $(quiz.host || "#quiz-box");
 }
 
+function quizMissBit() {
+  const n = (quiz.fails || []).length;
+  if (!n) return "";
+  const text = n === 1 ? t("quizMiss1") : t("quizMissN", { n });
+  return ` · ${quizMissBtnHtml(text)}`;
+}
+
+function quizMissJump() {
+  const mode = quiz?.mode || "";
+  if (mode === "ear" || mode === "exam") return { tab: "vocales" };
+  if (mode === "cierre") {
+    const last = quiz.fails[quiz.fails.length - 1];
+    const it = (quiz.items || []).find((x) => x.inf === last);
+    if (it?.type === "choice" || it?.type === "type") return { tab: "verbos" };
+    return { tab: "ia", lab: "error-journal" };
+  }
+  if (mode === "choice" || mode === "type") return { tab: "verbos" };
+  return { tab: "ia", lab: "error-journal" };
+}
+
+function quizMissBtnHtml(text) {
+  const j = quizMissJump();
+  const lab = j.lab ? ` data-lab="${esc(j.lab)}"` : "";
+  const title = j.lab ? t("quizMissGoJournal") : (j.tab === "verbos" ? t("quizMissGoVerbs") : text);
+  let focus = "";
+  if (j.lab === "error-journal") {
+    const last = quiz.fails[quiz.fails.length - 1];
+    const it = (quiz.items || []).find((x) => x.inf === last);
+    focus = it?.a || it?.q || last || "";
+  }
+  const focusAttr = focus ? ` data-journal-focus="${esc(focus)}"` : "";
+  return `<button type="button" class="quiz-miss-live chip sm" data-go-tab="${esc(j.tab)}"${lab}${focusAttr} title="${esc(title)}">${esc(text)}</button>`;
+}
+
+function cierreKindOf(it) {
+  if (it?.type === "ear") return t("cierreKindEar");
+  if (it?.type === "choice" || it?.type === "type") return t("cierreKindVerb");
+  return t("cierreKindUse");
+}
+
+function paintCierreNextHint() {
+  if (quiz.mode !== "cierre") return;
+  const card = quizBox()?.querySelector(".card");
+  if (!card) return;
+  const next = quiz.items[quiz.i + 1];
+  const text = next ? t("cierreNextKind", { kind: cierreKindOf(next) }) : t("cierreLast");
+  let el = card.querySelector(".cierre-next-hint");
+  if (!el) {
+    card.insertAdjacentHTML("beforeend", `<p class="cierre-next-hint muted"></p>`);
+    el = card.querySelector(".cierre-next-hint");
+  }
+  if (el) el.textContent = text;
+}
+
+function quizHeadHtml(it, extra) {
+  const n = quiz.items.length;
+  const i = quiz.i + 1;
+  const miss = quizMissBit();
+  if (quiz.mode === "cierre") {
+    return `<p class="kicker cierre-kicker">${esc(t("cierreKicker"))}</p><div class="muted">${esc(t("cierreQ", { i, n, kind: cierreKindOf(it) }))}${miss}</div>`;
+  }
+  const line = extra || esc(t("quizProgress", { i, n, score: quiz.score }));
+  return `<div class="muted">${line}${miss}</div>`;
+}
+
+function paintQuizMissLive() {
+  const card = quizBox()?.querySelector(".card");
+  if (!card) return;
+  const n = (quiz.fails || []).length;
+  let el = card.querySelector("button.quiz-miss-live, .quiz-miss-live");
+  if (!n) {
+    el?.remove();
+    return;
+  }
+  const text = n === 1 ? t("quizMiss1") : t("quizMissN", { n });
+  if (!el || el.tagName !== "BUTTON") {
+    el?.remove();
+    card.insertAdjacentHTML("beforeend", quizMissBtnHtml(text));
+    return;
+  }
+  el.textContent = text;
+  const j = quizMissJump();
+  el.dataset.goTab = j.tab;
+  if (j.lab) el.dataset.lab = j.lab;
+  else el.removeAttribute("data-lab");
+  if (j.lab === "error-journal") {
+    const last = quiz.fails[quiz.fails.length - 1];
+    const it = (quiz.items || []).find((x) => x.inf === last);
+    const focus = it?.a || it?.q || last || "";
+    if (focus) el.dataset.journalFocus = focus;
+  } else el.removeAttribute("data-journal-focus");
+}
+
 function renderQuiz() {
   clearEarTimers();
   const box = quizBox();
   if (!box) return;
+  box.classList.toggle("cierre-live", quiz.mode === "cierre" && quiz.i < quiz.items.length);
+  if (quiz.mode === "cierre" && typeof renderHoyPath === "function") renderHoyPath();
+  if (quiz.mode === "cierre" && quiz.i > 0 && quiz.i < quiz.items.length) persistCierreNow();
+  if (quiz.mode === "weekly" && quiz.i > 0 && quiz.i < quiz.items.length) persistWeeklyNow();
+  if (quiz.mode === "place" && quiz.i > 0 && quiz.i < quiz.items.length) window.PLUS?.persistPlaceNow?.();
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
@@ -2190,13 +2902,27 @@ function renderQuiz() {
         } else bumpPickWeak(quiz.mode, k, false);
       });
     }
-    if (weekly) markWeeklyExamDone(quiz.score, quiz.items.length);
+    if (weekly) {
+      markWeeklyExamDone(quiz.score, quiz.items.length);
+      clearWeeklyNow();
+      renderWeeklyToday();
+    }
+    if (quiz.mode === "place") {
+      window.PLUS?.clearPlaceNow?.();
+      window.PLUS?.renderPlaceToday?.();
+    }
     if (!quiz.fails.length) buzz(true);
     const g = todayGame();
     const extraGame = cierre && g.game
       ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
       : "";
+    let fromHoy = false;
+    try { fromHoy = !cierre && sessionStorage.getItem("enlab-quiz-from-hoy") === "1"; } catch { fromHoy = false; }
+    const backHoy = fromHoy
+      ? `<button type="button" class="btn ghost sm" data-go-tab="hoy">${esc(t("quizBackHoy"))}</button>`
+      : "";
     box.innerHTML = `<div class="card">
+      ${cierre ? `<p class="kicker cierre-kicker">${esc(t("cierreKicker"))}</p>` : ""}
       <h3>${cierre ? t("quizClosed") : weekly ? t("quizWeeklyDone") : cert ? t("quizCertDone") : t("quizDone")}</h3>
       <p class="score">${quiz.score} / ${quiz.items.length}</p>
       ${weekly ? `<p class="muted">${quiz.score >= 9 ? t("weeklyScoreGreat") : quiz.score >= 7 ? t("weeklyScoreGood") : t("weeklyScoreReview")}</p>` : ""}
@@ -2219,17 +2945,23 @@ function renderQuiz() {
       ${quiz.mode === "story" ? `<p class="muted">${esc(t("storyQuizTip"))}</p>` : ""}
       ${cierre ? `<p class="muted">${t("quizTipCierre")}</p>` : ""}
       ${extraGame}
-      <button class="btn" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
+      <button class="btn${cierre ? " ghost" : ""}" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
+      ${backHoy}
       ${quizPeerHtml()}
     </div>`;
-    if (cierre) markSession("quizDone");
+    if (cierre) {
+      markSession("quizDone");
+      saveCierreResult();
+      clearCierreNow();
+      renderCierreToday();
+    }
     syncRemindToSw();
     $("#quiz-again")?.addEventListener("click", cierre ? startCierreQuiz : weekly ? startWeeklyExam : startQuiz);
     renderVerbs();
     if (cierre) {
       renderHoyCheck();
       renderHoyReview();
-      renderHoyPath();
+      finishHoyPath();
     } else {
       renderHome();
       renderEarMisses();
@@ -2248,7 +2980,7 @@ function renderQuiz() {
   const it = quiz.items[quiz.i];
   if (it.type === "type") {
     box.innerHTML = `<div class="card">
-      <div class="muted">${t("quizProgress", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
+      ${quizHeadHtml(it)}
       <div class="quiz-q">${quizQ(it)}</div>
       <div class="row"><button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizListen"))}</button></div>
       <input id="quiz-input" type="text" autocomplete="off" placeholder="${esc(t("quizTypePh"))}" />
@@ -2262,7 +2994,7 @@ function renderQuiz() {
       $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
-      else quiz.fails.push(it.inf);
+      else quizMarkFail(it.inf);
       if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: it.type || "type", expected: it.a, said: val, prompt: it.q, why: "" });
       if (it.type === "dict") srsBump("dict", it.inf, ok);
       bump("quiz");
@@ -2275,7 +3007,7 @@ function renderQuiz() {
   if (it.type === "email") {
     const em = it.email;
     box.innerHTML = `<div class="card email-quiz">
-      <div class="muted">${t("quizEmailN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
+      ${quizHeadHtml(it, esc(t("quizEmailN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })))}
       <div class="quiz-q">${quizQ(it)}</div>
       ${em ? `<pre class="email-body">${esc(em.body)}</pre>` : ""}
       <div class="row">
@@ -2291,7 +3023,7 @@ function renderQuiz() {
   }
   if (it.type === "dict") {
     box.innerHTML = `<div class="card">
-      <div class="muted">${t("quizDictN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
+      ${quizHeadHtml(it, esc(t("quizDictN", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })))}
       <div class="quiz-q">${quizQ(it)}</div>
       <div class="row">
         <button type="button" class="btn" data-say="${esc(it.say)}" data-slow="1">${esc(t("quizHearOnce"))}</button>
@@ -2309,7 +3041,7 @@ function renderQuiz() {
       $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
       if (ok) quiz.score += 1;
-      else quiz.fails.push(it.inf);
+      else quizMarkFail(it.inf);
       if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: "dict", expected: it.a, said: val, prompt: it.q, why: "" });
       srsBump("dict", it.inf, ok);
       bump("quiz");
@@ -2322,7 +3054,7 @@ function renderQuiz() {
   if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email" || it.type === "story" || it.type === "emailtone") {
     const kind = it.type === "ed" ? "-ed" : it.type === "listen" ? t("listen") : it.type === "story" ? t("storyQuizMode") : it.type === "emailtone" ? t("quizModes.emailtone.t") : t("uso");
     box.innerHTML = `<div class="card">
-      <div class="muted">${kind} ${quiz.i + 1} / ${quiz.items.length} · ${t("quizHits", { score: quiz.score })}</div>
+      ${quizHeadHtml(it, `${esc(kind)} ${quiz.i + 1} / ${quiz.items.length} · ${esc(t("quizHits", { score: quiz.score }))}`)}
       <div class="quiz-q">${quizQ(it)}</div>
       ${it.prompt ? `<p class="quiz-prompt${/[áéíóúñ¿¡]/i.test(it.prompt) ? " es-line" : ""}">${esc(it.prompt)}</p>` : ""}
       <div class="row">
@@ -2343,7 +3075,7 @@ function renderQuiz() {
     const warm = !exam && quiz.mode !== "cierre" && earWarmupOn();
     const label = (o, i) => exam ? `${i + 1}. ${esc(o)}` : `${i + 1}. ${esc(it.labels[o] || o)}`;
     box.innerHTML = `<div class="card">
-      <div class="muted">${exam ? t("quizExam") : t("quizEar")} ${quiz.i + 1} / ${quiz.items.length} · ${t("quizHits", { score: quiz.score })}${exam ? "" : ` · ${esc(it.why)}`}</div>
+      ${quizHeadHtml(it, `${exam ? esc(t("quizExam")) : esc(t("quizEar"))} ${quiz.i + 1} / ${quiz.items.length} · ${esc(t("quizHits", { score: quiz.score }))}${exam ? "" : ` · ${esc(it.why)}`}`)}
       <div class="quiz-q">${exam
         ? t("quizEarExamQ")
         : (warm ? t("quizEarWarmQ") : t("quizEarQ"))}</div>
@@ -2385,13 +3117,36 @@ function renderQuiz() {
     return;
   }
   box.innerHTML = `<div class="card">
-    <div class="muted">${t("quizProgress", { i: quiz.i + 1, n: quiz.items.length, score: quiz.score })}</div>
+    ${quizHeadHtml(it)}
     <div class="quiz-q">${quizQ(it)}</div>
     <div class="row"><button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizListen"))}</button></div>
     <div class="choices" style="margin-top:12px">
       ${it.opts.map((o) => `<button data-opt="${encodeURIComponent(o)}">${esc(o)}</button>`).join("")}
     </div>
   </div>`;
+}
+
+function quizMarkFail(inf) {
+  quiz.fails.push(inf);
+  noteQuizFirstFail();
+  paintQuizMissLive();
+  paintCierreNextHint();
+}
+
+function noteQuizFirstFail() {
+  if (quiz._taughtFail) return;
+  quiz._taughtFail = true;
+  const host = quizBox();
+  if (!host) return;
+  const card = host.querySelector(".card") || host;
+  if (card.querySelector(".quiz-fail-note")) return;
+  const ear = quiz.mode === "ear" || quiz.mode === "exam";
+  const msg = quiz.mode === "cierre"
+    ? t("quizFailNoteCierre")
+    : ear
+      ? t("quizFailNoteEar")
+      : t("quizFailNote");
+  card.insertAdjacentHTML("beforeend", `<p class="quiz-fail-note">${esc(msg)}</p>`);
 }
 
 function startQuiz() {
@@ -2435,12 +3190,19 @@ function makeCierreItems() {
   return items.slice(0, 3);
 }
 
-function startCierreQuiz() {
-  if (quiz.mode === "cierre" && quiz.i < (quiz.items || []).length && quiz.items.length) {
+function startCierreQuiz(opts) {
+  const resume = opts?.resume ? loadCierreNow() : null;
+  if (!resume && quiz.mode === "cierre" && quiz.i < (quiz.items || []).length && quiz.items.length) {
     quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  quiz = { i: 0, score: 0, items: makeCierreItems(), fails: [], mode: "cierre", host: "#hoy-cierre-box" };
+  if (resume) {
+    quiz = { i: resume.i, score: resume.score || 0, items: resume.items, fails: resume.fails || [], mode: "cierre", host: "#hoy-cierre-box" };
+  } else {
+    clearCierreNow();
+    renderCierreToday();
+    quiz = { i: 0, score: 0, items: makeCierreItems(), fails: [], mode: "cierre", host: "#hoy-cierre-box" };
+  }
   renderQuiz();
   quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -2485,6 +3247,7 @@ function setSpeakTarget(item) {
   $("#speak-status").className = "status";
   const hoyBtn = $("#speak-hoy");
   if (hoyBtn) hoyBtn.hidden = !window._dailyDialog;
+  setSpeakPhase("hear");
 }
 
 function dialogSpeakItem(role) {
@@ -2670,6 +3433,7 @@ function applySpeakVerdict(said) {
     window._hoyPronPending = { said, target, blob: recState.lastBlob };
   }
   fireSpeakVerdict(said, { ok, target, surface });
+  if (surface === "hablar") setSpeakPhase("play");
 }
 
 function stopRecordingTracks() {
@@ -2705,8 +3469,11 @@ async function toggleRecording(surface) {
     recState.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
     setRecStatus(t("speakMicDenied"), "bad");
+    showVoiceWarn("mic");
+    fireRecording("deny");
     return;
   }
+  if (recState.surface === "hablar") setSpeakPhase("rec");
   recState.chunks = [];
   recState.said = "";
   recState.lastBlob = null;
@@ -2883,7 +3650,7 @@ function dialogCard(d) {
         <div>
           <p>${esc(d.a.en)}</p>
           <p class="muted es-line">${esc(d.a.es)}</p>
-          <button type="button" class="say" data-say="${esc(d.a.en)}">${esc(t("dialogHearA"))}</button>
+          <button type="button" class="say next-act" data-say="${esc(d.a.en)}" data-hoy-hear="a">${esc(t("dialogHearA"))}</button>
         </div>
       </div>
       <div class="dialog-turn you">
@@ -2892,7 +3659,7 @@ function dialogCard(d) {
           <p>${esc(d.b.en)}</p>
           <p class="muted es-line">${esc(d.b.es)}</p>
           <div class="row">
-            <button type="button" class="say" data-say="${esc(d.b.en)}">${esc(t("dialogHearB"))}</button>
+            <button type="button" class="say" data-say="${esc(d.b.en)}" data-hoy-hear="b">${esc(t("dialogHearB"))}</button>
             ${ygLink(d.b.en, t("real"))}
             <button type="button" class="btn sm" id="hoy-speak-rec">${esc(t("hoySpeakRec"))}</button>
           </div>
@@ -2959,11 +3726,61 @@ function playEarSequence(it, warmup) {
 }
 
 document.addEventListener("click", (e) => {
-  const tab = e.target.closest("[data-tab]");
+  const tab = e.target.closest("nav.tabs [data-tab]");
   if (tab) {
     const id = tab.dataset.tab;
     if (currentTab === id) closeLabRoom(document.getElementById(id));
     showTab(id);
+  }
+
+  const goTab = e.target.closest("[data-go-tab]");
+  if (goTab) {
+    if (goTab.dataset.journalFocus) {
+      try { sessionStorage.setItem("enlab-journal-focus", goTab.dataset.journalFocus); } catch { /* ignore */ }
+    }
+    showTab(goTab.dataset.goTab);
+    if (goTab.dataset.lab && typeof openLabRoom === "function") openLabRoom(goTab.dataset.lab);
+    if (goTab.dataset.lab === "error-journal") window.PLUS?.renderErrorJournal?.();
+  }
+
+  if (e.target.closest("[data-hoy-repeat]")) {
+    goHoyStep(0);
+  }
+
+  if (e.target.closest("#hoy-done-timer")) {
+    toggleHoyDoneTimer();
+    return;
+  }
+
+  if (e.target.closest("[data-oido-pick]")) {
+    if (typeof closeLabRoom === "function") closeLabRoom($("#vocales"));
+    highlightOidoHubPick();
+  }
+
+  if (e.target.closest("[data-prefs-transfer-go]")) {
+    importFromPrefs();
+    return;
+  }
+
+  const quizMiss = e.target.closest("[data-quiz-miss]");
+  if (quizMiss) {
+    markQuizFromHoy(!!quizMiss.closest("#hoy-done, #quiz-now"));
+    if (currentTab !== "quiz") showTab("quiz");
+    startTodayQuiz(quizMiss.dataset.quizMiss);
+    return;
+  }
+  if (e.target.closest("#quiz-now-btn, [data-quiz-now]")) {
+    markQuizFromHoy(false);
+    if (currentTab !== "quiz") showTab("quiz");
+    startTodayQuiz();
+  }
+
+  if (e.target.closest("#voice-warn-hide")) hideVoiceWarn();
+
+  const ygOff = e.target.closest("a.yg");
+  if (ygOff && navigator.onLine === false) {
+    e.preventDefault();
+    syncNetWarn();
   }
 
   const gTab = e.target.closest("[data-guide-tab]");
@@ -3163,7 +3980,30 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  if (e.target.closest("#hoy-pair-shadow")) {
+  if (e.target.closest("[data-cierre-resume]")) {
+    const i = hoyPath().findIndex((s) => s.id === "cierre");
+    if (i >= 0) goHoyStep(i, { cierreResume: true });
+    else startCierreQuiz({ resume: true });
+    return;
+  }
+
+  if (e.target.closest("[data-hoy-transfer-go]")) {
+    if (!classroomAllowsChange("classPinImport")) return;
+    importTransferCode($("#transfer-paste")?.value || "", true);
+    return;
+  }
+
+  if (e.target.closest("[data-hoy-shadow-stop]")) {
+    stopHoyPairShadowAndCue();
+    return;
+  }
+
+  if (e.target.closest("[data-hoy-shadow-next]")) {
+    advanceHoyPairShadow();
+    return;
+  }
+
+  if (e.target.closest("#hoy-pair-shadow, [data-hoy-shadow-again]")) {
     runHoyPairShadow();
     return;
   }
@@ -3183,6 +4023,11 @@ document.addEventListener("click", (e) => {
 
   const tabJump = e.target.closest("[data-tab-jump]");
   if (tabJump) showTab(tabJump.dataset.tabJump);
+
+  if (e.target.closest("[data-weekly-resume]")) {
+    startWeeklyExam({ resume: true });
+    return;
+  }
 
   if (e.target.closest("#weekly-exam-btn")) {
     startWeeklyExam();
@@ -3239,14 +4084,30 @@ document.addEventListener("click", (e) => {
   if (say) {
     $$(".say.playing").forEach((b) => b.classList.remove("playing"));
     say.classList.add("playing");
+    const pathHear = say.closest("#daily-verbs, #daily-pairs, #hoy-step-1, #hoy-step-flap, #hoy-rhythm-list, #block-rhythm, #daily-role");
+    if (pathHear) {
+      say.classList.remove("next-act");
+      cueHoyNext();
+    }
     Promise.resolve(speak(say.dataset.say, say.dataset.slow === "1"))
-      .finally(() => say.classList.remove("playing"));
+      .finally(() => {
+        say.classList.remove("playing");
+        if (say.dataset.hoyHear === "a") {
+          say.classList.remove("next-act");
+          $("#hoy-speak-rec")?.classList.add("next-act");
+        }
+        if (pathHear) cueHoyNext();
+      });
     bump("heard");
     const box = say.closest("[data-track]");
     if (box?.dataset.track === "pair") markSession("pairs", box.dataset.pair);
     if (box?.dataset.track === "verb") markSession("verbs", box.dataset.verb);
-    if (box?.dataset.track === "phrase") markSession("phrases", box.dataset.phrase);
-    if (say.closest("#block-rhythm")) sessionStorage.setItem(`enlab-flap-${todayKey()}`, "1");
+    if (box?.dataset.track === "phrase" && !box.classList.contains("dialog-card")) {
+      markSession("phrases", box.dataset.phrase);
+    }
+    if (say.closest("#block-rhythm, #hoy-step-flap, #hoy-rhythm-list")) {
+      sessionStorage.setItem(`enlab-flap-${todayKey()}`, "1");
+    }
   }
 
   const themeBtn = e.target.closest("[data-theme-set]");
@@ -3286,7 +4147,7 @@ document.addEventListener("click", (e) => {
       quiz.score += 1;
     } else {
       opt.classList.add("bad");
-      quiz.fails.push(it.inf);
+      quizMarkFail(it.inf);
       if (window.PLUS?.logError) {
         window.PLUS.logError({ mode: it.type, expected: it.a, said: val, prompt: it.q || it.prompt, why: it.why || "" });
       }
@@ -3315,6 +4176,7 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("#start-ear-from-oido")) {
+    jumpNote = t("jumpFromOido");
     const sel = $("#quiz-mode");
     if (sel) sel.value = "ear";
     syncQuizModePicks();
@@ -3327,6 +4189,7 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("#start-uso-from-oido")) {
+    jumpNote = t("jumpFromOido");
     const sel = $("#quiz-mode");
     if (sel) sel.value = "uso";
     syncQuizModePicks();
@@ -3335,6 +4198,7 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("#start-ed-from-oido") || e.target.closest("[data-start-quiz=\"ed\"]")) {
+    jumpNote = t("jumpFromOido");
     const sel = $("#quiz-mode");
     if (sel) sel.value = "ed";
     syncQuizModePicks();
@@ -3398,7 +4262,7 @@ $("#speak-hoy")?.addEventListener("click", () => {
 });
 $("#speak-listen")?.addEventListener("click", () => {
   if (window._speakTarget) {
-    speak(window._speakTarget.target, true);
+    speak(window._speakTarget.target, true).then(() => setSpeakPhase("rec"));
     bump("heard");
     markSession("phrases", window._speakTarget.target);
   }
@@ -3480,6 +4344,54 @@ function oidoHubItems() {
    Guía: ENLAB.ui.*.guide[place] = { t, w, s[], d? }. */
 function renderOidoToc() {
   renderLabHub("oido-toc", oidoHubItems());
+  renderOidoResume();
+}
+
+function rememberOidoRoom(id) {
+  if (!id) return;
+  localStorage.setItem("enlab-oido-last", JSON.stringify({ id, at: Date.now(), day: todayKey() }));
+}
+
+function highlightOidoHubPick() {
+  $$("#oido-toc .oido-pick-hint").forEach((el) => el.remove());
+  $$("#oido-toc .lab-hub-group").forEach((g) => g.classList.remove("lab-hub-now"));
+  const first = $("#oido-toc .lab-hub-group");
+  if (!first) {
+    $("#oido-toc")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  first.classList.add("lab-hub-now");
+  const kick = first.querySelector(".kicker");
+  if (kick) kick.insertAdjacentHTML("afterend", `<p class="oido-pick-hint muted">${esc(t("oidoPickHint"))}</p>`);
+  first.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderOidoResume() {
+  const el = $("#oido-resume");
+  if (!el) return;
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem("enlab-oido-last") || "null"); } catch { last = null; }
+  const panel = $("#vocales");
+  const here = panel?.classList.contains("lab-in") && panel.querySelector(".lab-topic.on")?.dataset.lab;
+  if (!last?.id || here === last.id) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const topic = document.querySelector(`[data-lab="${CSS.escape(last.id)}"]`);
+  const inHub = typeof oidoHubItems === "function" && oidoHubItems().some((i) => i.jump === last.id);
+  if (!topic || !inHub) {
+    el.hidden = false;
+    el.innerHTML = `<span class="muted">${esc(t("oidoResumeGone"))}</span> <button type="button" class="chip" data-oido-pick>${esc(t("oidoPickRoom"))}</button>`;
+    return;
+  }
+  const title = topic.querySelector("h3")?.textContent?.trim() || last.id;
+  const n = daysAgo(last.day);
+  const when = n <= 0 ? t("oidoResumeToday") : n === 1 ? t("oidoResumeYday") : t("oidoResumeAgo", { n });
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const label = kids ? t("oidoResumeKids") : `${when} ${title}`;
+  el.hidden = false;
+  el.innerHTML = `<button type="button" class="chip" data-lab-jump="${esc(last.id)}" title="${esc(title)}">${esc(label)}</button>`;
 }
 
 function renderLabHub(navId, items) {
@@ -3541,8 +4453,55 @@ function ayudaHubItems() {
   ];
 }
 
-function renderQuizHub() { renderLabHub("quiz-hub", quizHubItems()); }
+function renderQuizHub() {
+  renderLabHub("quiz-hub", quizHubItems());
+  renderQuizNow();
+  window.PLUS?.renderPlaceQuizResume?.();
+}
 function renderHablarHub() { renderLabHub("hablar-hub", hablarHubItems()); }
+
+function playableTodayGame() {
+  const g = typeof todayGame === "function" ? todayGame() : { game: "" };
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const ok = new Set(["choice", "type", "ed", "ear", "exam", "dict", "listen", "uso", "art", "prep", "phrasal", "cond", "emailtone", "story", "place", "weekly", "cert"]);
+  let game = g.game || "";
+  if (game === "travel" || game === "chat") game = "";
+  if (kids && (game === "cert" || game === "place")) game = "";
+  if (game && ok.has(game)) {
+    return { game, label: g.label || t("quizNowDefault"), hint: g.hint || t("quizNowDefaultHint") };
+  }
+  return { game: "choice", label: t("quizNowDefault"), hint: t("quizNowDefaultHint") };
+}
+
+function cierreMissGame() {
+  const r = typeof loadCierreResult === "function" ? loadCierreResult() : null;
+  if (!r) return null;
+  if (r.earFail) return { game: "ear", label: t("hoyDoneEar") };
+  if (r.useFail) return { game: "uso", label: t("hoyDoneUso") };
+  return null;
+}
+
+function renderQuizNow() {
+  const el = $("#quiz-now");
+  if (!el) return;
+  const g = playableTodayGame();
+  const miss = cierreMissGame();
+  const missBtn = miss
+    ? `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(miss.game)}">${esc(miss.label)}</button>`
+    : "";
+  el.innerHTML = `<p class="kicker">${esc(t("quizNowKicker"))}</p>
+    <p><strong>${esc(g.label)}</strong></p>
+    <p class="muted">${esc(g.hint)}</p>
+    <button type="button" class="btn" id="quiz-now-btn">${esc(t("quizNowPlay"))}</button>
+    ${missBtn}`;
+}
+
+function startTodayQuiz(mode) {
+  const game = mode || playableTodayGame().game;
+  if ($("#quiz-mode")) $("#quiz-mode").value = game;
+  if (typeof syncQuizModePicks === "function") syncQuizModePicks();
+  startQuiz();
+}
 function renderAyudaHub() { renderLabHub("ia-hub", ayudaHubItems()); }
 
 function quizRoomFor(mode) {
@@ -3587,6 +4546,7 @@ function closeLabRoom(panel) {
   panel.classList.remove("lab-in");
   panel.querySelectorAll(".lab-topic").forEach((el) => el.classList.remove("on"));
   syncGuide();
+  if (panel.id === "vocales") renderOidoResume();
 }
 
 function closeOidoTopic() {
@@ -3610,10 +4570,19 @@ function openLabRoom(jumpId) {
   const titleEl = panel.querySelector(".lab-room-title");
   if (titleEl) titleEl.textContent = topic.querySelector("h3")?.textContent || "";
   if (panel.id === "vocales") {
+    $$("#oido-toc .lab-hub-group").forEach((g) => g.classList.remove("lab-hub-now"));
+    $$("#oido-toc .oido-pick-hint").forEach((el) => el.remove());
     String(topic.dataset.paint || "").split(",").forEach((id) => { if (id) paintOidoSection(id); });
     paintOidoByJump(raw);
+    rememberOidoRoom(topic.dataset.lab || raw);
   }
   syncGuide();
+  if (panel.id === "vocales") renderOidoResume();
+  if (topic.dataset.lab === "quiz-exams") {
+    window.PLUS?.renderPlaceQuizResume?.();
+    renderWeeklyQuizResume();
+  }
+  if (topic.dataset.lab === "duo-card") window.NR?.renderDuoResumeHablar?.();
   return true;
 }
 
@@ -3626,6 +4595,7 @@ function playDailyPairs() {
   if (!pairs.length) return;
   pairs.forEach((p) => markSession("pairs", `${p.short}|${p.long}`));
   bump("heard");
+  cueHoyNext();
   speakQueue(pairs.flatMap((p) => [p.short, p.long]), true);
 }
 
@@ -3644,6 +4614,7 @@ function playNextHoyPair() {
   $$("#daily-pairs .card").forEach((c) => c.classList.toggle("flash", c.dataset.pair === key));
   const el = document.querySelector("#daily-pairs [data-pair=\"" + CSS.escape(key) + "\"]");
   el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  cueHoyNext();
   speakQueue([p.short, p.long], true);
 }
 
@@ -3681,6 +4652,67 @@ function persistTimer(t) {
   sessionStorage.setItem("enlab-timer", JSON.stringify(t));
 }
 
+function pauseTimer() {
+  if (!timerState().running) return;
+  persistTimer({ running: false, remaining: remainingNow(), until: 0 });
+  clearInterval(timerTick);
+  releaseWake();
+  renderClock();
+  fillYouAre();
+}
+
+function resumeHoyTimer() {
+  const left = remainingNow();
+  if (left <= 0 || timerState().running) return;
+  persistTimer({ running: true, remaining: left, until: Date.now() + left * 1000 });
+  startTimerLoop();
+  requestWake();
+  renderClock();
+  fillYouAre();
+}
+
+function restartHoyDoneTimer() {
+  try { sessionStorage.setItem("enlab-hoy-extra-timer", "1"); } catch { /* ignore */ }
+  persistTimer({ running: true, remaining: TIMER_TOTAL, until: Date.now() + TIMER_TOTAL * 1000 });
+  startTimerLoop();
+  requestWake();
+  renderClock();
+  fillYouAre();
+}
+
+function toggleHoyDoneTimer() {
+  const left = remainingNow();
+  if (left <= 0 && !timerState().running) {
+    restartHoyDoneTimer();
+    return;
+  }
+  if (timerState().running) pauseTimer();
+  else resumeHoyTimer();
+}
+
+function syncHoyDoneTimer() {
+  const timerBtn = $("#hoy-done-timer");
+  if (!timerBtn) return;
+  const done = $("#hoy")?.classList.contains("path-done");
+  const left = remainingNow();
+  const running = timerState().running;
+  const mid = !!done && left > 0 && left < TIMER_TOTAL - 0.5;
+  const again = !!done && !running && left <= 0;
+  timerBtn.hidden = !(mid || again);
+  if (!(mid || again)) {
+    setPressed(timerBtn, false);
+    return;
+  }
+  if (again) {
+    timerBtn.textContent = t("hoyDoneTimerAgain");
+    setPressed(timerBtn, false);
+    return;
+  }
+  const m = Math.max(1, Math.ceil(left / 60));
+  timerBtn.textContent = running ? t("timerPause") : t("hoyDoneTimer", { m });
+  setPressed(timerBtn, running);
+}
+
 function timerState() {
   return loadTimer() || { running: false, remaining: TIMER_TOTAL, until: 0 };
 }
@@ -3704,6 +4736,7 @@ function renderClock() {
     else btn.textContent = timerState().running ? t("timerPause") : t("hoyTimerStart");
     setPressed(btn, !!timerState().running);
   }
+  syncHoyDoneTimer();
 }
 
 function startTimerLoop() {
@@ -3713,6 +4746,7 @@ function startTimerLoop() {
       persistTimer({ running: false, remaining: 0, until: 0 });
       clearInterval(timerTick);
       releaseWake();
+      try { sessionStorage.removeItem("enlab-hoy-extra-timer"); } catch { /* ignore */ }
       buzz(true);
     }
     renderClock();
@@ -3994,7 +5028,11 @@ function applyKidsMode() {
   if (typeof renderQuizHub === "function") renderQuizHub();
   if (typeof renderHablarHub === "function") renderHablarHub();
   if (typeof renderAyudaHub === "function") renderAyudaHub();
+  if (typeof renderOidoResume === "function") renderOidoResume();
+  if (typeof renderDailyVerbs === "function") renderDailyVerbs();
   syncPrefsBadge();
+  if ($("#guide-panel") && !$("#guide-panel").hidden) fillGuide();
+  fillYouAre();
 }
 
 function setPrefsOpen(on) {
@@ -4011,9 +5049,12 @@ function setPrefsOpen(on) {
     btn.setAttribute("aria-expanded", on ? "true" : "false");
     setPressed(btn, on);
   }
+  fillYouAre();
 }
 
 function guidePlace() {
+  const hoy = $("#hoy");
+  if (currentTab === "hoy" && hoy?.classList.contains("path-done")) return "hoyDone";
   const panel = document.getElementById(currentTab);
   const topic = panel?.querySelector(".lab-topic.on");
   if (topic) return topic.dataset.lab || topic.dataset.oido || currentTab;
@@ -4029,6 +5070,78 @@ function guideEntry(place) {
   const oido = place.startsWith("oido-") || place === "pron-panel" || place === "stories-panel";
   if (oido) return pack.oidoRoom || es.oidoRoom;
   return pack[currentTab] || es[currentTab] || pack.hoy || es.hoy;
+}
+
+function guideExtraTimerLine() {
+  try {
+    if (sessionStorage.getItem("enlab-hoy-extra-timer") === "1" && timerState().running) {
+      return t("guideHoyDoneExtraTimer");
+    }
+  } catch { /* ignore */ }
+  return "";
+}
+
+function certTimedOutToday() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-cert-score") || "null");
+    return !!(raw?.timeUp && raw?.day === todayKey());
+  } catch { return false; }
+}
+
+function guideFillEntry() {
+  const place = guidePlace();
+  const full = guideEntry(place);
+  if (!full) return full;
+  let entry = full;
+  if (typeof kidsOn === "function" && kidsOn()) {
+    const lang = uiLang();
+    const pack = ENLAB.ui?.[lang]?.guideKids || {};
+    const es = ENLAB.ui?.es?.guideKids || {};
+    if (pack[place] || es[place]) entry = pack[place] || es[place];
+    else if (pack[currentTab] || es[currentTab]) entry = pack[currentTab] || es[currentTab];
+    else {
+      const oido = place.startsWith("oido-") || place === "pron-panel" || place === "stories-panel";
+      if (oido) entry = pack.oidoRoom || es.oidoRoom || full;
+      else {
+        entry = {
+          t: full.t,
+          w: String(full.w || "").split(". ")[0] + (full.w ? "." : ""),
+          s: (full.s || []).slice(0, 2),
+          d: full.d,
+        };
+      }
+    }
+  }
+  if (place === "hoyDone") {
+    const extra = guideExtraTimerLine();
+    if (extra) {
+      entry = {
+        ...entry,
+        w: entry.w ? `${entry.w} ${extra}` : extra,
+        s: [...(entry.s || []), extra],
+      };
+    }
+  }
+  if (repasoOn()) {
+    const rep = t("youAreRepaso");
+    entry = {
+      ...entry,
+      w: entry.w ? `${rep} ${entry.w}` : rep,
+      s: [rep, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  const placeNow = window.PLUS?.loadPlaceNow?.();
+  if (placeNow && (place === "quiz-exams" || place === "place" || currentTab === "quiz")) {
+    const hint = typeof kidsOn === "function" && kidsOn()
+      ? t("guidePlaceResumeKids", { i: placeNow.i + 1, total: placeNow.items.length })
+      : t("guidePlaceResume", { i: placeNow.i + 1, total: placeNow.items.length });
+    entry = {
+      ...entry,
+      w: entry.w ? `${hint} ${entry.w}` : hint,
+      s: [hint, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  return entry;
 }
 
 function guideSeen() {
@@ -4049,7 +5162,7 @@ function markGuideSeen(place) {
 }
 
 function fillGuide() {
-  const entry = guideEntry(guidePlace());
+  const entry = guideFillEntry();
   if (!entry) return;
   const title = $("#guide-title");
   const why = $("#guide-why");
@@ -4070,28 +5183,118 @@ function fillGuide() {
   fillYouAre();
 }
 
+function fillYouAreWhen(entry) {
+  const when = $("#you-are-when");
+  if (!when) return;
+  const hoy = $("#hoy");
+  const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
+  if (pathDone) {
+    when.hidden = true;
+    when.textContent = "";
+    return;
+  }
+  const d = entry?.d;
+  when.hidden = !d;
+  when.textContent = d ? `${t("guideWhen")} ${d}` : "";
+}
+
+function fillYouAreChips() {
+  const box = $("#you-are-chips");
+  if (!box) return;
+  const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
+  const parts = [];
+  const hoy = $("#hoy");
+  const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
+  if (pathDone && certTimedOutToday()) {
+    parts.push(`<button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`);
+  }
+  if (currentTab === "hablar" && window.NR?.duoYouAreChipHtml) {
+    const duo = window.NR.duoYouAreChipHtml();
+    if (duo) parts.push(duo);
+  }
+  box.hidden = guideOpen || !parts.length;
+  box.innerHTML = parts.join("");
+}
+
 function fillYouAre() {
   const btn = $("#you-are");
   const text = $("#you-are-text");
   if (!btn || !text) return;
   const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
   btn.hidden = !!guideOpen;
+  if (jumpNote && currentTab !== "quiz") jumpNote = "";
+  const entry = guideFillEntry() || guideEntry(guidePlace());
   const hoy = $("#hoy");
   const pathOn = currentTab === "hoy"
     && hoy?.classList.contains("path-on")
     && !hoy.classList.contains("path-done");
-  const pathCopy = $("#hoy-path-copy")?.textContent?.trim();
-  if (pathOn && pathCopy) {
-    text.textContent = pathCopy;
+  const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
+  if (pathDone) {
+    let line = "";
+    try {
+      if (sessionStorage.getItem("enlab-hoy-extra-timer") === "1" && timerState().running) {
+        line = t("youAreExtraTimer");
+      }
+    } catch { /* ignore */ }
+    if (!line) {
+      const oidoTitle = oidoLastTitle();
+      if (oidoTitle) line = t("youAreOidoLast", { title: oidoTitle });
+    }
+    if (!line && certTimedOutToday()) line = t("youAreCertTimeUp");
+    if (!line) {
+      const n = stats().streak || 0;
+      line = n > 0 ? t("youAreHoyDoneStreak", { n }) : (entry?.t || t("hoyDoneKicker"));
+    }
+    text.textContent = line;
+    fillYouAreWhen(entry);
+    fillYouAreChips();
     return;
   }
-  const entry = guideEntry(guidePlace());
+  if (currentTab === "hoy" && !pathOn && !pathDone) {
+    const mid = hoyMidSessionLine();
+    if (mid) {
+      text.textContent = mid;
+      fillYouAreWhen(entry);
+      fillYouAreChips();
+      return;
+    }
+  }
+  const pathCopy = $("#hoy-path-copy")?.textContent?.trim();
+  if (pathOn && pathCopy) {
+    if (quiz?.mode === "cierre" && quiz.items?.length && quiz.i < quiz.items.length) {
+      text.textContent = t("cierreQ", { i: quiz.i + 1, n: quiz.items.length, kind: cierreKindOf(quiz.items[quiz.i]) });
+    } else {
+      text.textContent = pathCopy;
+    }
+    fillYouAreWhen(entry);
+    fillYouAreChips();
+    return;
+  }
+  if (jumpNote && currentTab === "quiz") {
+    text.textContent = jumpNote;
+    fillYouAreWhen(entry);
+    fillYouAreChips();
+    return;
+  }
+  if (repasoOn()) {
+    text.textContent = t("youAreRepaso");
+    fillYouAreWhen(entry);
+    fillYouAreChips();
+    return;
+  }
   text.textContent = entry?.t || "";
+  fillYouAreWhen(entry);
+  fillYouAreChips();
 }
 
 function fillGuideMap() {
   const box = $("#guide-map");
   if (!box) return;
+  if (currentTab === "hoy" && $("#hoy")?.classList.contains("path-done")) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
   const panel = document.getElementById(currentTab);
   const cards = [...(panel?.querySelectorAll(".lab-card") || [])];
   const inRoom = panel?.classList.contains("lab-in");
@@ -4198,7 +5401,7 @@ function maybeOfferGuide() {
 function syncPrefsBadge() {
   const btn = $("#prefs-toggle");
   if (!btn) return;
-  const active = kidsOn() || hideEsOn() || uiLang() === "en" || localStorage.getItem("enlab-travel") === "1";
+  const active = kidsOn() || hideEsOn() || uiLang() === "en" || localStorage.getItem("enlab-travel") === "1" || !!classroomPin();
   btn.classList.toggle("has-on", active);
 }
 
@@ -4296,10 +5499,12 @@ function applyUiLangBody() {
   if (typeof renderHoyCheck === "function") renderHoyCheck();
   if (typeof renderSituations === "function") renderSituations();
   if (typeof renderPodcastToday === "function") renderPodcastToday();
+  if (typeof renderCierreToday === "function") renderCierreToday();
   if (typeof renderVerbs === "function" && currentTab === "verbos") renderVerbs();
   if (typeof renderOidoToc === "function" && currentTab === "vocales") renderOidoToc();
   if (typeof renderQuizHub === "function") renderQuizHub();
   if (typeof renderHablarHub === "function") renderHablarHub();
+  if (typeof syncNetWarn === "function") syncNetWarn();
   if (typeof renderAyudaHub === "function") renderAyudaHub();
   if (typeof renderRemind === "function") renderRemind();
   if (typeof renderClock === "function") renderClock();
@@ -4316,6 +5521,7 @@ function applyUiLangBody() {
   setPressed($("#guide-toggle"), guideOpen);
   $("#guide-toggle")?.setAttribute("aria-expanded", guideOpen ? "true" : "false");
   if (guideOpen) fillGuide();
+  prepareWelcome();
   fillYouAre();
 }
 
@@ -4365,13 +5571,28 @@ function maybeAutoAdvancePath() {
   if (step.id === "cierre" && s.quizDone) done = true;
   if (step.id === "flap" && sessionStorage.getItem(`enlab-flap-${todayKey()}`) === "1") done = true;
   if (step.id === "role" && s.pairs.length >= 1) done = true;
-  if (done) setTimeout(() => advanceHoyPath(), 700);
+  if (done) {
+    renderHoyPath();
+    cueHoyNext();
+    const fast = prefersReducedMotion();
+    if (!fast) buzz(false);
+    if (fast) advanceHoyPath();
+    else setTimeout(() => advanceHoyPath(), 900);
+  }
 }
 
 function startRepasoMode() {
   localStorage.setItem("enlab-repaso", "1");
   sessionStorage.setItem("enlab-repaso-speak-only", speakOnlyWeakOn() ? "1" : "0");
   localStorage.setItem("enlab-speak-only-weak", "1");
+  try {
+    const hoy = $("#hoy");
+    const pathOn = hoy?.classList.contains("path-on") && !hoy.classList.contains("path-done");
+    if (pathOn && timerState().running) {
+      sessionStorage.setItem("enlab-repaso-pause-path-timer", String(Math.floor(remainingNow())));
+      pauseTimer();
+    }
+  } catch { /* ignore */ }
   document.body.classList.add("repaso-active");
   setPressed($("#repaso-btn"), true);
   showTab("hoy");
@@ -4396,6 +5617,23 @@ function clearRepasoMode() {
   const prev = sessionStorage.getItem("enlab-repaso-speak-only");
   if (prev === "0") localStorage.setItem("enlab-speak-only-weak", "0");
   sessionStorage.removeItem("enlab-repaso-speak-only");
+  try {
+    const saved = sessionStorage.getItem("enlab-repaso-pause-path-timer");
+    if (saved != null) {
+      sessionStorage.removeItem("enlab-repaso-pause-path-timer");
+      pauseTimer();
+      const left = Number(saved);
+      const hoy = $("#hoy");
+      const pathOn = hoy?.classList.contains("path-on") && !hoy.classList.contains("path-done");
+      if (pathOn && left > 0) {
+        persistTimer({ running: true, remaining: left, until: Date.now() + left * 1000 });
+        startTimerLoop();
+        requestWake();
+        renderClock();
+        fillYouAre();
+      }
+    }
+  } catch { /* ignore */ }
   $$(".hoy-next").forEach((b) => { b.hidden = false; });
   const exitBtn = $("#repaso-exit");
   if (exitBtn) exitBtn.hidden = true;
@@ -4531,8 +5769,23 @@ function transferEncode(payload) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
 }
 
+let prefsTransferEcho = "";
+let prefsTransferTail = "";
+
+function transferTail(code) {
+  const s = String(code || "").replace(/\s/g, "");
+  return s.slice(-4);
+}
+
 function transferDecode(str) {
   return JSON.parse(decodeURIComponent(escape(atob(String(str || "").trim()))));
+}
+
+function transferDecodeLooksCut(err) {
+  const name = err?.name || "";
+  const msg = String(err?.message || err);
+  if (name === "URIError" || name === "InvalidCharacterError") return true;
+  return /URI malformed|Invalid character|Unexpected end|Unterminated string/i.test(msg);
 }
 
 function applyTransferPayload(data) {
@@ -4544,24 +5797,25 @@ function applyTransferPayload(data) {
 }
 
 function drawTransferQr(text) {
-  const canvas = $("#transfer-qr");
-  if (!canvas?.getContext) return;
-  const ctx = canvas.getContext("2d");
-  const n = 21;
-  const cell = Math.floor(canvas.width / n);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#0d3b36";
-  let h = 0;
-  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
-  for (let y = 0; y < n; y += 1) {
-    for (let x = 0; x < n; x += 1) {
-      const bit = (h >> ((x + y * 3) % 30)) & 1;
-      if ((x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4) || bit) {
-        ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+  document.querySelectorAll("#transfer-qr, #prefs-transfer-qr, #audit-transfer-qr").forEach((canvas) => {
+    if (!canvas?.getContext) return;
+    const ctx = canvas.getContext("2d");
+    const n = 21;
+    const cell = Math.floor(canvas.width / n);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#0d3b36";
+    let h = 0;
+    for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+    for (let y = 0; y < n; y += 1) {
+      for (let x = 0; x < n; x += 1) {
+        const bit = (h >> ((x + y * 3) % 30)) & 1;
+        if ((x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4) || bit) {
+          ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+        }
       }
     }
-  }
+  });
 }
 
 function renderTransferCode() {
@@ -4585,15 +5839,45 @@ function renderTransferCode() {
   }
 }
 
-function importTransferCode(raw) {
+function importTransferCode(raw, quiet) {
+  const st = $("#prefs-transfer-status");
+  const say = (msg) => {
+    if (quiet && st) {
+      st.hidden = false;
+      st.textContent = msg;
+      return;
+    }
+    alert(msg);
+  };
+  const trimmed = String(raw || "").replace(/\s/g, "");
+  if (!trimmed) {
+    say(t("prefsTransferEmpty"));
+    return;
+  }
+  if (trimmed.length < 16) {
+    say(t("transferTooShort"));
+    return;
+  }
+  let payload;
   try {
-    applyTransferPayload(transferDecode(raw));
+    payload = transferDecode(trimmed);
+  } catch (err) {
+    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"));
+    return;
+  }
+  if (transferTailMismatch(trimmed)) {
+    say(t("prefsTransferTailBlocked"));
+    return;
+  }
+  try {
+    applyTransferPayload(payload);
     applyLevel();
     renderRemind();
     renderTransferCode();
-    alert(t("progressImported"));
-  } catch {
-    alert(t("progressInvalid"));
+    say(t("progressImported"));
+    prefsTransferEcho = trimmed;
+  } catch (err) {
+    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"));
   }
 }
 
@@ -4827,7 +6111,7 @@ function renderWeekReport() {
     const weeklyBtn = done
       ? `<span class="pill ok">Examen ${esc(wscore || "hecho")}</span>`
       : `<button type="button" class="btn sm" id="weekly-exam-btn">Examen semanal (12)</button>`;
-    el.innerHTML = `<p class="muted">${esc(t("weeklyReportStart", { week: t("week") }))}</p><p class="row">${weeklyBtn}</p>`;
+    el.innerHTML = `<p class="muted">${esc(t("weeklyReportStart", { week: t("week") }))}</p><p class="row">${weeklyBtn}${weeklyMidChipHtml() ? ` ${weeklyMidChipHtml()}` : ""}</p>`;
     return;
   }
   el.hidden = false;
@@ -4836,6 +6120,7 @@ function renderWeekReport() {
   const weeklyBtn = done
     ? `<span class="pill ok">${esc(t("weeklyExamDone", { score: wscore || t("sessionComplete") }))}</span>`
     : `<button type="button" class="btn sm" id="weekly-exam-btn">${esc(t("weeklyExamBtn"))}</button>`;
+  const mid = weeklyMidChipHtml();
   el.innerHTML = `<p class="muted">${esc(t("weeklyReport", {
     week: t("week"),
     days,
@@ -4843,11 +6128,92 @@ function renderWeekReport() {
     quiz: quizN,
     spoke,
     due: srsDueList(99).length,
-  }))}</p><p class="row">${weeklyBtn}</p>`;
+  }))}</p><p class="row">${weeklyBtn}${mid ? ` ${mid}` : ""}</p>`;
+}
+
+function importFromPrefs() {
+  const raw = $("#prefs-transfer-paste")?.value || "";
+  const st = $("#prefs-transfer-status");
+  const say = (msg) => {
+    if (!st) return;
+    st.hidden = false;
+    st.textContent = msg;
+  };
+  if (!raw.trim()) {
+    say(t("prefsTransferEmpty"));
+    return;
+  }
+  if (classroomLocked()) {
+    say(t("classPinImport"));
+    return;
+  }
+  importTransferCode(raw, true);
+}
+
+function transferTailMismatch(code) {
+  const tail = transferTail(String(code || "").replace(/\s/g, ""));
+  return !!(prefsTransferTail && tail && tail !== prefsTransferTail);
+}
+
+function syncTransferPaste(raw, st, goSel) {
+  if (!st) return;
+  const trimmed = String(raw || "").replace(/\s/g, "");
+  if (trimmed.length < 16) return;
+  if (trimmed === prefsTransferEcho) return;
+  const tail = transferTail(trimmed);
+  const mismatch = prefsTransferTail && tail !== prefsTransferTail;
+  let msg = mismatch
+    ? t("prefsTransferTailMismatch", { tail, expect: prefsTransferTail })
+    : t("prefsTransferReady", { n: trimmed.length, tail });
+  st.hidden = false;
+  if (mismatch) {
+    st.textContent = msg;
+    return;
+  }
+  st.innerHTML = `${esc(msg)} <button type="button" class="chip sm" ${goSel}>${esc(t("prefsTransferImport"))}</button>`;
+}
+
+function syncPrefsTransferPaste() {
+  syncTransferPaste($("#prefs-transfer-paste")?.value, $("#prefs-transfer-status"), 'data-prefs-transfer-go');
+}
+
+function syncHoyTransferPaste() {
+  syncTransferPaste($("#transfer-paste")?.value, $("#transfer-hoy-status"), 'data-hoy-transfer-go');
+}
+
+function sayTransferCopied(st, code) {
+  if (!st) return;
+  st.hidden = false;
+  st.textContent = t("prefsTransferCopied", { tail: transferTail(code) });
+  prefsTransferTail = transferTail(code);
+  prefsTransferEcho = "";
+}
+
+function copyTransferFromPrefs() {
+  if (!classroomAllowsChange("classPinExport")) return;
+  if (typeof renderTransferCode === "function") renderTransferCode();
+  const code = $("#transfer-code")?.value || "";
+  const st = $("#prefs-transfer-status");
+  const done = (msg) => {
+    if (!st) return;
+    st.hidden = false;
+    st.textContent = msg;
+  };
+  if (!code) {
+    done(t("prefsTransferEmpty"));
+    return;
+  }
+  const ok = () => sayTransferCopied(st, code);
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).then(ok).catch(ok);
+  else ok();
 }
 
 function classroomPin() {
   return localStorage.getItem("enlab-class-pin") || "";
+}
+
+function classroomLocked() {
+  return !!(classroomPin() && sessionStorage.getItem("enlab-class-ok") !== "1");
 }
 
 function classroomAllowsChange(failKey) {
@@ -4866,8 +6232,14 @@ function classroomAllowsChange(failKey) {
 
 function renderClassPin() {
   const st = $("#class-pin-status");
-  if (!st) return;
-  st.textContent = classroomPin() ? t("classPinOn") : t("classPinOff");
+  if (st) st.textContent = classroomPin() ? t("classPinOn") : t("classPinOff");
+  const prefs = $("#prefs-class");
+  if (prefs) {
+    const on = !!classroomPin();
+    prefs.hidden = !on;
+    if (on) prefs.textContent = t("prefsClassOn");
+  }
+  syncPrefsBadge();
 }
 
 function saveClassPin() {
@@ -5117,6 +6489,28 @@ function applyLevel(opts = {}) {
   if (!opts.skipPaint) paintTab(currentTab);
 }
 
+function prepareWelcome() {
+  const welcome = $("#welcome");
+  if (!welcome || localStorage.getItem("enlab-welcome-v2") === "1" || localStorage.getItem("enlab-onboard-v3") === "1") return;
+  const n = stats().streak || 0;
+  if (n <= 0) return;
+  const ol = welcome.querySelector("ol");
+  if (ol) ol.hidden = true;
+  let streakEl = $("#welcome-streak");
+  if (!streakEl && ol) {
+    streakEl = document.createElement("p");
+    streakEl.id = "welcome-streak";
+    streakEl.className = "welcome-streak";
+    ol.insertAdjacentElement("afterend", streakEl);
+  }
+  if (streakEl) {
+    streakEl.hidden = false;
+    streakEl.textContent = t("welcomeStreak", { n });
+  }
+  const note = welcome.querySelector("[data-i18n=welcomeNote]");
+  if (note) note.hidden = true;
+}
+
 function init() {
   applyTheme();
   applyHideEs();
@@ -5136,7 +6530,9 @@ function init() {
   renderClock();
   syncQuizModePicks();
   setupRemind();
+  syncNetWarn();
   const welcome = $("#welcome");
+  prepareWelcome();
   if (welcome && localStorage.getItem("enlab-onboard-v3") !== "1" && localStorage.getItem("enlab-welcome-v2") !== "1") welcome.hidden = false;
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
@@ -5151,6 +6547,16 @@ function init() {
   }
   setupPwaInstall();
   renderClassPin();
+  if (!window._hoyRecCue && typeof onRecording === "function") {
+    window._hoyRecCue = true;
+    onRecording((phase) => {
+      if (phase === "deny" && recState.surface === "hoy") return;
+      if (phase !== "stop") return;
+      if (recState.surface !== "hoy") return;
+      $("#hoy-speak-rec")?.classList.remove("next-act");
+      cueHoyNext();
+    });
+  }
   window.addEventListener("enlab-packs-ready", () => {
     dirty.hablar = true;
     if (currentTab === "hablar" || currentTab === "vocales" || currentTab === "ia") paintTab(currentTab);
@@ -5191,7 +6597,11 @@ $("#welcome-go")?.addEventListener("click", () => {
   localStorage.setItem("enlab-welcome-v2", "1");
   localStorage.setItem("enlab-onboard-v3", "1");
   const el = $("#welcome");
-  if (el) el.hidden = true;
+  if (el) {
+    el.querySelector("ol")?.setAttribute("hidden", "");
+    el.querySelector("[data-i18n=welcomeNote]")?.setAttribute("hidden", "");
+    el.hidden = true;
+  }
   maybeOfferGuide();
 });
 
@@ -5231,11 +6641,47 @@ $("#shadow-go")?.addEventListener("click", () => runShadowing());
 
 $("#transfer-copy")?.addEventListener("click", () => {
   if (!classroomAllowsChange("classPinExport")) return;
+  if (typeof renderTransferCode === "function") renderTransferCode();
   const code = $("#transfer-code")?.value || "";
-  if (code) navigator.clipboard.writeText(code).catch(() => {});
+  if (code) {
+    navigator.clipboard.writeText(code).catch(() => {});
+    sayTransferCopied($("#transfer-hoy-status"), code);
+  }
 });
 
+function copyTransferFromQr(statusEl, pasteEl, syncFn) {
+  if (!classroomAllowsChange("classPinExport")) return;
+  if (typeof renderTransferCode === "function") renderTransferCode();
+  const code = $("#transfer-code")?.value || "";
+  if (!code) return;
+  navigator.clipboard.writeText(code).catch(() => {});
+  if (statusEl) sayTransferCopied(statusEl, code);
+  if (pasteEl) {
+    pasteEl.value = code;
+    if (typeof syncFn === "function") syncFn();
+  }
+}
+
+$("#transfer-qr")?.addEventListener("click", () => {
+  copyTransferFromQr($("#transfer-hoy-status"), $("#transfer-paste"), syncHoyTransferPaste);
+});
+
+$("#prefs-transfer-qr")?.addEventListener("click", () => {
+  copyTransferFromQr($("#prefs-transfer-status"), $("#prefs-transfer-paste"), syncPrefsTransferPaste);
+});
+
+$("#transfer-paste")?.addEventListener("input", () => syncHoyTransferPaste());
+$("#transfer-paste")?.addEventListener("paste", () => setTimeout(syncHoyTransferPaste, 0));
+
+$("#prefs-transfer-copy")?.addEventListener("click", () => copyTransferFromPrefs());
+
+$("#prefs-transfer-import")?.addEventListener("click", () => importFromPrefs());
+
+$("#prefs-transfer-paste")?.addEventListener("input", () => syncPrefsTransferPaste());
+$("#prefs-transfer-paste")?.addEventListener("paste", () => setTimeout(syncPrefsTransferPaste, 0));
+
 $("#transfer-import")?.addEventListener("click", () => {
+  if (!classroomAllowsChange("classPinImport")) return;
   importTransferCode($("#transfer-paste")?.value || $("#transfer-code")?.value || "");
 });
 

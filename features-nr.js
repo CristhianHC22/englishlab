@@ -218,7 +218,22 @@
           <tbody>${rows}</tbody>
         </table>
       </div>
+      <details class="fold audit-transfer-qr">
+        <summary>${esc(t("auditTransferQr"))}</summary>
+        <p class="muted">${esc(t("auditTransferQrHint"))}</p>
+        <canvas id="audit-transfer-qr" width="120" height="120" aria-label="QR del progreso"></canvas>
+        <p class="muted" id="audit-transfer-chunks"></p>
+        <button type="button" class="btn ghost sm" id="audit-transfer-copy" data-i18n="auditTransferCopy">Copiar código</button>
+      </details>
       <p class="muted">${esc(t("auditFootnote"))}</p>`;
+    if (typeof renderTransferCode === "function") renderTransferCode();
+    const code = document.querySelector("#transfer-code")?.value || "";
+    const hint = document.querySelector("#audit-transfer-chunks");
+    if (hint && code) {
+      hint.textContent = typeof t === "function"
+        ? t("transferQrHint", { len: code.length, cs: code.length % 997 })
+        : `${code.length} chars · checksum ${code.length % 997}`;
+    }
   }
 
   /* ── Modo viaje ── */
@@ -261,18 +276,39 @@
   }
 
   /* ── Podcasts ── */
-  function stopPodcast() {
-    if (podcastTimer) { clearTimeout(podcastTimer); podcastTimer = null; }
-    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+  let podcastCur = { id: "", seg: 0, playing: false };
+
+  function savePodcastNow(id, seg, done) {
+    try {
+      if (done || !id) {
+        localStorage.removeItem("enlab-podcast-now");
+      } else {
+        localStorage.setItem("enlab-podcast-now", JSON.stringify({
+          id, seg, day: typeof todayKey === "function" ? todayKey() : "", at: Date.now(),
+        }));
+      }
+    } catch { /* ignore */ }
+    if (typeof renderPodcastToday === "function") renderPodcastToday();
   }
 
-  function playPodcast(id) {
-    stopPodcast();
+  function stopPodcast(quiet) {
+    if (podcastTimer) { clearTimeout(podcastTimer); podcastTimer = null; }
+    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+    if (!quiet && podcastCur.playing && podcastCur.id) savePodcastNow(podcastCur.id, podcastCur.seg, false);
+    podcastCur.playing = false;
+    renderPodcastList();
+  }
+
+  function playPodcast(id, fromSeg) {
+    stopPodcast(true);
     const pod = (ENLAB.podcasts || []).find((p) => p.id === id);
     const box = document.querySelector("#podcast-player");
     if (!pod || !box) return;
-    let segI = 0;
+    let segI = Math.max(0, Math.min(Number(fromSeg) || 0, Math.max(0, (pod.segments || []).length - 1)));
+    podcastCur = { id, seg: segI, playing: true };
+    savePodcastNow(id, segI, false);
     box.hidden = false;
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
     const renderSeg = () => {
       box.innerHTML = `
         <p class="kicker">${esc(t("podKicker", { title: pod.title }))}</p>
@@ -291,6 +327,7 @@
         if (line && window.PLUS?.runPhraseShadow) window.PLUS.runPhraseShadow(line);
         else if (line && typeof speak === "function") speak(line, true);
       });
+      renderPodcastList();
     };
     const next = () => {
       if (segI >= pod.segments.length) {
@@ -302,8 +339,12 @@
           if (!log.includes(id)) log.push(id);
           localStorage.setItem("enlab-podcast-log", JSON.stringify(log.slice(-30)));
         } catch { /* ignore */ }
+        podcastCur.playing = false;
+        savePodcastNow(id, 0, true);
         return;
       }
+      podcastCur.seg = segI;
+      savePodcastNow(id, segI, false);
       renderSeg();
       speak(pod.segments[segI].en, false).then(() => {
         segI += 1;
@@ -313,12 +354,32 @@
     next();
   }
 
+  function renderPodcastResumeBanner() {
+    let now = null;
+    try { now = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null"); } catch { now = null; }
+    const pod = now?.id ? (ENLAB.podcasts || []).find((p) => p.id === now.id) : null;
+    if (!pod) return "";
+    const player = document.querySelector("#podcast-player");
+    if (podcastCur?.id === now.id && player && !player.hidden) return "";
+    const segs = pod.segments || [];
+    const mid = now.seg > 0 && now.seg < segs.length;
+    const label = mid
+      ? t("podcastResume", { n: now.seg + 1, total: segs.length })
+      : t("podcastListen");
+    const segAttr = mid ? ` data-pod-seg="${esc(String(now.seg))}"` : "";
+    return `<div class="card podcast-resume-banner">
+      <p class="kicker">${esc(t("podcastResumeKicker"))}</p>
+      <button type="button" class="btn sm" data-podcast="${esc(pod.id)}"${segAttr}>${esc(label)} · ${esc(pod.title)}</button>
+    </div>`;
+  }
+
   function renderPodcastList() {
     const el = document.querySelector("#podcast-list");
     if (!el) return;
     const n = lvlNum();
     const pods = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= n);
     const series = (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n);
+    const resumeBanner = renderPodcastResumeBanner();
     const seriesHtml = series.map((s) => `
       <div class="card podcast-series">
         <p class="kicker">${esc(s.title)} · 3 eps</p>
@@ -329,7 +390,7 @@
         }).join("")}</div>
         <button type="button" class="btn sm" data-series-quiz="${esc(s.id)}">${esc(typeof t === "function" ? t("seriesQuizGo") : "Quiz de la serie (9 preg.)")}</button>
       </div>`).join("");
-    el.innerHTML = seriesHtml + pods.map((p) => `
+    el.innerHTML = resumeBanner + seriesHtml + pods.map((p) => `
       <button type="button" class="card podcast-card" data-podcast="${esc(p.id)}">
         <strong>${esc(p.title)}</strong>
         <span class="muted">${esc(p.duration)} · ${p.segments.length} frases${p.seriesEp ? ` · ep ${p.seriesEp}/3` : ""}</span>
@@ -417,6 +478,7 @@
       el.innerHTML = `<p class="muted">${esc(t("duoIdle"))}</p>
         <button type="button" class="btn" id="duo-start">${esc(t("duoStart"))}</button>`;
       el.className = "";
+      renderDuoResumeHablar();
       return;
     }
     el.className = duoState.player === 1 ? "player-1" : "player-2";
@@ -440,15 +502,118 @@
         <button type="button" class="btn ghost sm" id="duo-end">${esc(t("duoEnd"))}</button>
       </div>`;
     document.querySelector("#duo-hear")?.addEventListener("click", () => speak(target, true));
+    renderDuoResumeHablar();
+  }
+
+  function persistDuoNow() {
+    if (!duoState.active || !duoState.scene || duoState.turn >= 6) return;
+    try {
+      sessionStorage.setItem("enlab-duo-now", JSON.stringify({
+        day: typeof todayKey === "function" ? todayKey() : "",
+        player: duoState.player,
+        scoreA: duoState.scoreA,
+        scoreB: duoState.scoreB,
+        turn: duoState.turn,
+        scene: duoState.scene,
+      }));
+    } catch { /* ignore */ }
+    renderDuoToday();
+  }
+
+  function loadDuoNow() {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem("enlab-duo-now") || "null");
+      const today = typeof todayKey === "function" ? todayKey() : "";
+      if (raw?.day !== today || !raw?.scene || raw.turn >= 6) return null;
+      if (duoState.active) return null;
+      return raw;
+    } catch { return null; }
+  }
+
+  function clearDuoNow() {
+    sessionStorage.removeItem("enlab-duo-now");
+    renderDuoToday();
+  }
+
+  function duoYouAreChipHtml() {
+    if (typeof currentTab !== "undefined" && currentTab !== "hablar") return "";
+    const now = loadDuoNow();
+    if (!now || duoState.active || (typeof kidsOn === "function" && kidsOn())) return "";
+    return `<button type="button" class="btn sm" data-duo-resume>${esc(t("duoResume", { turn: now.turn + 1 }))}</button>`;
+  }
+
+  function renderDuoResumeHablar() {
+    const el = document.querySelector("#duo-resume-hablar");
+    if (!el) return;
+    if (typeof currentTab !== "undefined" && currentTab !== "hablar") {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    const now = loadDuoNow();
+    if (!now || duoState.active || (typeof kidsOn === "function" && kidsOn())) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `
+      <p class="muted">${esc(t("duoResumeHint"))}</p>
+      <p class="muted">${esc(t("duoScore", { a: now.scoreA || 0, b: now.scoreB || 0 }))}</p>
+      <button type="button" class="btn sm" data-duo-resume>${esc(t("duoResume", { turn: now.turn + 1 }))}</button>`;
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+  }
+
+  function renderDuoToday() {
+    const el = document.querySelector("#duo-today");
+    if (!el) return;
+    if (typeof kidsOn === "function" && kidsOn()) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    const now = loadDuoNow();
+    if (!now) {
+      el.hidden = true;
+      el.innerHTML = "";
+      renderDuoResumeHablar();
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `
+      <p class="kicker">${esc(t("duoResumeKicker"))}</p>
+      <p class="muted">${esc(t("duoResumeHint"))}</p>
+      <p class="muted">${esc(t("duoScore", { a: now.scoreA || 0, b: now.scoreB || 0 }))}</p>
+      <button type="button" class="btn sm" data-duo-resume>${esc(t("duoResume", { turn: now.turn + 1 }))}</button>`;
+    renderDuoResumeHablar();
+  }
+
+  function resumeDuo() {
+    const raw = loadDuoNow();
+    if (!raw) return;
+    duoState.active = true;
+    duoState.scene = raw.scene;
+    duoState.player = raw.player || 1;
+    duoState.scoreA = raw.scoreA || 0;
+    duoState.scoreB = raw.scoreB || 0;
+    duoState.turn = raw.turn || 0;
+    sessionStorage.removeItem("enlab-duo-now");
+    if (typeof showTab === "function") showTab("hablar");
+    if (typeof openLabRoom === "function") openLabRoom("duo-card");
+    renderDuoCard();
+    renderDuoToday();
   }
 
   function startDuo() {
     const sc = pickDuoScene();
     if (!sc) return;
+    clearDuoNow();
     duoState.active = true;
     duoState.scene = sc;
     duoState.turn = 0;
     duoState.player = 1;
+    duoState.scoreA = 0;
+    duoState.scoreB = 0;
     renderDuoCard();
   }
 
@@ -489,6 +654,7 @@
     duoState.turn += 1;
     if (duoState.turn >= 6) {
       duoState.active = false;
+      clearDuoNow();
       try {
         localStorage.setItem("enlab-duo-stats", JSON.stringify({
           at: typeof todayKey === "function" ? todayKey() : "",
@@ -496,6 +662,8 @@
           scoreB: duoState.scoreB,
         }));
       } catch { /* ignore */ }
+    } else {
+      persistDuoNow();
     }
     renderDuoCard();
   }
@@ -503,6 +671,7 @@
   function endDuo() {
     duoState.active = false;
     duoState.scene = null;
+    clearDuoNow();
     renderDuoCard();
   }
 
@@ -578,9 +747,10 @@
     if (certTimerId) { clearInterval(certTimerId); certTimerId = null; }
   }
 
-  function startCertTimer() {
+  function startCertTimer(from) {
     stopCertTimer();
-    certLeft = CERT_TOTAL;
+    const n = Number(from);
+    certLeft = Number.isFinite(n) && n > 0 ? Math.min(CERT_TOTAL, Math.floor(n)) : CERT_TOTAL;
     renderCertClock();
     certTimerId = setInterval(() => {
       certLeft -= 1;
@@ -592,8 +762,88 @@
     }, 1000);
   }
 
+  function loadCertNow() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("enlab-cert-now") || "null");
+      const today = typeof todayKey === "function" ? todayKey() : "";
+      if (raw?.day !== today) return null;
+      if (raw?.timeUp) return { timeUp: true, i: raw.i || 0, total: raw.total || raw.items?.length || 0 };
+      if (Array.isArray(raw.items) && raw.i < raw.items.length && (raw.left == null || raw.left > 0)) return raw;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  function persistCertNow() {
+    if (typeof quiz === "undefined" || quiz?.mode !== "cert" || !quiz.items?.length || quiz.i >= quiz.items.length) return;
+    if (certLeft <= 0) return;
+      try {
+      localStorage.setItem("enlab-cert-now", JSON.stringify({
+        day: typeof todayKey === "function" ? todayKey() : "",
+        i: quiz.i,
+        score: quiz.score || 0,
+        fails: quiz.fails || [],
+        items: quiz.items,
+        left: certLeft,
+      }));
+    } catch { /* ignore */ }
+    renderCertToday();
+  }
+
+  function clearCertNow() {
+    localStorage.removeItem("enlab-cert-now");
+  }
+
+  function renderCertToday() {
+    const el = document.querySelector("#cert-today");
+    if (!el) return;
+    if (typeof kidsOn === "function" && kidsOn()) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    const now = loadCertNow();
+    if (!now) {
+      if (typeof certTimedOutToday === "function" && certTimedOutToday()) {
+        el.hidden = false;
+        el.innerHTML = `
+          <p class="kicker">${esc(t("certTimeUpKicker"))}</p>
+          <p class="muted">${esc(t("certTimeUpHint"))}</p>
+          <button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`;
+        return;
+      }
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    if (now.timeUp) {
+      el.innerHTML = `
+        <p class="kicker">${esc(t("certTimeUpKicker"))}</p>
+        <p class="muted">${esc(t("certTimeUpHint"))}</p>
+        <button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`;
+      return;
+    }
+    el.innerHTML = `
+      <p class="kicker">${esc(t("certResumeKicker"))}</p>
+      <p class="muted">${esc(t("certResumeHint"))}</p>
+      <button type="button" class="btn sm" data-cert-resume>${esc(t("certResume", { n: now.i + 1, total: now.items.length }))}</button>`;
+  }
+
   function finishCertExam(timeUp) {
     stopCertTimer();
+    if (timeUp && quiz.i < quiz.items.length) {
+      try {
+        localStorage.setItem("enlab-cert-now", JSON.stringify({
+          day: typeof todayKey === "function" ? todayKey() : "",
+          timeUp: true,
+          i: quiz.i,
+          total: quiz.items.length,
+        }));
+      } catch { /* ignore */ }
+    } else {
+      clearCertNow();
+    }
+    renderCertToday();
     const score = quiz.score;
     const total = quiz.items.length;
     const pct = total ? Math.round((score / total) * 100) : 0;
@@ -608,7 +858,11 @@
       if (fails.includes(it.inf)) byType[k].miss += 1;
     });
     const breakdown = Object.entries(byType).map(([k, v]) => `${k}: ${v.n - v.miss}/${v.n}`).join(" · ");
-    localStorage.setItem("enlab-cert-score", JSON.stringify({ score, total, pct, pass, at: Date.now(), breakdown }));
+    localStorage.setItem("enlab-cert-score", JSON.stringify({
+      score, total, pct, pass, at: Date.now(), breakdown,
+      timeUp: !!timeUp,
+      day: typeof todayKey === "function" ? todayKey() : "",
+    }));
     const name = localStorage.getItem("enlab-cert-name") || t("certStudent");
     showCertificate(name, score, total, pct, pass, timeUp, breakdown);
     renderLabAudit();
@@ -631,6 +885,11 @@
         <p class="muted">${typeof todayKey === "function" ? todayKey() : ""} · English Lab PWA</p>
       </div>`;
     if (box) {
+      let fromHoy = false;
+      try { fromHoy = sessionStorage.getItem("enlab-quiz-from-hoy") === "1"; } catch { fromHoy = false; }
+      const backHoy = fromHoy
+        ? `<button type="button" class="btn ghost sm" data-go-tab="hoy">${esc(t("quizBackHoy"))}</button>`
+        : "";
       box.innerHTML = `
         <div class="card">
           <p class="kicker">${esc(t("certKicker"))}</p>
@@ -642,6 +901,7 @@
           <div class="row">
             <button type="button" class="btn" id="cert-print-btn">${esc(t("certPrint"))}</button>
             <button type="button" class="btn ghost" id="cert-retry">${esc(t("certRetry"))}</button>
+            ${backHoy}
           </div>
         </div>`;
       document.querySelector("#cert-name-input")?.addEventListener("change", (e) => {
@@ -657,14 +917,20 @@
     }
   }
 
-  function startCertExam() {
+  function startCertExam(opts) {
     if (typeof recState !== "undefined" && recState.rec?.state === "recording") stopRecording(false);
-    quiz = { i: 0, score: 0, items: makeCertExamItems(), fails: [], mode: "cert", host: "#quiz-box" };
+    const resume = opts?.resume ? loadCertNow() : null;
+    if (resume) {
+      quiz = { i: resume.i, score: resume.score || 0, items: resume.items, fails: resume.fails || [], mode: "cert", host: "#quiz-box" };
+    } else {
+      clearCertNow();
+      quiz = { i: 0, score: 0, items: makeCertExamItems(), fails: [], mode: "cert", host: "#quiz-box" };
+    }
     showTab("quiz");
     if (typeof openQuizRoom === "function") openQuizRoom("cert");
     const bar = document.querySelector("#cert-timer-bar");
     if (bar) bar.hidden = false;
-    startCertTimer();
+    startCertTimer(resume ? resume.left : undefined);
     renderQuiz();
     quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -712,8 +978,9 @@
     if (typeof drawTransferQr !== "function") return;
     window._drawTransferQrOrig = drawTransferQr;
     window.drawTransferQr = function (text) {
-      const canvas = document.querySelector("#transfer-qr");
-      if (canvas) drawRealQr(text, canvas);
+      document.querySelectorAll("#transfer-qr, #prefs-transfer-qr, #audit-transfer-qr").forEach((canvas) => {
+        if (canvas) drawRealQr(text, canvas);
+      });
     };
     if (typeof renderTransferCode === "function") renderTransferCode();
   }
@@ -758,6 +1025,7 @@
       if (quiz.mode === "cert" && quiz.i < quiz.items.length) {
         if (bar) bar.hidden = false;
         renderCertClock();
+        persistCertNow();
       } else if (bar && quiz.mode !== "cert") {
         bar.hidden = true;
         stopCertTimer();
@@ -779,8 +1047,10 @@
     if (typeof onTabPaint === "function") {
       onTabPaint((id) => {
         if (id === "vocales") renderPodcastList();
-        if (id === "hablar") { renderChatWork(); renderDuoCard(); }
+        if (id === "hablar") { renderChatWork(); renderDuoCard(); renderDuoResumeHablar(); if (typeof fillYouAreChips === "function") fillYouAreChips(); }
         if (id === "ia") renderLabAudit();
+        if (id !== "quiz") persistCertNow();
+        if (id === "hoy") { renderCertToday(); renderDuoToday(); }
       });
     }
   }
@@ -807,6 +1077,7 @@
         renderTravelPanel();
       }
       if (e.target.closest("#duo-start")) startDuo();
+      if (e.target.closest("[data-duo-resume]")) resumeDuo();
       if (e.target.closest("#duo-end")) endDuo();
       if (e.target.closest("#duo-skip")) duoNextTurn(false);
       if (e.target.closest("#duo-pass")) duoNextTurn(false);
@@ -827,7 +1098,14 @@
         }
       }
       if (e.target.closest("[data-podcast]")) {
-        playPodcast(e.target.closest("[data-podcast]").dataset.podcast);
+        const btn = e.target.closest("[data-podcast]");
+        const from = Number(btn.dataset.podSeg || 0);
+        const mid = btn.closest("#podcast-today") && btn.hasAttribute("data-pod-seg");
+        if (btn.closest("#podcast-today") || from > 0 || mid) {
+          if (typeof showTab === "function") showTab("vocales");
+          if (typeof openLabRoom === "function") openLabRoom("oido-podcasts");
+        }
+        playPodcast(btn.dataset.podcast, mid ? from : (from > 0 ? from : undefined));
       }
       if (e.target.closest("[data-series-quiz]")) {
         startSeriesQuiz(e.target.closest("[data-series-quiz]").dataset.seriesQuiz);
@@ -845,6 +1123,31 @@
           if (typeof setSpeakTarget === "function") setSpeakTarget(window._speakTarget);
           showTab("hablar");
         }
+      }
+      if (e.target.closest("[data-cert-resume]")) {
+        startCertExam({ resume: true });
+      }
+      if (e.target.closest("[data-cert-retry]")) {
+        const now = loadCertNow();
+        if (now?.timeUp && typeof window.confirm === "function" && !window.confirm(t("certRetryWarn"))) return;
+        startCertExam();
+      }
+      if (e.target.closest("#audit-transfer-copy")) {
+        if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
+        if (typeof renderTransferCode === "function") renderTransferCode();
+        const code = document.querySelector("#transfer-code")?.value || "";
+        const hint = document.querySelector("#audit-transfer-chunks");
+        if (!code) {
+          if (hint) hint.textContent = typeof t === "function" ? t("prefsTransferEmpty") : "";
+          return;
+        }
+        const ok = () => {
+          if (hint && typeof t === "function") {
+            hint.textContent = t("transferQrHint", { len: code.length, cs: code.length % 997 });
+          }
+        };
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).then(ok).catch(ok);
+        else ok();
       }
       if (e.target.closest('[data-quiz-mode="cert"]')) {
         const sel = document.querySelector("#quiz-mode");
@@ -900,19 +1203,31 @@
     renderChatWork();
     renderDuoCard();
     bindEvents();
+    renderCertToday();
+    renderDuoToday();
     if (typeof onHomePaint === "function" && !window._renderHomePatched) {
       window._renderHomePatched = true;
-      onHomePaint(() => renderTravelPanel());
+      onHomePaint(() => {
+        renderTravelPanel();
+        renderCertToday();
+        renderDuoToday();
+      });
     }
   }
 
   window.NR = {
     bootstrap,
     startCertExam,
+    persistCertNow,
+    renderCertToday,
+    renderDuoToday,
+    renderDuoResumeHablar,
+    duoYouAreChipHtml,
     makeCertExamItems,
     travelOn,
     travelMapToday,
     renderLabAudit,
+    playPodcast,
   };
 
   if (!window.ENLAB_LOADER) NR.bootstrap();

@@ -1,6 +1,65 @@
 const { test, expect } = require("@playwright/test");
 const { boot, openOidoRoom } = require("./helpers/boot");
 
+test("Oír: resume chip for last room", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 3);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("enlab-oido-last", JSON.stringify({
+      id: "oido-reglas", at: Date.now(), day,
+    }));
+    if (typeof renderOidoResume === "function") renderOidoResume();
+  });
+  await page.locator('nav.tabs [data-tab="vocales"]').click();
+  await expect(page.locator("#oido-resume")).toBeVisible();
+  await expect(page.locator("#oido-resume")).toContainText(/Hace 3 días|3 days ago/i);
+  await expect(page.locator("#oido-resume")).toContainText(/reglas|Rules/i);
+  await page.locator("#oido-resume [data-lab-jump]").click();
+  await expect(page.locator("#vocales")).toHaveClass(/lab-in/);
+  await expect(page.locator("#oido-resume")).toBeHidden();
+});
+
+test("Oír: kids resume chip is short", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-kids", "1");
+    localStorage.setItem("enlab-oido-last", JSON.stringify({
+      id: "oido-reglas", at: Date.now(), day: "2020-01-01",
+    }));
+    if (typeof applyKidsMode === "function") applyKidsMode();
+    if (typeof renderOidoResume === "function") renderOidoResume();
+  });
+  await page.locator('nav.tabs [data-tab="vocales"]').click();
+  await expect(page.locator("#oido-resume")).toBeVisible();
+  await expect(page.locator("#oido-resume")).toContainText(/Seguir aquí|Continue here/i);
+  await expect(page.locator("#oido-resume")).not.toContainText(/Hace|days ago|Ayer|Yesterday/i);
+});
+
+test("Oír: filtered last room offers pick a room", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-kids", "1");
+    localStorage.setItem("enlab-oido-last", JSON.stringify({
+      id: "oido-tips", at: Date.now(), day: "2020-01-01",
+    }));
+    if (typeof applyKidsMode === "function") applyKidsMode();
+    if (typeof renderOidoResume === "function") renderOidoResume();
+  });
+  await page.locator('nav.tabs [data-tab="vocales"]').click();
+  await expect(page.locator("#oido-resume")).toBeVisible();
+  await expect(page.locator("#oido-resume")).toContainText(/Elige una sala|Pick a room/i);
+  await expect(page.locator("#oido-resume [data-oido-pick]")).toBeVisible();
+  await page.locator("#oido-resume [data-oido-pick]").click();
+  await expect(page.locator("#oido-toc .lab-hub-now")).toBeVisible();
+  await expect(page.locator("#oido-toc .oido-pick-hint")).toContainText(/Empieza|Start with/i);
+  await page.locator("#oido-toc .lab-card").first().click();
+  await expect(page.locator("#vocales")).toHaveClass(/lab-in/);
+  await page.locator("#vocales .lab-back").click();
+  await expect(page.locator("#oido-toc .lab-hub-now")).toHaveCount(0);
+});
+
 test("Oír: pronunciation panel", async ({ page }) => {
   await boot(page);
   await openOidoRoom(page, "pron-panel");
@@ -107,6 +166,38 @@ test("Oír: 40 podcasts", async ({ page }) => {
   await page.locator('[data-tab="vocales"]').click();
   await openOidoRoom(page, "oido-podcasts");
   await expect(page.locator("#podcast-list .podcast-card").first()).toBeVisible();
+});
+
+test("Oír: podcast in progress shows resume banner", async ({ page }) => {
+  await boot(page);
+  const id = await page.evaluate(() => {
+    const p = (window.ENLAB.podcasts || [])[0];
+    localStorage.setItem("enlab-podcast-now", JSON.stringify({
+      id: p.id, seg: 1, day: todayKey(), at: Date.now(),
+    }));
+    return p.id;
+  });
+  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "oido-podcasts");
+  await expect(page.locator(".podcast-resume-banner [data-podcast]")).toHaveAttribute("data-podcast", id);
+  await expect(page.locator(".podcast-resume-banner [data-podcast]")).toHaveAttribute("data-pod-seg", "1");
+});
+
+test("Oír: podcast banner hides while player is open", async ({ page }) => {
+  await boot(page);
+  const id = await page.evaluate(() => {
+    const p = (window.ENLAB.podcasts || [])[0];
+    localStorage.setItem("enlab-podcast-now", JSON.stringify({
+      id: p.id, seg: 1, day: todayKey(), at: Date.now(),
+    }));
+    return p.id;
+  });
+  await page.locator('[data-tab="vocales"]').click();
+  await openOidoRoom(page, "oido-podcasts");
+  await expect(page.locator(".podcast-resume-banner")).toBeVisible();
+  await page.locator(".podcast-resume-banner [data-podcast]").click();
+  await expect(page.locator("#podcast-player")).toBeVisible();
+  await expect(page.locator(".podcast-resume-banner")).toBeHidden();
 });
 
 test("Oír: podcasts hand-written (en/es, no templates)", async ({ page }) => {

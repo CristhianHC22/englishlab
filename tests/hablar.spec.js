@@ -40,6 +40,17 @@ test("Hablar: role-play starts with timer", async ({ page }) => {
   await expect(page.locator("#roleplay-now [data-role-next]")).toBeVisible();
 });
 
+test("Hablar: hear then record is the first action", async ({ page }) => {
+  await boot(page);
+  await page.locator('nav.tabs [data-tab="hablar"]').click();
+  await expect(page.locator("#speak-target")).toBeVisible();
+  await expect(page.locator(".speak-act #speak-listen")).toBeVisible();
+  await expect(page.locator(".speak-act #speak-rec")).toBeVisible();
+  await expect(page.locator("#speak-listen")).toHaveClass(/next-act/);
+  await expect(page.locator(".speak-steps [data-speak-phase=hear]")).toHaveClass(/on/);
+  await expect(page.locator(".speak-opts")).toBeVisible();
+});
+
 test("Hablar: speak verdict mock", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="hablar"]').click();
@@ -58,4 +69,41 @@ test("Hablar: class pro student QR", async ({ page }) => {
   await page.locator("#class-student-qr").click();
   await expect(page.locator("#class-student-qr-box")).toBeVisible();
   await expect(page.locator("#class-student-qr-box textarea")).not.toHaveValue("");
+});
+
+test("Hablar: duo resume chip when game saved", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-duo-now", JSON.stringify({
+      day: todayKey(),
+      player: 1,
+      scoreA: 2,
+      scoreB: 1,
+      turn: 3,
+      scene: { type: "dialog", data: { title: "Test", turns: [{ a: "Hi", b: "Hello" }] } },
+    }));
+    if (window.NR?.renderDuoResumeHablar) window.NR.renderDuoResumeHablar();
+  });
+  await openLabRoom(page, "duo-card", "hablar");
+  await expect(page.locator("#duo-resume-hablar [data-duo-resume]")).toBeVisible();
+  await expect(page.locator("#duo-resume-hablar")).toContainText(/A:\s*2|A: 2/i);
+  await page.locator("#duo-resume-hablar [data-duo-resume]").click();
+  await expect(page.locator("#duo-now")).toContainText(/Jugador|Player/i);
+});
+
+test("Hablar: duo resume chip in you-are", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-duo-now", JSON.stringify({
+      day: todayKey(),
+      player: 1,
+      scoreA: 1,
+      scoreB: 0,
+      turn: 1,
+      scene: { type: "dialog", data: { title: "Test", turns: [{ a: "Hi", b: "Hello" }] } },
+    }));
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+  });
+  await page.locator('nav.tabs [data-tab="hablar"]').click();
+  await expect(page.locator("#you-are-chips [data-duo-resume]")).toBeVisible();
 });

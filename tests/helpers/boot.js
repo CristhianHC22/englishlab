@@ -55,7 +55,7 @@ async function closeLabIfOpen(page, panelSel) {
 
 async function openLabRoom(page, jump, tab) {
   if (tab && !(await page.locator(`#${tab}.panel.active`).isVisible().catch(() => false))) {
-    await page.locator(`[data-tab="${tab}"]`).click();
+    await page.locator(`nav.tabs [data-tab="${tab}"]`).click();
   }
   const root = tab ? `#${tab}` : "body";
   await closeLabIfOpen(page, root);
@@ -77,7 +77,7 @@ const QUIZ_ROOMS = {
 async function openQuizMode(page, mode) {
   const room = QUIZ_ROOMS[mode] || "quiz-verbs";
   if (!(await page.locator("#quiz.panel.active").isVisible().catch(() => false))) {
-    await page.locator('[data-tab="quiz"]').click();
+    await page.locator('nav.tabs [data-tab="quiz"]').click();
   }
   const pick = page.locator(`[data-quiz-mode="${mode}"]`);
   if (!(await pick.isVisible().catch(() => false))) {

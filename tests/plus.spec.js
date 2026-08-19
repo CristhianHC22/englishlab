@@ -29,17 +29,149 @@ test("Plus: level test starts 20-item quiz", async ({ page }) => {
 test("Plus: error journal and Anki export in Ayuda", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
     window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
   });
   await page.locator('[data-tab="ia"]').click();
   await openLabRoom(page, "error-journal", "ia");
   await expect(page.locator("#error-journal")).toContainText(/are/i);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-journal-focus", "are");
+    window.PLUS.renderErrorJournal();
+  });
+  await expect(page.locator("#error-journal .journal-card-now")).toBeVisible();
+  await expect(page.locator("#error-journal")).toContainText(/Este fallo|This miss/i);
+  await expect(page.locator("#error-journal .journal-rest")).toBeVisible();
+  await expect(page.locator("#error-journal .journal-rest")).toContainText(/Los otros|The other/i);
+  await expect(page.locator(".journal-card-now [data-quiz-miss='uso']")).toBeVisible();
   await expect(page.locator("#journal-anki")).toBeVisible();
   await expect(page.locator("#journal-csv")).toBeVisible();
   await expect(page.locator("#week-sheet-print")).toBeVisible();
   await openLabRoom(page, "perf-panel", "ia");
   await expect(page.locator("#perf-panel")).toContainText(/paquete|pack/i);
   await expect(page.locator("#perf-panel")).toContainText(/KB/i);
+});
+
+test("Plus: journal Practice this opens the miss mode", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    sessionStorage.setItem("enlab-journal-focus", "ship");
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await expect(page.locator(".journal-card-now [data-quiz-miss='ear']")).toBeVisible();
+  await page.locator(".journal-card-now [data-quiz-miss='ear']").click();
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+});
+
+test("Plus: journal Practice this opens uso without Back to Today", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
+    sessionStorage.setItem("enlab-journal-focus", "are");
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await page.locator(".journal-card-now [data-quiz-miss='uso']").click();
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+  await page.evaluate(() => {
+    const s = document.createElement("script");
+    s.textContent = "quiz.i = quiz.items.length; renderQuiz();";
+    document.documentElement.appendChild(s);
+    s.remove();
+  });
+  await expect(page.locator("#quiz-box [data-go-tab='hoy']")).toHaveCount(0);
+});
+
+test("Plus: journal Practice this opens listen mode", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "listen", expected: "The bus is late.", said: "", prompt: "Listen passage", why: "past simple" });
+    sessionStorage.setItem("enlab-journal-focus", "The bus is late.");
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await expect(page.locator(".journal-card-now [data-quiz-miss='listen']")).toBeVisible();
+  await page.locator(".journal-card-now [data-quiz-miss='listen']").click();
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+  await expect(page.locator("#listen-next-pass")).toBeVisible();
+});
+
+test("Plus: journal groups rest rows by mode", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "ear", expected: "thin", said: "tin", prompt: "thin / tin", why: "short i" });
+    window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await expect(page.locator(".journal-card-group")).toHaveCount(2);
+  await expect(page.locator(".journal-card-group [data-quiz-miss='ear']")).toBeVisible();
+});
+
+test("Plus: journal groups now rows by mode when several match", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "ear", expected: "thin", said: "tin", prompt: "thin / tin", why: "short i" });
+    sessionStorage.setItem("enlab-journal-focus", "thin");
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await expect(page.locator(".journal-card-now.journal-card-group")).toBeVisible();
+  await expect(page.locator(".journal-card-now [data-quiz-miss='ear']")).toBeVisible();
+});
+
+test("Plus: journal Anki now exports only focused rows", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
+    sessionStorage.setItem("enlab-journal-focus", "ship");
+    window.PLUS.renderErrorJournal();
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#journal-anki")).toContainText(/este fallo|this miss/i);
+  const lines = await page.evaluate(() => {
+    window.PLUS.exportAnki();
+    return window._journalNowRows?.length || 0;
+  });
+  expect(lines).toBe(1);
+});
+
+test("Plus: journal CSV now exports only focused rows", async ({ page }) => {
+  await boot(page);
+  const n = await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
+    sessionStorage.setItem("enlab-journal-focus", "ship");
+    window.PLUS.renderErrorJournal();
+    window.PLUS.exportWeakCsv();
+    return window._journalNowRows?.length || 0;
+  });
+  expect(n).toBe(1);
+});
+
+test("Plus: journal groups by mode when focus is mode name", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "ear", expected: "thin", said: "tin", prompt: "thin / tin", why: "short i" });
+    sessionStorage.setItem("enlab-journal-focus", "oído");
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.evaluate(() => window.PLUS.renderErrorJournal());
+  await expect(page.locator(".journal-card-now.journal-card-group")).toBeVisible();
+  await expect(page.locator(".journal-card-now")).toContainText(/2 fallos|2 misses/i);
 });
 
 test("Plus: hard pairs and branched role-plays", async ({ page }) => {

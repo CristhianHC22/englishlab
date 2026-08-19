@@ -84,6 +84,9 @@ async function stabilizeForSnapshot(page) {
     document.getElementById("welcome")?.setAttribute("hidden", "");
     const guide = document.getElementById("guide-panel");
     if (guide) { guide.hidden = true; guide.setAttribute("hidden", ""); }
+    document.body.classList.remove("repaso-active");
+    const extras = document.getElementById("hoy-extras");
+    if (extras?.open) extras.open = false;
   });
 }
 
@@ -108,7 +111,7 @@ async function expectViewportShot(page, name, opts = {}) {
 }
 
 async function gotoTab(page, tab) {
-  await page.locator(`[data-tab="${tab}"]`).click();
+  await page.locator(`nav.tabs [data-tab="${tab}"]`).click();
   await page.locator(`#${tab}.panel.active`).waitFor({ state: "visible" });
   if (tab === "vocales") {
     await page.waitForSelector("#oido-toc .lab-card");

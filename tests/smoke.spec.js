@@ -13,6 +13,9 @@ test("loads Hoy path and tabs", async ({ page }) => {
   await expect(page.locator("#hablar-hub [data-lab-jump='email-card']")).toBeVisible();
   await expect(page.locator("#hablar-hub [data-lab-jump='chat-work-card']")).toBeVisible();
   await expect(page.locator("#hablar-hub [data-lab-jump='duo-card']")).toBeVisible();
+  await page.locator('[data-tab="verbos"]').click();
+  await expect(page.locator("#verb-today")).toBeVisible();
+  await expect(page.locator("#verb-today .quiz-q")).not.toHaveText("");
 });
 
 test("English UI toggle", async ({ page }) => {
@@ -288,6 +291,14 @@ test("podcast of the day on Hoy", async ({ page }) => {
   await openHoyExtras(page);
   await expect(page.locator("#podcast-today")).toBeVisible();
   await expect(page.locator("#podcast-today [data-podcast]")).toBeVisible();
+  const id = await page.locator("#podcast-today [data-podcast]").getAttribute("data-podcast");
+  await page.evaluate((podId) => {
+    localStorage.setItem("enlab-podcast-now", JSON.stringify({
+      id: podId, seg: 1, day: todayKey(), at: Date.now(),
+    }));
+    if (typeof renderPodcastToday === "function") renderPodcastToday();
+  }, id);
+  await expect(page.locator("#podcast-today [data-podcast]")).toContainText(/Seguir|Continue/i);
 });
 
 test("quiz débiles button always on Hoy", async ({ page }) => {

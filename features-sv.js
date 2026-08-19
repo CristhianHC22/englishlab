@@ -291,18 +291,28 @@
   }
 
   function renderHoyStoryChip() {
-    const host = document.querySelector("#hoy-story-chip");
-    if (!host) return;
     const hit = findContinuableStory();
+    const html = hit ? `
+      <p class="muted">${esc(typeof t === "function" ? t("hoyStoryChipHint") : "Retoma el nodo donde lo dejaste.")}</p>
+      <button type="button" class="btn sm" data-story-resume="${esc(hit.id)}">${esc(typeof t === "function" ? t("hoyStoryContinue", { title: hit.story.title }) : hit.story.title)}</button>` : "";
+    const pathDone = document.querySelector("#hoy")?.classList.contains("path-done");
+    const hosts = [
+      document.querySelector("#hoy-story-chip"),
+      pathDone ? document.querySelector("#hoy-done-story") : null,
+    ].filter(Boolean);
     if (!hit) {
-      host.hidden = true;
-      host.innerHTML = "";
+      hosts.forEach((host) => { host.hidden = true; host.innerHTML = ""; });
       return;
     }
-    host.hidden = false;
-    host.innerHTML = `
-      <p class="muted">${esc(typeof t === "function" ? t("hoyStoryChipHint") : "Retoma el nodo donde lo dejaste.")}</p>
-      <button type="button" class="btn sm" data-story-resume="${esc(hit.id)}">${esc(typeof t === "function" ? t("hoyStoryContinue", { title: hit.story.title }) : hit.story.title)}</button>`;
+    hosts.forEach((host) => {
+      host.hidden = false;
+      host.innerHTML = html;
+    });
+    const above = document.querySelector("#hoy-story-chip");
+    if (above && pathDone) {
+      above.hidden = true;
+      above.innerHTML = "";
+    }
   }
   function renderStoriesPanel() {
     const host = document.querySelector("#stories-panel");
@@ -414,6 +424,7 @@
         <div class="card">
           <h4>${esc(typeof t === "function" ? t("writePrompt") : "Prompt")}</h4>
           <p>${esc(pick.prompt)}</p>
+          <p class="muted">${esc(typeof t === "function" ? t("writeHint") : "Nada se envía.")}</p>
           <label class="muted">${esc(typeof t === "function" ? t("writeDraft") : "Tu borrador")}<textarea id="writing-draft" rows="8" placeholder="Write here…"></textarea></label>
           <button type="button" class="btn sm" id="writing-score">${esc(typeof t === "function" ? t("writeScore") : "Comparar con modelo")}</button>
         </div>
@@ -759,13 +770,15 @@
             ? (typeof t === "function" ? t("offlinePartial") : "⚠ Carga parcial")
             : (typeof t === "function" ? t("offlineReady") : "✓ Listo sin red"))
           : "…")
-        : (typeof t === "function" ? t("offlineModeHint") : "Sin red. El Lab cacheado sigue en este aparato.");
+        : (typeof t === "function" ? t("offlineModeHint") : "Sin red.");
+      badge.hidden = !online;
       badge.classList.toggle("offline-on", !online);
       badge.classList.toggle("offline-ready", online && ready);
+      if (typeof syncNetWarn === "function") syncNetWarn();
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v44";
+  const SW_CACHE = "enlab-v61";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;

@@ -78,36 +78,196 @@
     return "b2";
   }
 
-  function startPlacement() {
+  function startPlacement(opts) {
     if (typeof stopRecording === "function" && recState?.rec?.state === "recording") stopRecording(false);
-    quiz = { i: 0, score: 0, items: makePlacementItems(), fails: [], mode: "place", host: "#quiz-box" };
+    const resume = opts?.resume ? loadPlaceNow() : null;
+    if (resume) {
+      quiz = { i: resume.i, score: resume.score || 0, items: resume.items, fails: resume.fails || [], mode: "place", host: "#quiz-box" };
+    } else {
+      clearPlaceNow();
+      renderPlaceToday();
+      quiz = { i: 0, score: 0, items: makePlacementItems(), fails: [], mode: "place", host: "#quiz-box" };
+    }
     if (typeof showTab === "function") showTab("quiz");
     if (typeof openQuizRoom === "function") openQuizRoom("place");
     if (typeof renderQuiz === "function") renderQuiz();
+  }
+
+  function loadPlaceNow() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("enlab-place-now") || "null");
+      const today = typeof todayKey === "function" ? todayKey() : "";
+      if (raw?.day !== today) return null;
+      if (Array.isArray(raw.items) && raw.i > 0 && raw.i < raw.items.length) return raw;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  function persistPlaceNow() {
+    if (typeof quiz === "undefined" || quiz?.mode !== "place" || !quiz.items?.length || quiz.i <= 0 || quiz.i >= quiz.items.length) return;
+    try {
+      localStorage.setItem("enlab-place-now", JSON.stringify({
+        day: typeof todayKey === "function" ? todayKey() : "",
+        i: quiz.i,
+        score: quiz.score || 0,
+        fails: quiz.fails || [],
+        items: quiz.items,
+      }));
+  } catch { /* ignore */ }
+  renderPlaceToday();
+  renderPlaceQuizResume();
+}
+
+  function clearPlaceNow() {
+    localStorage.removeItem("enlab-place-now");
+  }
+
+  function renderPlaceQuizResume() {
+    const el = document.querySelector("#place-quiz-resume");
+    if (!el) return;
+    const now = loadPlaceNow();
+    if (!now || (typeof kidsOn === "function" && kidsOn())) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `
+      <p class="muted">${esc(tt("placeResumeHint"))}</p>
+      <button type="button" class="btn sm" data-place-resume>${esc(tt("placeResume", { i: now.i + 1, total: now.items.length }))}</button>`;
+    if (typeof renderHoyDoneMid === "function") renderHoyDoneMid();
+  }
+
+  function renderPlaceToday() {
+    const el = document.querySelector("#place-today");
+    if (!el) return;
+    if (typeof kidsOn === "function" && kidsOn()) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    const now = loadPlaceNow();
+    if (!now) {
+      el.hidden = true;
+      el.innerHTML = "";
+      renderPlaceQuizResume();
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `
+      <p class="kicker">${esc(tt("placeResumeKicker"))}</p>
+      <p class="muted">${esc(tt("placeResumeHint"))}</p>
+      <button type="button" class="btn sm" data-place-resume>${esc(tt("placeResume", { i: now.i + 1, total: now.items.length }))}</button>`;
+    if (typeof renderHoyDoneMid === "function") renderHoyDoneMid();
+  }
+
+  function journalPlayMode(mode) {
+    const m = String(mode || "").toLowerCase();
+    if (m === "exam") return "ear";
+    if (["ear", "dict", "listen"].includes(m)) return m;
+    if (["choice", "type", "ed"].includes(m)) return m;
+    if (["uso", "art", "prep", "phrasal", "cond", "emailtone", "story"].includes(m)) return m;
+    if (["speak", "voice", "rec", "role", "dialog"].includes(m)) return "hablar";
+    return "uso";
+  }
+
+  function journalPlayBtn(r, now) {
+    if (!now) return "";
+    const mode = journalPlayMode(r.mode);
+    if (mode === "hablar") {
+      return `<button type="button" class="btn ghost sm" data-go-tab="hablar">${esc(tt("journalPlay"))}</button>`;
+    }
+    return `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(mode)}">${esc(tt("journalPlay"))}</button>`;
+  }
+
+  function journalCardHtml(r, now) {
+    return `
+      <div class="card journal-card${now ? " journal-card-now" : ""}">
+        <p><strong>${esc(r.expected || r.prompt)}</strong></p>
+        ${r.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(r.said)}</p>` : ""}
+        <p class="muted">${esc(r.why || whyFor(r.expected))}</p>
+        ${r.f1 ? `<p class="muted">${esc(tt("journalFormants", { f1: r.f1, f2: r.f2 || "?" }))}</p>` : ""}
+        ${r.expected ? `<button type="button" class="say chip" data-say="${esc(r.expected)}">▶</button>` : ""}
+        ${now ? journalPlayBtn(r, true) : ""}
+      </div>`;
+  }
+
+  function journalGroupHtml(rows, now) {
+    const groups = new Map();
+    rows.forEach((r) => {
+      const mode = journalPlayMode(r.mode);
+      if (!groups.has(mode)) groups.set(mode, []);
+      groups.get(mode).push(r);
+    });
+    return [...groups.entries()].map(([mode, list]) => {
+      const sample = list[0];
+      const label = list.length > 1
+        ? tt("journalGroupN", { n: list.length, mode: tt(`quizModes.${mode}.t`) || mode })
+        : (sample.expected || sample.prompt || mode);
+      const btn = mode === "hablar"
+        ? `<button type="button" class="btn ghost sm" data-go-tab="hablar">${esc(tt("journalPlay"))}</button>`
+        : `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(mode)}">${esc(tt("journalPlay"))}</button>`;
+      return `<div class="card journal-card journal-card-group${now ? " journal-card-now" : ""}">
+        <p><strong>${esc(label)}</strong></p>
+        ${sample.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(sample.said)}</p>` : ""}
+        <p class="muted">${esc(sample.why || whyFor(sample.expected))}</p>
+        ${btn}
+      </div>`;
+    }).join("");
   }
 
   function renderErrorJournal() {
     const host = document.querySelector("#error-journal");
     if (!host) return;
     const rows = loadErrors().slice(0, 12);
+    let focus = "";
+    try { focus = sessionStorage.getItem("enlab-journal-focus") || ""; } catch { focus = ""; }
+    const focusNorm = focus.toLowerCase().trim();
+    const hitI = focusNorm
+      ? rows.findIndex((r) => [r.expected, r.prompt, r.said].some((x) =>
+        x && String(x).toLowerCase().includes(focusNorm.slice(0, 40))))
+      : -1;
+    let nowI = hitI >= 0 ? hitI : (focusNorm && rows.length ? 0 : -1);
+    let nowRow = nowI >= 0 ? rows[nowI] : null;
+    if (hitI < 0 && focusNorm) {
+      const modeHit = rows.filter((r) => {
+        const m = journalPlayMode(r.mode);
+        const label = (tt(`quizModes.${m}.t`) || m).toLowerCase();
+        return focusNorm.includes(m) || (label.length > 3 && focusNorm.includes(label.slice(0, 6)));
+      });
+      if (modeHit.length) {
+        nowRow = modeHit[0];
+        nowI = rows.indexOf(nowRow);
+      }
+    }
+    const nowMode = nowRow ? journalPlayMode(nowRow.mode) : null;
+    const nowPeers = nowMode ? rows.filter((r) => journalPlayMode(r.mode) === nowMode) : [];
+    const rest = nowI >= 0 ? rows.filter((r) => !nowPeers.includes(r)) : rows;
+    const nowHtml = nowPeers.length > 1
+      ? journalGroupHtml(nowPeers, true)
+      : (nowRow ? journalCardHtml(nowRow, true) : "");
+    const restHtml = rest.length
+      ? (nowI >= 0
+        ? `<details class="fold journal-rest"><summary>${esc(tt("journalRest", { n: rest.length }))}</summary>${journalGroupHtml(rest)}</details>`
+        : journalGroupHtml(rest))
+      : "";
+    const list = nowI >= 0 && rest.length
+      ? `${nowHtml}${restHtml}`
+      : (nowHtml + restHtml);
+    window._journalNowRows = nowI >= 0 ? (nowPeers.length ? nowPeers : (nowRow ? [nowRow] : [])) : [];
+    const ankiLabel = nowI >= 0 ? tt("exportAnkiNow") : tt("exportAnki");
     host.innerHTML = `
       <p class="kicker">${esc(tt("journalTitle"))}</p>
+      ${nowI >= 0 ? `<p class="kicker journal-now-kicker">${esc(tt("journalNow"))}</p>` : ""}
       <p class="muted">${esc(tt("journalHint"))}</p>
       <div class="row">
-        <button type="button" class="btn ghost sm" id="journal-anki">${esc(tt("exportAnki"))}</button>
-        <button type="button" class="btn ghost sm" id="journal-csv">${esc(tt("exportWeakCsv"))}</button>
+        <button type="button" class="btn ghost sm" id="journal-anki">${esc(ankiLabel)}</button>
+        <button type="button" class="btn ghost sm" id="journal-csv">${esc(nowI >= 0 ? tt("exportWeakCsvNow") : tt("exportWeakCsv"))}</button>
         <button type="button" class="btn ghost sm" id="week-sheet-print">${esc(tt("weekSheetPrint"))}</button>
       </div>
-      ${rows.length
-        ? rows.map((r) => `
-          <div class="card journal-card">
-            <p><strong>${esc(r.expected || r.prompt)}</strong></p>
-            ${r.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(r.said)}</p>` : ""}
-            <p class="muted">${esc(r.why || whyFor(r.expected))}</p>
-            ${r.f1 ? `<p class="muted">${esc(tt("journalFormants", { f1: r.f1, f2: r.f2 || "?" }))}</p>` : ""}
-            ${r.expected ? `<button type="button" class="chip say" data-say="${esc(r.expected)}">▶</button>` : ""}
-          </div>`).join("")
-        : `<p class="muted">${esc(tt("journalEmpty"))}</p>`}`;
+      ${list || `<p class="muted">${esc(tt("journalEmpty"))}</p>`}`;
+    const now = host.querySelector(".journal-card-now");
+    if (now) now.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function ankiEscape(s) {
@@ -122,7 +282,8 @@
   }
 
   function exportAnki() {
-    const errs = loadErrors();
+    const focus = window._journalNowRows;
+    const errs = focus?.length ? focus : loadErrors();
     const weak = typeof weakSet === "function" ? [...weakSet()] : [];
     const srs = typeof srsDueList === "function" ? srsDueList(40) : [];
     const lines = ["#separator:tab", "#html:true"];
@@ -131,20 +292,28 @@
       const back = `${r.expected}<br><small>${r.why || ""}</small>`;
       lines.push(`${front.replace(/\t/g, " ")}\t${back.replace(/\t/g, " ")}`);
     });
-    weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));
-    srs.forEach((x) => lines.push(`${(x.label || x.key || "").replace(/\t/g, " ")}\tSRS due`));
-    downloadText("englishlab-anki.txt", lines.join("\n"), "text/plain");
+    if (!focus?.length) {
+      weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));
+      srs.forEach((x) => lines.push(`${(x.label || x.key || "").replace(/\t/g, " ")}\tSRS due`));
+    }
+    downloadText(focus?.length ? "englishlab-anki-now.txt" : "englishlab-anki.txt", lines.join("\n"), "text/plain");
   }
 
   function exportWeakCsv() {
+    const focus = window._journalNowRows;
     const rows = [["kind", "item", "note"]];
-    (typeof weakSet === "function" ? [...weakSet()] : []).forEach((v) => rows.push(["verb", v, "weak"]));
-    (typeof speakWeakSet === "function" ? [...speakWeakSet()] : []).forEach((v) => rows.push(["speak", v, "not understood"]));
-    (typeof earWeakSet === "function" ? [...earWeakSet()] : []).forEach((v) => rows.push(["ear", v, "minimal pair"]));
-    loadErrors().forEach((r) => rows.push(["error", r.expected || r.prompt, r.why || ""]));
-    (typeof srsDueList === "function" ? srsDueList(50) : []).forEach((x) => rows.push(["srs", x.label || "", x.due || ""]));
+    const addErr = (r) => rows.push(["error", r.expected || r.prompt, r.why || ""]);
+    if (focus?.length) {
+      focus.forEach(addErr);
+    } else {
+      (typeof weakSet === "function" ? [...weakSet()] : []).forEach((v) => rows.push(["verb", v, "weak"]));
+      (typeof speakWeakSet === "function" ? [...speakWeakSet()] : []).forEach((v) => rows.push(["speak", v, "not understood"]));
+      (typeof earWeakSet === "function" ? [...earWeakSet()] : []).forEach((v) => rows.push(["ear", v, "minimal pair"]));
+      loadErrors().forEach(addErr);
+      (typeof srsDueList === "function" ? srsDueList(50) : []).forEach((x) => rows.push(["srs", x.label || "", x.due || ""]));
+    }
     const csv = rows.map((r) => r.map((c) => `"${ankiEscape(c)}"`).join(",")).join("\n");
-    downloadText("englishlab-weak.csv", csv, "text/csv");
+    downloadText(focus?.length ? "englishlab-weak-now.csv" : "englishlab-weak.csv", csv, "text/csv");
   }
 
   function printWeekSheet() {
@@ -447,6 +616,7 @@
 
   function bindPlus() {
     document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-place-resume]")) startPlacement({ resume: true });
       if (e.target.closest("#place-start") || e.target.closest('[data-quiz-mode="place"]')) {
         /* place se despacha en startQuiz de app.js */
       }
@@ -484,16 +654,24 @@
     liveRegions();
     bindPlus();
     renderErrorJournal();
+    renderPlaceToday();
     renderPerfHint();
     window.addEventListener("enlab-packs-ready", () => renderPerfHint());
     if (typeof onTabPaint === "function") {
       onTabPaint((id) => {
         if (id === "ia") { renderErrorJournal(); renderPerfHint(); }
-        if (id === "hoy") renderChart90();
+        if (id === "quiz") {
+          renderPlaceQuizResume();
+          if (typeof renderWeeklyQuizResume === "function") renderWeeklyQuizResume();
+        }
+        if (id === "hoy") { renderChart90(); renderPlaceToday(); }
         liveRegions();
       });
     }
-    if (typeof onHomePaint === "function") onHomePaint(() => renderChart90());
+    if (typeof onHomePaint === "function") onHomePaint(() => {
+      renderChart90();
+      renderPlaceToday();
+    });
     setTimeout(autoClassTask, 800);
   }
 
@@ -502,6 +680,11 @@
     logError,
     startPlacement,
     makePlacementItems,
+    loadPlaceNow,
+    persistPlaceNow,
+    clearPlaceNow,
+    renderPlaceToday,
+    renderPlaceQuizResume,
     exportAnki,
     exportWeakCsv,
     printWeekSheet,

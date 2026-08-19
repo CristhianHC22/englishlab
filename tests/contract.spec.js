@@ -88,12 +88,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v44 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v61 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v44/);
+  expect(sw).toMatch(/enlab-v61/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");

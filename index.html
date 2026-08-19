@@ -22,11 +22,11 @@
       <p class="kicker" data-i18n="welcomeKicker">Cómo funciona</p>
       <h2 data-i18n="welcomeTitle">Pulsa, oye, repite</h2>
       <ol>
-        <li data-i18n="welcomeStep1">Elige un nivel: A1 es fácil, B1 es la meta.</li>
-        <li data-i18n="welcomeStep2">Seis pestañas abajo. Hoy es la sesión de 15 min. Oír, Verbos, Juego y Hablar son práctica. Ayuda son herramientas.</li>
-        <li data-i18n="welcomeStep3">Pulsa <strong>Empezar el camino</strong>: pares → verbos → diálogo (Grabar B aquí) → 3 preguntas.</li>
+        <li data-i18n="welcomeStep1">Hoy: un botón te lleva 15 min (oír, un verbo, grabar, 3 preguntas).</li>
+        <li data-i18n="welcomeStep2">Guía (arriba a la derecha) explica esta pantalla. Ayuda es otra cosa: herramientas.</li>
+        <li data-i18n="welcomeStep3">Si te queda rato: Juego → Juega ahora. El resto está en las 6 pestañas.</li>
       </ol>
-      <p class="muted" data-i18n="welcomeNote">Guía (arriba a la derecha) explica la pantalla en la que estás. Chrome o Edge. Nada se sube a internet.</p>
+      <p class="muted" data-i18n="welcomeNote">A1 es fácil; B1 es la meta. Chrome o Edge. Nada se sube a internet.</p>
       <p><button type="button" class="btn" id="welcome-go" data-i18n="onboardStart">Empezar</button></p>
     </div>
   </div>
@@ -46,6 +46,19 @@
       <p class="muted hero-blurb" id="level-blurb"></p>
       <div id="level-nudge" class="level-nudge" hidden></div>
       <div id="prefs-panel" class="prefs-panel" hidden>
+        <p class="muted" data-i18n="prefsHint">Voz, tema, niño e idioma. Para entender la pantalla, pulsa Guía (no Ajustes).</p>
+        <p id="prefs-class" class="prefs-class" hidden></p>
+        <p class="prefs-transfer">
+          <button type="button" class="chip sm" id="prefs-transfer-copy" data-i18n="prefsTransferCopy">Copiar código para otro PC</button>
+          <canvas id="prefs-transfer-qr" width="120" height="120" aria-label="QR del progreso" title="Copiar y pegar"></canvas>
+          <span class="muted" data-i18n="prefsTransferHint">Pulsa el QR para copiar y pegar abajo.</span>
+        </p>
+        <div class="prefs-transfer prefs-transfer-in">
+          <label class="muted" for="prefs-transfer-paste" data-i18n="prefsTransferPasteLabel">Pegar código de otro PC</label>
+          <textarea id="prefs-transfer-paste" class="transfer-code" rows="2" data-i18n-placeholder="transferPastePh" placeholder="Pega el código aquí"></textarea>
+          <button type="button" class="chip sm" id="prefs-transfer-import" data-i18n="prefsTransferImport">Importar</button>
+        </div>
+        <p id="prefs-transfer-status" class="muted" hidden></p>
         <p class="lede" id="level-lede" data-i18n="heroLede">Pulsa las palabras para oírlas. 15 minutos al día. Empieza en fácil (A1) y sube cuando ya no te trabe.</p>
         <div class="hero-controls">
           <div class="ctrl-group" role="group" aria-label="Velocidad de la voz" data-i18n-aria="voiceLabel">
@@ -75,14 +88,22 @@
       <button data-tab="hoy" aria-current="page" data-i18n-title="tabHintHoy" title="Sesión de 15 min. Un botón te lleva.">Hoy</button>
       <button data-tab="vocales" data-i18n-title="tabHintVocales" title="Temas para oír. Cada tarjeta es una sala.">Oír</button>
       <button data-tab="verbos" data-i18n-title="tabHintVerbos" title="Tu lista: busca, oye, marca débil o fuerte.">Verbos</button>
-      <button data-tab="quiz" data-i18n-title="tabHintQuiz" title="Rounds. Primero un grupo, luego el juego.">Juego</button>
-      <button data-tab="hablar" data-i18n-title="tabHintHablar" title="Oye el modelo y grábate. Prácticas extra abajo.">Hablar</button>
+      <button data-tab="quiz" data-i18n-title="tabHintQuiz" title="Juega ahora usa el del día. O elige un grupo.">Juego</button>
+      <button data-tab="hablar" data-i18n-title="tabHintHablar" title="Oír modelo, luego Grabarme. Extra abajo.">Hablar</button>
       <button data-tab="ia" data-i18n-title="tabHintIa" title="Herramientas (prompts, aula). No explica el lab: eso es Guía.">Ayuda</button>
     </nav>
 
     <button type="button" id="you-are" class="you-are" aria-controls="guide-panel" data-i18n-title="youAreHint" title="Pulsa para abrir Guía">
+      <span class="you-are-kicker" data-i18n="youAreKicker">¿Qué es esto?</span>
       <span id="you-are-text"></span>
+      <span id="you-are-when" class="you-are-when" hidden></span>
     </button>
+    <div id="you-are-chips" class="you-are-chips row" hidden></div>
+    <p id="net-warn" class="net-warn" hidden></p>
+    <p id="voice-warn" class="voice-warn" hidden>
+      <span id="voice-warn-text"></span>
+      <button type="button" class="chip sm" id="voice-warn-hide" data-i18n="voiceWarnDismiss">Ocultar</button>
+    </p>
 
     <aside id="guide-panel" class="guide-panel" hidden>
       <div class="guide-panel-head">
@@ -124,6 +145,24 @@
             <button type="button" class="btn ghost sm" id="repaso-exit" hidden data-i18n="repasoExit">Salir de repaso</button>
           </div>
         </div>
+        <div id="hoy-done" class="hoy-done" hidden>
+          <p class="kicker" data-i18n="hoyDoneKicker">Día marcado</p>
+          <div id="hoy-done-story" class="hoy-story-chip" hidden></div>
+          <p id="hoy-done-streak" class="hoy-done-streak" hidden></p>
+          <p id="hoy-done-cierre" class="muted" hidden></p>
+          <p id="hoy-done-copy"></p>
+          <div id="hoy-done-mid" class="row hoy-done-mid" hidden></div>
+          <div class="row hoy-done-next">
+            <button type="button" class="btn ghost sm" data-go-tab="vocales" data-i18n="hoyDoneOir">Seguir en Oír</button>
+            <button type="button" class="btn ghost sm" data-go-tab="hablar" data-i18n="hoyDoneHablar">Practicar Hablar</button>
+            <button type="button" class="btn ghost sm" data-go-tab="quiz" data-quiz-now data-i18n="hoyDoneQuiz">Juego del día</button>
+            <button type="button" class="btn ghost sm" data-hoy-repeat data-i18n="hoyDoneRepeat">Repetir camino</button>
+            <button type="button" class="btn ghost sm" id="hoy-done-verbs" data-go-tab="verbos" hidden data-i18n="hoyDoneVerbs">El verbo que fallaste</button>
+            <button type="button" class="btn ghost sm" id="hoy-done-ear" data-quiz-miss="ear" hidden data-i18n="hoyDoneEar">El oído que fallaste</button>
+            <button type="button" class="btn ghost sm" id="hoy-done-uso" data-quiz-miss="uso" hidden data-i18n="hoyDoneUso">El uso que fallaste</button>
+            <button type="button" class="btn ghost sm" id="hoy-done-timer" hidden data-i18n="hoyDoneTimer">Seguir los 15 min</button>
+          </div>
+        </div>
         <div id="hoy-check"></div>
         <div id="week-strip" class="week-strip"></div>
         <div id="week-report" class="week-report" hidden></div>
@@ -136,6 +175,11 @@
         <p class="muted" data-i18n="hoySessionNote">Se marca solo, en el orden del camino: oír pares, oír verbos, grabar el diálogo, 3 preguntas.</p>
         <div id="situations-panel" class="card situations-panel" hidden></div>
         <div id="podcast-today" class="card" hidden></div>
+        <div id="cierre-today" class="card" hidden></div>
+        <div id="cert-today" class="card" hidden></div>
+        <div id="weekly-today" class="card" hidden></div>
+        <div id="place-today" class="card" hidden></div>
+        <div id="duo-today" class="card" hidden></div>
         <div id="hoy-streak-chart" class="streak-chart" hidden></div>
         <div class="remind-box">
           <label class="remind-label"><span data-i18n="remindLabel">Avisarme a</span>
@@ -158,6 +202,7 @@
           <label class="muted" data-i18n="transferPasteLabel">Pegar en otro PC</label>
           <textarea id="transfer-paste" class="transfer-code" rows="2" data-i18n-placeholder="transferPastePh" placeholder="Pega el código aquí"></textarea>
           <button type="button" class="btn ghost sm" id="transfer-import" data-i18n="transferImport">Importar código</button>
+          <p id="transfer-hoy-status" class="muted" hidden></p>
         </details>
         <details class="fold" id="class-box">
           <summary data-i18n="class">Modo aula</summary>
@@ -233,7 +278,7 @@
         <p class="muted shadow-hint" data-i18n="step1Shadow">Tip: después de oír robot, abre gente real en un par difícil.</p>
         <div class="row" style="margin:8px 0">
           <button type="button" class="btn ghost sm" id="hoy-pair-shadow" data-i18n="hoyPairShadow">Shadowing: oye → repite (4 pares)</button>
-          <span class="muted" id="hoy-shadow-status"></span>
+          <span class="muted" id="hoy-shadow-status" aria-live="polite"></span>
         </div>
         <div id="daily-pairs" class="grid grid-2"></div>
       </article>
@@ -252,8 +297,8 @@
         <div class="step-head">
           <span class="step-n" aria-hidden="true">3</span>
           <div>
-            <h3 data-i18n="step3Title">10 verbos del día</h3>
-            <p class="muted" data-i18n="step3Hint">Pulsa Presente, 3 formas o I have…</p>
+            <h3 data-i18n="step3Title">El verbo de hoy</h3>
+            <p class="muted" data-i18n="step3Hint">Óyelo. Débil si se te traba. El resto de la lista está en Verbos.</p>
           </div>
         </div>
         <div id="daily-verbs" class="card"></div>
@@ -263,35 +308,48 @@
           <span class="step-n" aria-hidden="true">4</span>
           <div>
             <h3 data-i18n="step4Title">Di este diálogo</h3>
-            <p class="muted" data-i18n="step4Hint">Oye A. Tú dices B: Grabar B graba y comprueba aquí, sin salir de Hoy.</p>
+            <p class="muted" data-i18n="step4Hint">Oír A marca Grabar B. Graba y comprueba aquí, sin salir de Hoy.</p>
           </div>
         </div>
         <div id="daily-dialog"></div>
         <div id="interview-list" class="grid"></div>
+      </article>
+      <article class="step-card" id="hoy-step-flap">
+        <div class="step-head">
+          <span class="step-n" aria-hidden="true">·</span>
+          <div>
+            <h3 data-i18n="pathStepFlap">Flap T / gonna</h3>
+            <p class="muted" data-i18n="hoyFlapHint">Óyelo aquí, sin salir de Hoy. El tema completo está en Oír.</p>
+          </div>
+        </div>
+        <div id="hoy-rhythm-list"></div>
       </article>
       <article class="step-card" id="hoy-step-cierre">
         <div class="step-head">
           <span class="step-n" aria-hidden="true">5</span>
           <div>
             <h3 data-i18n="step5Title">Cierra con 3 preguntas</h3>
-            <p class="muted" data-i18n="step5Hint">Oído + un verbo débil + uso o -ed. Marca la sesión del día.</p>
+            <p class="muted" data-i18n="step5Hint">Una a una: oído, un verbo, uso o -ed. No es otro juego. Marca el día.</p>
           </div>
         </div>
         <div id="hoy-cierre-box"></div>
       </article>
       <p class="hoy-path-foot">
-        <button type="button" class="btn hoy-next" data-i18n="next">Siguiente</button>
+        <button type="button" class="btn hoy-next" data-i18n="next" aria-live="polite">Siguiente</button>
       </p>
     </section>
 
     <section id="vocales" class="panel">
       <div class="card lab-keep">
         <h2 data-i18n="oidoTitle">Oír: por qué cambia cada vocal</h2>
-        <p data-i18n="oidoIntro">Elige un tema. Pulsa para oír. Empieza por las reglas.</p>
-        <p>
+        <p data-i18n="oidoIntro">Cada tarjeta es una sala para oír. Los botones Jugar te llevan a Juego (otra pestaña).</p>
+        <p class="muted" data-i18n="oidoJumpHint">Estos dos botones te sacan a Juego (otra pestaña). Las tarjetas de abajo se quedan en Oír.</p>
+        <p class="oido-leave">
+          <span class="kicker" data-i18n="oidoLeave">Va a Juego →</span>
           <button type="button" class="btn" id="start-ear-from-oido" data-i18n="oidoPlayEar">Jugar: ¿cap o cape?</button>
           <button type="button" class="btn ghost" data-start-quiz="ed" data-i18n="oidoPlayEd">Jugar: liked / played / wanted</button>
         </p>
+        <p id="oido-resume" class="oido-resume" hidden></p>
       </div>
       <nav class="lab-hub" id="oido-toc" aria-label="Temas de Oír" data-i18n-aria="oidoTocAria"></nav>
       <div id="oido-room-bar" class="lab-room-bar">
@@ -388,6 +446,7 @@
     </section>
 
     <section id="verbos" class="panel">
+      <div id="verb-today" class="card verb-today" hidden></div>
       <div class="card">
         <h2 data-i18n="verbosTitle">Verbos</h2>
         <p class="muted" data-i18n="verbosHint">Busca. Débil = se te traba. I + pasado = ayer; I have… = experiencia.</p>
@@ -402,7 +461,8 @@
     <section id="quiz" class="panel">
       <div class="card lab-hub-head">
         <h2 data-i18n="quizTitle">Elige un juego</h2>
-        <p class="muted" data-i18n="quizHint">Elige un grupo. Un round cuenta en Hoy. Teclas 1/2 en oído; espacio = oír otra vez.</p>
+        <p class="muted" data-i18n="quizHint">Juega ahora usa el del día. Un grupo es si quieres otro. Un round cuenta en Hoy.</p>
+        <div id="quiz-now" class="quiz-now"></div>
       </div>
       <nav class="lab-hub" id="quiz-hub" aria-label="Tipos de juego" data-i18n-aria="labQuizAria"></nav>
       <div class="lab-room-bar">
@@ -482,6 +542,8 @@
       </article>
       <article class="lab-topic" data-lab="quiz-exams">
         <h3 data-i18n="quizGroupExams">Exámenes</h3>
+        <div id="place-quiz-resume" class="place-quiz-resume" hidden></div>
+        <div id="weekly-quiz-resume" class="weekly-quiz-resume" hidden></div>
         <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
           <button type="button" class="mode-pick" data-quiz-mode="place">
             <strong data-i18n="quizModes.place.t">Test de nivel</strong>
@@ -533,24 +595,29 @@
     <section id="hablar" class="panel">
       <div class="card lab-keep">
         <h2 data-i18n="hablarTitle">Di esto</h2>
-        <p class="muted" data-i18n="hablarHint">Oye el modelo y pulsa Grabarme: graba y comprueba a la vez.</p>
+        <p class="muted" data-i18n="hablarHint">Primero Oír modelo (Grabarme se marca). Luego graba: comprueba sola.</p>
         <p class="muted" id="speak-weak-hint" hidden></p>
-        <div class="speak-steps" aria-hidden="true">
-          <span data-i18n="speakStep1">1 Oye</span>
-          <span data-i18n="speakStep2">2 Graba (comprueba sola)</span>
-          <span data-i18n="speakStep3">3 Escúchate</span>
-        </div>
-        <label class="muted"><input type="checkbox" id="speak-starter" checked> <span data-i18n="speakStarter">Solo frases de mi nivel</span></label>
-        <label class="muted"><input type="checkbox" id="speak-only-weak"> <span data-i18n="speakOnlyWeak">Solo lo que no me entendió</span></label>
         <p class="quiz-q" id="speak-target"></p>
         <p class="muted" id="speak-help"></p>
         <p><button type="button" class="chip" id="speak-hoy" hidden data-i18n="speakHoy">Usar el diálogo de Hoy</button></p>
-        <div class="row">
-          <button class="btn ghost" id="speak-listen" data-i18n="speakListen">Oír modelo</button>
+        <div class="speak-steps" aria-hidden="true">
+          <span data-speak-phase="hear" class="on" data-i18n="speakStep1">1 Oye</span>
+          <span data-speak-phase="rec" data-i18n="speakStep2">2 Graba</span>
+          <span data-speak-phase="play" data-i18n="speakStep3">3 Escúchate</span>
+        </div>
+        <div class="row speak-act">
+          <button class="btn ghost next-act" id="speak-listen" data-i18n="speakListen">Oír modelo</button>
           <button type="button" class="btn" id="speak-rec" data-i18n="speakRec">Grabarme</button>
+        </div>
+        <div class="row speak-more-row">
           <button type="button" class="btn ghost" id="speak-shadow" data-i18n="shadow">Shadowing</button>
           <button class="btn ghost" id="speak-next" data-i18n="speakNext">Otra frase</button>
         </div>
+        <details class="speak-opts">
+          <summary data-i18n="speakMore">Opciones (nivel, solo débiles)</summary>
+          <label class="muted"><input type="checkbox" id="speak-starter" checked> <span data-i18n="speakStarter">Solo frases de mi nivel</span></label>
+          <label class="muted"><input type="checkbox" id="speak-only-weak"> <span data-i18n="speakOnlyWeak">Solo lo que no me entendió</span></label>
+        </details>
         <div id="shadow-box" class="shadow-box" hidden>
           <p class="muted" data-i18n="shadowHint">Oye → pausa → repite en voz alta.</p>
           <p class="muted"><span data-i18n="shadowTimerLabel">Segundos:</span> <strong id="shadow-timer">30</strong></p>
@@ -615,6 +682,7 @@
           <h3 data-i18n="duo">Duo · 2 jugadores</h3>
           <p class="muted" data-i18n="duoHint">Mismo dispositivo. Turnos alternos A/B en role-plays o diálogos.</p>
           <p class="duo-score muted" id="duo-score">A: 0 · B: 0</p>
+          <div id="duo-resume-hablar" class="duo-resume-hablar" hidden></div>
           <div id="duo-now"></div>
         </div>
       </article>
