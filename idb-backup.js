@@ -19,7 +19,8 @@
     "enlab-pron-log", "enlab-story-progress", "enlab-writing-done", "enlab-onboard-v3",
     "enlab-class-roster", "enlab-class-task", "enlab-accent-pref", "enlab-a11y-contrast",
     "enlab-a11y-motion", "enlab-student-name", "enlab-onboard-goal", "enlab-error-log",
-    "enlab-place-result",
+    "enlab-place-result", "enlab-quiz-ux", "enlab-quiz-ux-daily",
+    "enlab-class-friction-week", "enlab-coach-plan-mirror", "enlab-weekly-fails", "enlab-cert-warmup",
   ];
   const KEYS = PROG_KEYS.concat(["enlab-push-sub"]);
 

@@ -19,6 +19,21 @@
     } catch { return []; }
   }
 
+  function logPlanStepEvent(kind, mode) {
+    const steps = typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear", "uso", "choice"];
+    const done = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
+    const stepMode = mode || steps[Math.min(done, steps.length - 1)] || "?";
+    const label = tt(`quizModes.${stepMode}.t`) || stepMode;
+    logError({
+      mode: `plan:${stepMode}`,
+      expected: kind === "abandon" ? tt("journalPlanAbandon") : tt("journalPlanFail"),
+      prompt: tt("journalPlanStepPrompt", { step: Math.min(done + 1, steps.length), total: steps.length, mode: label }),
+      said: kind === "abandon" ? tt("journalPlanAbandonSaid") : tt("journalPlanFailSaid"),
+      why: kind === "abandon" ? tt("journalPlanAbandonWhy") : tt("journalPlanFailWhy"),
+      planStep: kind,
+    });
+  }
+
   function logError(entry) {
     if (!entry?.expected && !entry?.prompt) return;
     const row = {
@@ -29,6 +44,7 @@
       said: String(entry.said || "").slice(0, 160),
       why: String(entry.why || "").slice(0, 220),
     };
+    if (entry.planStep) row.planStep = entry.planStep;
     if (entry.f1) {
       row.f1 = entry.f1;
       row.f2 = entry.f2;
@@ -171,6 +187,40 @@
     return "uso";
   }
 
+  function journalCoachPlanMode() {
+    const errors = loadErrors().slice(0, 30);
+    const stepScores = { ear: 0, uso: 0, choice: 0 };
+    errors.forEach((r) => {
+      const m = journalPlayMode(r.mode);
+      if (["ear", "dict", "listen"].includes(m)) stepScores.ear += 1;
+      else if (["choice", "type", "ed"].includes(m)) stepScores.choice += 1;
+      else if (m !== "hablar") stepScores.uso += 1;
+    });
+    try {
+      const wf = typeof loadWeeklyFailsForCoach === "function"
+        ? loadWeeklyFailsForCoach()
+        : JSON.parse(localStorage.getItem("enlab-weekly-fails") || "null");
+      const day = typeof todayKey === "function" ? todayKey() : "";
+      if (wf?.day === day && Array.isArray(wf.modes)) {
+        wf.modes.forEach((m) => {
+          if (["ear", "dict", "listen", "exam"].includes(m)) stepScores.ear += 2;
+          else if (["choice", "type", "ed"].includes(m)) stepScores.choice += 2;
+          else stepScores.uso += 2;
+        });
+      }
+    } catch { /* ignore */ }
+    const pending = typeof coachPlanPendingModes === "function"
+      ? coachPlanPendingModes()
+      : (typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear", "uso", "choice"]);
+    let best = pending[0] || "ear";
+    let max = -1;
+    pending.forEach((step) => {
+      const n = stepScores[step] || 0;
+      if (n > max) { max = n; best = step; }
+    });
+    return best;
+  }
+
   function journalPlayBtn(r, now) {
     if (!now) return "";
     const mode = journalPlayMode(r.mode);
@@ -182,8 +232,8 @@
 
   function journalCardHtml(r, now) {
     return `
-      <div class="card journal-card${now ? " journal-card-now" : ""}">
-        <p><strong>${esc(r.expected || r.prompt)}</strong></p>
+      <div class="card journal-card${now ? " journal-card-now" : ""}${r.planStep ? " journal-card-plan" : ""}">
+        <p><strong>${esc(r.expected || r.prompt)}</strong>${r.planStep ? ` <span class="chip sm journal-plan-tag">${esc(tt("journalPlanTag"))}</span>` : ""}</p>
         ${r.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(r.said)}</p>` : ""}
         <p class="muted">${esc(r.why || whyFor(r.expected))}</p>
         ${r.f1 ? `<p class="muted">${esc(tt("journalFormants", { f1: r.f1, f2: r.f2 || "?" }))}</p>` : ""}
@@ -207,8 +257,8 @@
       const btn = mode === "hablar"
         ? `<button type="button" class="btn ghost sm" data-go-tab="hablar">${esc(tt("journalPlay"))}</button>`
         : `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(mode)}">${esc(tt("journalPlay"))}</button>`;
-      return `<div class="card journal-card journal-card-group${now ? " journal-card-now" : ""}">
-        <p><strong>${esc(label)}</strong></p>
+      return `<div class="card journal-card journal-card-group${now ? " journal-card-now" : ""}${list.some((r) => r.planStep) ? " journal-card-plan" : ""}">
+        <p><strong>${esc(label)}</strong>${list.some((r) => r.planStep) ? ` <span class="chip sm journal-plan-tag">${esc(tt("journalPlanTag"))}</span>` : ""}</p>
         ${sample.said ? `<p class="muted">${esc(tt("journalSaid"))}: ${esc(sample.said)}</p>` : ""}
         <p class="muted">${esc(sample.why || whyFor(sample.expected))}</p>
         ${btn}
@@ -219,7 +269,16 @@
   function renderErrorJournal() {
     const host = document.querySelector("#error-journal");
     if (!host) return;
-    const rows = loadErrors().slice(0, 12);
+    let sortBy = "date";
+    try { sortBy = sessionStorage.getItem("enlab-journal-sort") || "date"; } catch { /* ignore */ }
+    let sortedRows = loadErrors();
+    if (sortBy === "mode") {
+      sortedRows = [...sortedRows].sort((a, b) => journalPlayMode(a.mode).localeCompare(journalPlayMode(b.mode)));
+    } else if (sortBy === "word") {
+      sortedRows = [...sortedRows].sort((a, b) => String(a.expected || "").localeCompare(String(b.expected || "")));
+    }
+    /* date = default order (most recent first, already stored that way) */
+    const rows = sortedRows.slice(0, 12);
     let focus = "";
     try { focus = sessionStorage.getItem("enlab-journal-focus") || ""; } catch { focus = ""; }
     const focusNorm = focus.toLowerCase().trim();
@@ -256,14 +315,50 @@
       : (nowHtml + restHtml);
     window._journalNowRows = nowI >= 0 ? (nowPeers.length ? nowPeers : (nowRow ? [nowRow] : [])) : [];
     const ankiLabel = nowI >= 0 ? tt("exportAnkiNow") : tt("exportAnki");
+    /* collect distinct modes for filter chips */
+    const allRows = loadErrors().slice(0, 80);
+    const modeCounts = {};
+    allRows.forEach((r) => {
+      const m = journalPlayMode(r.mode);
+      modeCounts[m] = (modeCounts[m] || 0) + 1;
+    });
+    const modeKeys = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a]);
+    const activeModeFilter = focusNorm && !focusNorm.includes(" ")
+      ? modeKeys.find((m) => focusNorm.includes(m.slice(0, 4))) : "";
+    const modeChipsHtml = modeKeys.length > 1 ? `
+      <div class="journal-mode-chips row" role="group" aria-label="${esc(tt("journalFilterAria"))}">
+        <button type="button" class="chip${!activeModeFilter ? " on" : ""}" data-journal-mode="">${esc(tt("journalFilterAll"))}</button>
+        ${modeKeys.map((m) => {
+          const on = activeModeFilter === m;
+          const label = (typeof t === "function" && t(`quizModes.${m}.t`)) || m;
+          return `<button type="button" class="chip${on ? " on" : ""}" data-journal-mode="${esc(m)}">${esc(label)} <span class="muted">${modeCounts[m]}</span></button>`;
+        }).join("")}
+      </div>` : "";
+    const searchVal = esc(focus);
+    const coachMode = journalCoachPlanMode();
+    const coachLabel = (typeof t === "function" && t(`quizModes.${coachMode}.t`)) || coachMode;
+    const coachPlanBtn = (typeof coachPlanLeft === "function" && coachPlanLeft() > 0)
+      ? `<button type="button" class="btn ghost sm" id="journal-coach-plan" data-coach-plan-mode="${esc(coachMode)}" title="${esc(tt("journalCoachPlanHint", { mode: coachLabel }))}">${esc(tt("journalCoachPlan"))}</button>`
+      : "";
     host.innerHTML = `
       <p class="kicker">${esc(tt("journalTitle"))}</p>
       ${nowI >= 0 ? `<p class="kicker journal-now-kicker">${esc(tt("journalNow"))}</p>` : ""}
       <p class="muted">${esc(tt("journalHint"))}</p>
+      ${modeChipsHtml}
+      <div class="row journal-controls-row">
+        <input type="search" id="journal-search" class="journal-search" placeholder="${esc(tt("journalSearch"))}" value="${searchVal}" aria-label="${esc(tt("journalSearch"))}">
+        <select id="journal-sort" class="journal-sort" aria-label="${esc(tt("journalSortAria"))}">
+          <option value="date"${sortBy === "date" ? " selected" : ""}>${esc(tt("journalSortDate"))}</option>
+          <option value="mode"${sortBy === "mode" ? " selected" : ""}>${esc(tt("journalSortMode"))}</option>
+          <option value="word"${sortBy === "word" ? " selected" : ""}>${esc(tt("journalSortWord"))}</option>
+        </select>
+      </div>
       <div class="row">
         <button type="button" class="btn ghost sm" id="journal-anki">${esc(ankiLabel)}</button>
         <button type="button" class="btn ghost sm" id="journal-csv">${esc(nowI >= 0 ? tt("exportWeakCsvNow") : tt("exportWeakCsv"))}</button>
         <button type="button" class="btn ghost sm" id="week-sheet-print">${esc(tt("weekSheetPrint"))}</button>
+        ${coachPlanBtn}
+        ${nowI >= 0 ? `<button type="button" class="btn ghost sm" id="journal-print-now">${esc(tt("journalPrintNow"))}</button>` : ""}
       </div>
       ${list || `<p class="muted">${esc(tt("journalEmpty"))}</p>`}`;
     const now = host.querySelector(".journal-card-now");
@@ -286,11 +381,34 @@
     const errs = focus?.length ? focus : loadErrors();
     const weak = typeof weakSet === "function" ? [...weakSet()] : [];
     const srs = typeof srsDueList === "function" ? srsDueList(40) : [];
+    const friction = typeof topQuizFriction === "function" ? topQuizFriction(3) : [];
+    const pending = typeof coachPlanPendingModes === "function" ? coachPlanPendingModes() : [];
     const lines = ["#separator:tab", "#html:true"];
+    if (friction.length) {
+      lines.push(`# friction-top: ${friction.map((r) => `${r.mode} ${r.drop}%`).join(", ")}`);
+    }
+    if (pending.length) {
+      lines.push(`# coach-pending: ${pending.join(", ")}`);
+    }
+    if (typeof coachPlanLeft === "function" && coachPlanLeft() >= 3
+      && typeof coachPlanStarted === "function" && !coachPlanStarted()) {
+      lines.push("# plan-pending: 0/3");
+    }
+    const pr = typeof loadPlaceResult === "function" ? loadPlaceResult() : null;
+    const placePct = pr?.n ? pr.score / pr.n : null;
+    if (placePct != null && placePct < 0.65) {
+      lines.push(`# placement-low: ${Math.round(placePct * 100)}%`);
+    }
     errs.forEach((r) => {
       const front = r.prompt || r.said || "Fix this";
-      const back = `${r.expected}<br><small>${r.why || ""}</small>`;
-      lines.push(`${front.replace(/\t/g, " ")}\t${back.replace(/\t/g, " ")}`);
+      const mode = journalPlayMode(r.mode);
+      const drop = typeof quizModeDropPct === "function" ? quizModeDropPct(mode) : 0;
+      const coachTag = typeof coachPlanStepForMode === "function" && pending.includes(coachPlanStepForMode(mode)) ? " #coach-pending" : "";
+      const placeTag = placePct != null && placePct < 0.65 && typeof placementCoachStep === "function"
+        && placementCoachStep(placePct) === coachPlanStepForMode(mode) ? " #placement-low" : "";
+      const frTag = drop ? `<br><small>friction ${mode}: ${drop}%</small>` : "";
+      const back = `${r.expected}<br><small>${r.why || ""}</small>${frTag}`;
+      lines.push(`${front.replace(/\t/g, " ")}${coachTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
     });
     if (!focus?.length) {
       weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));
@@ -299,21 +417,75 @@
     downloadText(focus?.length ? "englishlab-anki-now.txt" : "englishlab-anki.txt", lines.join("\n"), "text/plain");
   }
 
+  function exportFrictionCsv() {
+    let ux = {};
+    let daily = {};
+    try { ux = JSON.parse(localStorage.getItem("enlab-quiz-ux") || "{}") || {}; } catch { ux = {}; }
+    try { daily = JSON.parse(localStorage.getItem("enlab-quiz-ux-daily") || "{}") || {}; } catch { daily = {}; }
+    const rows = [["mode", "sessions", "completed", "abandoned", "drop_pct", "avg_sec", "answers", "correct"]];
+    Object.entries(ux).forEach(([mode, row]) => {
+      const sessions = Number(row?.sessions || 0);
+      rows.push([
+        mode,
+        sessions,
+        row?.completed || 0,
+        row?.abandoned || 0,
+        sessions ? Math.round(((row?.abandoned || 0) * 100) / sessions) : 0,
+        sessions ? Math.round((Number(row?.ms || 0)) / sessions / 1000) : 0,
+        row?.answers || 0,
+        row?.correct || 0,
+      ]);
+    });
+    rows.push([]);
+    rows.push(["day", "mode", "sessions", "abandoned", "completed"]);
+    Object.keys(daily).sort().forEach((day) => {
+      Object.entries(daily[day] || {}).forEach(([mode, row]) => {
+        rows.push([day, mode, row?.sessions || 0, row?.abandoned || 0, row?.completed || 0]);
+      });
+    });
+    const csv = rows.map((r) => (r.length
+      ? r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
+      : "")).join("\n");
+    downloadText("englishlab-friction.csv", csv, "text/csv");
+  }
+
   function exportWeakCsv() {
     const focus = window._journalNowRows;
-    const rows = [["kind", "item", "note"]];
-    const addErr = (r) => rows.push(["error", r.expected || r.prompt, r.why || ""]);
+    const rows = [["kind", "mode", "item", "note", "at"]];
+    const addErr = (r) => rows.push([
+      "error",
+      journalPlayMode(r.mode),
+      r.expected || r.prompt,
+      r.why || "",
+      r.at ? new Date(r.at).toISOString() : "",
+    ]);
     if (focus?.length) {
       focus.forEach(addErr);
     } else {
-      (typeof weakSet === "function" ? [...weakSet()] : []).forEach((v) => rows.push(["verb", v, "weak"]));
-      (typeof speakWeakSet === "function" ? [...speakWeakSet()] : []).forEach((v) => rows.push(["speak", v, "not understood"]));
-      (typeof earWeakSet === "function" ? [...earWeakSet()] : []).forEach((v) => rows.push(["ear", v, "minimal pair"]));
+      (typeof weakSet === "function" ? [...weakSet()] : []).forEach((v) => rows.push(["verb", "verb", v, "weak", ""]));
+      (typeof speakWeakSet === "function" ? [...speakWeakSet()] : []).forEach((v) => rows.push(["speak", "hablar", v, "not understood", ""]));
+      (typeof earWeakSet === "function" ? [...earWeakSet()] : []).forEach((v) => rows.push(["ear", "ear", v, "minimal pair", ""]));
       loadErrors().forEach(addErr);
-      (typeof srsDueList === "function" ? srsDueList(50) : []).forEach((x) => rows.push(["srs", x.label || "", x.due || ""]));
+      (typeof srsDueList === "function" ? srsDueList(50) : []).forEach((x) => rows.push(["srs", "srs", x.label || "", x.due || "", ""]));
     }
     const csv = rows.map((r) => r.map((c) => `"${ankiEscape(c)}"`).join(",")).join("\n");
     downloadText(focus?.length ? "englishlab-weak-now.csv" : "englishlab-weak.csv", csv, "text/csv");
+  }
+
+  function printJournalNow() {
+    const rows = window._journalNowRows;
+    if (!rows?.length) return;
+    const area = document.querySelector("#weak-print-area") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "weak-print-area" }));
+    area.hidden = false;
+    area.innerHTML = `
+      <h1>English Lab — ${esc(tt("journalPrintNowTitle"))}</h1>
+      <p>${typeof todayKey === "function" ? todayKey() : ""} · ${rows.length} ${esc(tt("journalPrintNowItems"))}</p>
+      <table>
+        <thead><tr><th>${esc(tt("journalPrintNowExpected"))}</th><th>${esc(tt("journalPrintNowNote"))}</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr><td>${esc(r.expected || r.prompt || "")}</td><td>${esc(r.why || "")}</td></tr>`).join("")}</tbody>
+      </table>`;
+    window.print();
+    requestAnimationFrame(() => { area.hidden = true; area.innerHTML = ""; });
   }
 
   function printWeekSheet() {
@@ -359,10 +531,16 @@
     const area = document.querySelector("#weak-print-area");
     if (!area) return;
     area.hidden = false;
+    const planDone = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
+    const planTotal = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+    const planLine = planDone < planTotal
+      ? tt("studentReportPlan", { done: planDone, total: planTotal })
+      : tt("studentReportPlanDone");
     area.innerHTML = `
       <h1>English Lab — ${esc(tt("studentReport"))}</h1>
       <p><strong>${esc(name)}</strong> · ${esc(lvl)} · ${typeof todayKey === "function" ? todayKey() : ""}</p>
       <ul>
+        <li>${esc(tt("classColCoachPlan"))}: ${esc(planLine)}</li>
         <li>${esc(tt("classColWeekly"))}: ${esc(weekly || "—")}</li>
         <li>${esc(tt("classColCert"))}: ${esc(cert)}</li>
         <li>${esc(tt("classColDue"))}: ${dueN}</li>
@@ -558,14 +736,19 @@
   function autoClassTask() {
     const task = localStorage.getItem("enlab-class-task");
     if (!task) return;
+    if (window.SV?.renderClassTaskBanner) window.SV.renderClassTaskBanner();
     const today = typeof todayKey === "function" ? todayKey() : "";
     if (localStorage.getItem("enlab-class-task-auto") === today) return;
     if (localStorage.getItem("enlab-onboard-v3") !== "1" && localStorage.getItem("enlab-welcome-v2") !== "1") return;
     const banner = document.querySelector("#class-task-banner");
     if (!banner || banner.hidden) return;
+    if (task === "coach" && typeof coachPlanLeft === "function" && coachPlanLeft() === 0) return;
     localStorage.setItem("enlab-class-task-auto", today);
     banner.classList.add("class-task-must");
     banner.scrollIntoView({ block: "nearest" });
+    if (task === "coach" && typeof maybeScrollCoachPlanChip === "function") {
+      setTimeout(() => maybeScrollCoachPlanChip(true), 300);
+    }
   }
 
   function liveRegions() {
@@ -597,6 +780,12 @@
   function renderPerfHint() {
     const host = document.querySelector("#perf-panel");
     if (!host) return;
+    const planDone = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
+    const planTotal = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+    const planLeft = typeof coachPlanLeft === "function" ? coachPlanLeft() : 0;
+    const hintKey = `${window.ENLAB_LOADER?.DEFERRED?.length || 0}|${planDone}|${planLeft}|${uiLang?.() || "es"}`;
+    if (hintKey === window._perfHintKey && host.innerHTML) return;
+    window._perfHintKey = hintKey;
     const n = window.ENLAB_LOADER?.DEFERRED?.length || 0;
     const stats = scriptStats();
     const kb = Math.max(1, Math.round((stats.decoded || stats.transfer) / 1024)) || 0;
@@ -611,6 +800,48 @@
     if (typeof ms === "number") {
       lines.push(`<p class="muted">${esc(tt("perfReady", { ms }))}</p>`);
     }
+    if (planDone < planTotal) {
+      const started = typeof coachPlanStarted === "function" ? coachPlanStarted() : false;
+      const planLabel = !started && planLeft >= 3
+        ? tt("perfPlanPending")
+        : tt("perfPlanProgress", { done: planDone, total: planTotal, left: planLeft });
+      lines.push(`<p class="muted perf-plan-row">${esc(planLabel)}</p>`);
+    }
+    let ux = {};
+    try { ux = typeof loadQuizUx === "function" ? loadQuizUx() : JSON.parse(localStorage.getItem("enlab-quiz-ux") || "{}") || {}; } catch { ux = {}; }
+    const topDrop = typeof topQuizFriction === "function"
+      ? topQuizFriction(3)
+      : Object.entries(ux)
+        .map(([mode, row]) => ({
+          mode,
+          sessions: Number(row?.sessions || 0),
+          drop: Math.round(((Number(row?.abandoned || 0)) * 100) / Math.max(1, Number(row?.sessions || 0))),
+          avgSec: Math.round((Number(row?.ms || 0)) / Math.max(1, Number(row?.sessions || 0)) / 1000),
+        }))
+        .filter((r) => r.sessions >= 1)
+        .sort((a, b) => (b.drop - a.drop) || (b.sessions - a.sessions))
+        .slice(0, 3);
+    lines.push(`<p class="kicker">${esc(tt("perfFrictionTitle"))}</p>`);
+    if (topDrop.length) {
+      lines.push(`<div class="perf-friction-list">${topDrop.map((r) => {
+        const trend = typeof quizUxTrend7 === "function" ? quizUxTrend7(r.mode) : null;
+        const trendTxt = trend === "down" ? tt("perfTrendDown") : trend === "up" ? tt("perfTrendUp") : trend === "flat" ? tt("perfTrendFlat") : "";
+        return `<p class="muted">${esc(tt("perfFrictionRow", { mode: tt(`quizModes.${r.mode}.t`) || r.mode, drop: r.drop, sec: r.avgSec }))}${trendTxt ? ` · ${esc(trendTxt)}` : ""}</p>`;
+      }).join("")}</div>`);
+    } else {
+      lines.push(`<p class="muted">${esc(tt("perfFrictionNone"))}</p>`);
+    }
+    if (typeof perfFrictionHeatmapHtml === "function") {
+      const heat = perfFrictionHeatmapHtml(2);
+      if (heat) {
+        lines.push(`<p class="kicker">${esc(tt("perfHeatTitle"))}</p>${heat}`);
+      }
+    }
+    if (typeof perfFrictionWeekHtml === "function") {
+      const week = perfFrictionWeekHtml();
+      if (week) lines.push(week);
+    }
+    lines.push(`<p><button type="button" class="btn ghost sm" id="perf-friction-csv">${esc(tt("perfFrictionCsv"))}</button></p>`);
     host.innerHTML = lines.join("");
   }
 
@@ -625,8 +856,25 @@
         if (lv && typeof setCefr === "function") setCefr(lv);
       }
       if (e.target.closest("#journal-anki")) exportAnki();
+      if (e.target.closest("#journal-coach-plan")) {
+        const mode = e.target.closest("#journal-coach-plan")?.dataset.coachPlanMode
+          || (typeof journalCoachPlanMode === "function" ? journalCoachPlanMode() : null);
+        if (typeof startCoachPlanQuiz === "function") startCoachPlanQuiz(mode);
+      }
       if (e.target.closest("#journal-csv")) exportWeakCsv();
+      if (e.target.closest("#perf-friction-csv")) exportFrictionCsv();
       if (e.target.closest("#week-sheet-print")) printWeekSheet();
+      if (e.target.closest("#journal-print-now")) printJournalNow();
+      if (e.target.closest(".journal-search-row [data-journal-clear]")) {
+        try { sessionStorage.removeItem("enlab-journal-focus"); } catch { /* ignore */ }
+        renderErrorJournal();
+      }
+      const modeChip = e.target.closest("[data-journal-mode]");
+      if (modeChip) {
+        const m = modeChip.dataset.journalMode;
+        try { sessionStorage.setItem("enlab-journal-focus", m || ""); } catch { /* ignore */ }
+        renderErrorJournal();
+      }
       if (e.target.closest("#student-pdf")) printStudentPdf();
       const pick = e.target.closest("[data-role-pick-b]");
       if (pick && window._roleplay) {
@@ -653,6 +901,20 @@
     patchWeekA11y();
     liveRegions();
     bindPlus();
+    /* journal search + sort — live filter */
+    document.addEventListener("input", (e) => {
+      if (e.target.id === "journal-search") {
+        try { sessionStorage.setItem("enlab-journal-focus", e.target.value || ""); } catch { /* ignore */ }
+        clearTimeout(window._journalSearchTimer);
+        window._journalSearchTimer = setTimeout(() => renderErrorJournal(), 200);
+      }
+    });
+    document.addEventListener("change", (e) => {
+      if (e.target.id === "journal-sort") {
+        try { sessionStorage.setItem("enlab-journal-sort", e.target.value || "date"); } catch { /* ignore */ }
+        renderErrorJournal();
+      }
+    });
     renderErrorJournal();
     renderPlaceToday();
     renderPerfHint();
@@ -664,7 +926,7 @@
           renderPlaceQuizResume();
           if (typeof renderWeeklyQuizResume === "function") renderWeeklyQuizResume();
         }
-        if (id === "hoy") { renderChart90(); renderPlaceToday(); }
+        if (id === "hoy") { renderChart90(); renderPlaceToday(); autoClassTask(); }
         liveRegions();
       });
     }
@@ -678,6 +940,7 @@
   window.PLUS = {
     bootstrap,
     logError,
+    logPlanStepEvent,
     startPlacement,
     makePlacementItems,
     loadPlaceNow,
@@ -687,10 +950,13 @@
     renderPlaceQuizResume,
     exportAnki,
     exportWeakCsv,
+    exportFrictionCsv,
     printWeekSheet,
     printStudentPdf,
     renderErrorJournal,
     renderChart90,
+    autoClassTask,
+    renderPerfHint,
     runPhraseShadow,
     scoreToCefr,
   };

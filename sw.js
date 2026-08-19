@@ -1,4 +1,4 @@
-const CACHE = "enlab-v61";
+const CACHE = "enlab-v86";
 const ASSETS = [
   "./",
   "./index.html",
@@ -55,6 +55,41 @@ function todayKeySW() {
 function remindCopy(data) {
   const lang = data?.lang === "en" ? "en" : "es";
   const due = typeof data.dueCount === "number" ? data.dueCount : 0;
+  const planLeft = typeof data.coachPlanLeft === "number" ? data.coachPlanLeft : 0;
+  const planStarted = !!data.coachPlanStarted;
+  const quickmixHot = !!data.quickmixHot;
+  const placePlanNudge = !!data.placePlanNudge;
+  const certWarmupNudge = !!data.certWarmupNudge;
+  if (placePlanNudge && !planStarted && planLeft >= 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: "Level test was low — start the 8-min plan (ear → usage → verbs)." };
+    }
+    return { title: "English Lab", body: "Test de nivel bajo — empieza el plan 8 min (oído → uso → verbos)." };
+  }
+  if (certWarmupNudge && !planStarted && planLeft >= 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: "Cert warm-up done — start the 8-min plan (ear → usage → verbs)." };
+    }
+    return { title: "English Lab", body: "Calentamiento cert hecho — empieza el plan 8 min (oído → uso → verbos)." };
+  }
+  if (quickmixHot && !planStarted && planLeft >= 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: "3-day friction streak — try a quick session today." };
+    }
+    return { title: "English Lab", body: "3 días seguidos con fricción — prueba una sesión rápida hoy." };
+  }
+  if (!planStarted && planLeft >= 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: "8-min plan: 3 steps waiting today (ear → usage → verbs)." };
+    }
+    return { title: "English Lab", body: "Plan 8 min: 3 pasos te esperan hoy (oído → uso → verbos)." };
+  }
+  if (planStarted && planLeft > 0 && planLeft < 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: `8-min plan: ${planLeft} step${planLeft > 1 ? "s" : ""} left today.` };
+    }
+    return { title: "English Lab", body: `Plan 8 min: te faltan ${planLeft} paso${planLeft > 1 ? "s" : ""} hoy.` };
+  }
   if (lang === "en") {
     if (due >= 3) return { title: "English Lab", body: `You have ${due} reviews due. Got 15 minutes?` };
     return { title: "English Lab", body: "Did you do your 15 minutes today?" };

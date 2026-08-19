@@ -24,9 +24,9 @@ test("Quiz: after a round, stay in the same group", async ({ page }) => {
   });
   await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
   await expect(page.locator("#quiz-again")).toBeVisible();
-  await expect(page.locator('[data-quiz-start="listen"]')).toBeVisible();
-  await expect(page.locator('[data-quiz-start="ear"]')).toBeVisible();
-  await page.locator('[data-quiz-start="ear"]').click();
+  await expect(page.locator('#quiz-box .quiz-peers [data-quiz-start="listen"]')).toBeVisible();
+  await expect(page.locator('#quiz-box .quiz-peers [data-quiz-start="ear"]')).toBeVisible();
+  await page.locator('#quiz-box .quiz-peers [data-quiz-start="ear"]').click();
   await expect(page.locator("#quiz-box .quiz-q, #quiz-box .choices button").first()).toBeVisible();
   await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
 });
@@ -164,6 +164,34 @@ test("Quiz: after day-marked miss, Play offers that mode", async ({ page }) => {
   await expect(page.locator("#quiz-box [data-go-tab='hoy']")).toBeVisible();
 });
 
+test("Quiz: placement end offers 8-min plan CTA", async ({ page }) => {
+  await boot(page);
+  await openQuizMode(page, "place");
+  await page.locator("#quiz-start").click();
+  await page.evaluate(() => {
+    quiz.score = Math.round(quiz.items.length * 0.4);
+    quiz.i = quiz.items.length;
+    renderQuiz();
+  });
+  await expect(page.locator("#quiz-box [data-coach-plan-go]")).toBeVisible();
+  await expect(page.locator("#quiz-box")).toContainText(/plan 8 min|8-min plan/i);
+});
+
+test("Quiz: placement below 50% auto-starts plan flow", async ({ page }) => {
+  await boot(page);
+  await openQuizMode(page, "place");
+  await page.locator("#quiz-start").click();
+  await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    quiz.score = Math.round(quiz.items.length * 0.35);
+    quiz.i = quiz.items.length;
+    renderQuiz();
+  });
+  await expect(page.locator("#quiz-box .quiz-plan-auto")).toContainText(/35%|arrancamos|starting/i);
+  await expect(page.locator("#coach-plan-skip")).toBeVisible();
+});
+
 test("Quiz: place from the hub does not offer Back to Today", async ({ page }) => {
   await boot(page);
   await openQuizMode(page, "place");
@@ -242,6 +270,18 @@ test("Quiz: weekly resume in exams room", async ({ page }) => {
   await expect(page.locator("#quiz-box")).toContainText(/4\s*\/\s*12|Pregunta 4|Question 4/i);
 });
 
+test("Quiz: weekly stale in exams room has start-fresh button", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-weekly-stale", JSON.stringify({ week: "2000-01-01", i: 4, total: 12 }));
+    renderWeeklyQuizResume();
+  });
+  await page.locator('nav.tabs [data-tab="quiz"]').click();
+  await page.locator('#quiz-hub [data-lab-jump="quiz-exams"]').click();
+  await expect(page.locator("#weekly-quiz-resume")).toContainText(/semana pasada|last week/i);
+  await expect(page.locator("#weekly-quiz-resume [data-quiz-mode='weekly']")).toBeVisible();
+});
+
 test("Quiz: placement resume shows in Guide when open", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
@@ -291,6 +331,22 @@ test("Quiz: cert time-up in Today extras shows message, not Continue", async ({ 
   await expect(page.locator("#cert-today")).toContainText(/acabó el tiempo|Time's up/i);
   await expect(page.locator("[data-cert-resume]")).toBeHidden();
   await expect(page.locator("[data-cert-retry]")).toBeVisible();
+});
+
+test("Quiz: cert resume chip in you-are when cert in progress after day marked", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const items = window.NR.makeCertExamItems();
+    localStorage.setItem("enlab-cert-now", JSON.stringify({
+      day: todayKey(), i: 3, score: 2, fails: [], items, left: 1500,
+    }));
+    hoyPathI = hoyPath().length;
+    persistHoyPath();
+    finishHoyPath();
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+  });
+  await expect(page.locator("#you-are-chips [data-cert-resume]")).toBeVisible();
+  await expect(page.locator("#you-are-chips [data-cert-retry]")).toBeHidden();
 });
 
 test("Quiz: cert retry from time-up starts a fresh exam", async ({ page }) => {

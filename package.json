@@ -8,7 +8,8 @@
     "test:visual:update": "playwright test tests/visual.spec.js --update-snapshots",
     "icons": "node scripts/gen-icons.js",
     "vapid": "node scripts/gen-vapid.js",
-    "push": "node scripts/push-remind.js"
+    "push": "node scripts/push-remind.js",
+    "audit:i18n": "node scripts/audit-i18n.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

@@ -88,12 +88,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v61 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v86 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v61/);
+  expect(sw).toMatch(/enlab-v86/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -139,4 +139,124 @@ test("lab standard: 6 tabs, lab frame, a guide per room", async ({ page, request
   expect(miss.en, `EN guide missing: ${miss.en.join(", ")}`).toEqual([]);
   expect(miss.hubs).toBeGreaterThanOrEqual(4);
   expect(miss.oidoCards).toBe(0);
+});
+
+test("Remind push copy differentiates plan and quickmix hot", async ({ page }) => {
+  await boot(page);
+  const lines = await page.evaluate(() => ({
+    hot: remindPushBody(0, 3, false, true, false),
+    start: remindPushBody(0, 3, false, false, false),
+    mid: remindPushBody(0, 2, true, false, false),
+    daily: remindPushBody(0, 0, false, false, false),
+    place: remindPushBody(0, 3, false, false, true),
+  }));
+  expect(lines.hot).toMatch(/fricci|friction/i);
+  expect(lines.start).toMatch(/plan|Plan/i);
+  expect(lines.mid).toMatch(/2|dos|two/i);
+  expect(lines.daily).toMatch(/15|minut/i);
+  expect(lines.place).toMatch(/test|nivel|level|plan/i);
+});
+
+test("SW remindCopy four priority tiers", async ({ request }) => {
+  const sw = await (await request.get("/sw.js")).text();
+  const fn = sw.match(/function remindCopy\(data\)\s*\{[\s\S]*?\n\}/);
+  expect(fn).toBeTruthy();
+  const run = new Function(`${fn[0]}; return remindCopy;`)();
+  const base = { lang: "es", dueCount: 0, coachPlanLeft: 3, coachPlanStarted: false };
+  expect(run({ ...base, placePlanNudge: true, certWarmupNudge: true, quickmixHot: true }).body)
+    .toMatch(/test de nivel|nivel bajo/i);
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: true, quickmixHot: true }).body)
+    .toMatch(/calentamiento cert/i);
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, quickmixHot: true }).body)
+    .toMatch(/fricci/i);
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, quickmixHot: false }).body)
+    .toMatch(/plan 8 min|3 pasos/i);
+});
+
+test("Remind push priority: place beats cert warmup beats quickmix", async ({ page }) => {
+  await boot(page);
+  const lines = await page.evaluate(() => ({
+    place: remindPushBody(0, 3, false, true, true, true),
+    certOnly: remindPushBody(0, 3, false, true, false, true),
+    hotOnly: remindPushBody(0, 3, false, true, false, false),
+  }));
+  expect(lines.place).toMatch(/test|nivel|level/i);
+  expect(lines.certOnly).toMatch(/calentamiento|warm-up/i);
+  expect(lines.hotOnly).toMatch(/fricci|friction/i);
+});
+
+test("Remind SW payload fields complete", async ({ page }) => {
+  await boot(page);
+  const payload = await page.evaluate(() => {
+    localStorage.setItem("enlab-place-result", JSON.stringify({ score: 6, n: 20, at: Date.now() }));
+    sessionStorage.removeItem("enlab-coach-plan");
+    return {
+      placePlanNudge: placePlanNudgeOn(),
+      coachPlanLeft: coachPlanLeft(),
+      quickmixHot: quickmixFrictionStreak(3),
+      today: todayKey(),
+    };
+  });
+  expect(payload.placePlanNudge).toBe(true);
+  expect(payload.coachPlanLeft).toBe(3);
+  expect(typeof payload.quickmixHot).toBe("boolean");
+  expect(payload.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("SW remindCopy includes cert warmup nudge branch", async ({ request }) => {
+  const sw = await (await request.get("/sw.js")).text();
+  expect(sw).toMatch(/certWarmupNudge/);
+  expect(sw).toMatch(/Calentamiento cert|Cert warm-up done/);
+});
+
+test("SW remindCopy includes placement nudge branch", async ({ request }) => {
+  const sw = await (await request.get("/sw.js")).text();
+  expect(sw).toMatch(/placePlanNudge/);
+  expect(sw).toMatch(/Test de nivel bajo|Level test was low/);
+});
+
+test("Remind payload includes certWarmupNudge", async ({ page }) => {
+  await boot(page);
+  const payload = await page.evaluate(() => {
+    localStorage.setItem("enlab-cert-warmup", JSON.stringify({ day: todayKey(), n: 1 }));
+    sessionStorage.removeItem("enlab-coach-plan");
+    return {
+      streak: certWarmupStreak(),
+      left: coachPlanLeft(),
+      started: coachPlanStarted(),
+    };
+  });
+  expect(payload.streak).toBeGreaterThanOrEqual(1);
+  expect(payload.left).toBe(3);
+  expect(payload.started).toBe(false);
+});
+
+test("syncRemindPayload shape is complete", async ({ page }) => {
+  await boot(page);
+  const payload = await page.evaluate(() => {
+    localStorage.setItem("enlab-cert-warmup", JSON.stringify({ day: todayKey(), n: 1 }));
+    sessionStorage.removeItem("enlab-coach-plan");
+    return syncRemindPayload();
+  });
+  expect(payload.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(payload.coachPlanLeft).toBe(3);
+  expect(payload.certWarmupNudge).toBe(true);
+  expect(typeof payload.placePlanNudge).toBe("boolean");
+  expect(typeof payload.quickmixHot).toBe("boolean");
+  expect(["es", "en"]).toContain(payload.lang);
+});
+
+test("Remind SW payload includes placePlanNudge", async ({ page }) => {
+  await boot(page);
+  const payload = await page.evaluate(() => {
+    localStorage.setItem("enlab-place-result", JSON.stringify({ score: 5, n: 20, at: Date.now() }));
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    return {
+      nudge: placePlanNudgeOn(),
+      left: coachPlanLeft(),
+    };
+  });
+  expect(payload.nudge).toBe(true);
+  expect(payload.left).toBe(3);
 });

@@ -114,6 +114,7 @@
       <p class="muted" id="guide-why"></p>
       <ol id="guide-steps"></ol>
       <p id="guide-done" class="guide-done" hidden></p>
+      <div id="guide-keys" class="guide-keys"></div>
       <div id="guide-map" class="guide-map" hidden></div>
       <nav id="guide-lab" class="guide-lab" hidden></nav>
     </aside>
@@ -125,6 +126,7 @@
             <p class="kicker" data-i18n="hoyMission">Misión del día</p>
             <h2 data-i18n="hoyTitle">15 minutos de oído</h2>
             <p class="muted" id="home-stats"></p>
+            <p class="muted home-stats-totals" id="home-stats-totals" hidden></p>
             <p id="day-theme"></p>
           </div>
           <div class="timer-box">
@@ -167,6 +169,7 @@
         <div id="week-strip" class="week-strip"></div>
         <div id="week-report" class="week-report" hidden></div>
         <div id="due-today" class="due-today" hidden></div>
+        <div id="coach-plan-today" class="card" hidden></div>
         <div id="hoy-review" class="hoy-review" hidden></div>
       </div>
       <details class="fold hoy-extras" id="hoy-extras">
@@ -451,7 +454,7 @@
         <h2 data-i18n="verbosTitle">Verbos</h2>
         <p class="muted" data-i18n="verbosHint">Busca. Débil = se te traba. I + pasado = ayer; I have… = experiencia.</p>
         <input id="verb-search" type="search" data-i18n-placeholder="verbSearchPh" placeholder="Busca: go, ir, thought, escribir, I have…" />
-        <div id="verb-filters" class="row" style="margin-top:10px"></div>
+        <div id="verb-filters" class="verb-filters"></div>
         <p class="muted" id="verb-count"></p>
         <p class="muted" data-i18n="verbWeakNote">Débil = se te traba. Fuerte = ya te sale. Son tu lista personal.</p>
       </div>
@@ -544,7 +547,16 @@
         <h3 data-i18n="quizGroupExams">Exámenes</h3>
         <div id="place-quiz-resume" class="place-quiz-resume" hidden></div>
         <div id="weekly-quiz-resume" class="weekly-quiz-resume" hidden></div>
+        <div id="weekly-history" class="weekly-history" hidden></div>
         <div class="mode-picks" role="radiogroup" aria-label="Tipo de juego" data-i18n-aria="quizModesAria">
+          <button type="button" class="mode-pick" data-quiz-mode="quickmix">
+            <strong data-i18n="quizModes.quickmix.t">Sesión rápida</strong>
+            <span data-i18n="quizModes.quickmix.s">8 preguntas adaptativas</span>
+          </button>
+          <button type="button" class="mode-pick" data-quiz-mode="srs" id="quiz-mode-srs">
+            <strong data-i18n="quizModes.srs.t">Repaso SRS</strong>
+            <span data-i18n="quizModes.srs.s">Solo las tarjetas vencidas hoy</span>
+          </button>
           <button type="button" class="mode-pick" data-quiz-mode="place">
             <strong data-i18n="quizModes.place.t">Test de nivel</strong>
             <span data-i18n="quizModes.place.s">20 preguntas · propone A1–B2</span>
@@ -581,6 +593,8 @@
           <option value="listen">Escucha larga</option>
           <option value="story">Historias SRS</option>
           <option value="emailtone">Email tono</option>
+          <option value="quickmix">Sesión rápida adaptativa</option>
+          <option value="srs">Repaso SRS: tarjetas vencidas hoy</option>
           <option value="place">Test de nivel</option>
           <option value="weekly">Examen semanal</option>
           <option value="cert">Examen certificado B1/B2</option>

@@ -63,6 +63,18 @@ Claves `enlab-*` en `localStorage`. `PROG_KEYS` en `app.js` es lo que viaja en e
 
 No hay usuario en la nube. Aula pro = PIN local + roster + QR de transfer.
 
+## Plan 8 min (coach)
+
+Flujo diario opcional tras el camino de Hoy: **oído → uso → verbos** (`quizCoachPlan8()` = `ear`, `uso`, `choice`).
+
+| Estado | UI |
+|---|---|
+| Pendiente 0/3 | Badge punteado Hoy/Quiz, chip `#hoy-path-plan`, Guía, push genérico |
+| En curso 1–2/3 | Badge sólido, auto-continúa si `enlab-coach-plan-flow` |
+| Repaso + plan | Filtro solo paso pendiente, timer 6–10 min |
+
+**Triggers:** placement &lt;50 %, cert warm-up ×2, fallos semanal (`enlab-weekly-fails`), fricción 3 días → quickmix. Espejo IDB: `enlab-coach-plan-mirror` (via transfer). Aula pro: columna Plan + mapa visual + CSV. Deep-link alumno: `#coach-plan`. Diario: entradas `planStep` (abandono/fallo).
+
 ## Extensión a propósito (y su coste)
 
 `features-nr` aún envuelve `renderQuiz` (reloj del cert). Formantes, diario de voz y onda usan `onSpeakVerdict` / `onRecording`, el mismo patrón que `onTabPaint`. No reemplaces `applySpeakVerdict` ni `toggleRecording`.

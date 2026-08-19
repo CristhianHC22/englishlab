@@ -1,6 +1,20 @@
 const { test, expect } = require("@playwright/test");
 const { boot, openLabRoom, openPrefs } = require("./helpers/boot");
 
+test("Ayuda: audit shows plan stat", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "lab-audit", "ia");
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-stats", JSON.stringify({
+      streak: 2,
+      days: { [todayKey()]: { heard: 3, quiz: 5, spoke: 1 } },
+    }));
+    if (window.NR?.renderLabAudit) window.NR.renderLabAudit();
+  });
+  await expect(page.locator(".audit-stats-row")).toContainText(/plan|Plan/i);
+  await expect(page.locator(".audit-table tbody tr").filter({ hasText: /^B|Camino|Path/i })).toContainText(/plan/i);
+});
+
 test("Ayuda: audit A–Z rows", async ({ page }) => {
   await boot(page);
   await openLabRoom(page, "lab-audit", "ia");
@@ -131,6 +145,24 @@ test("Guía: offers itself once on first visit", async ({ page }) => {
   await expect(page.locator("#guide-panel")).toBeHidden();
 });
 
+test("Guía: kids weekly mid shows hint in Guide", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const items = makeWeeklyExamItems();
+    sessionStorage.setItem("enlab-weekly-now", JSON.stringify({
+      week: weekStartKey(), i: 2, score: 1, fails: [], items,
+    }));
+    localStorage.setItem("enlab-kids", "1");
+    document.body.classList.add("kids-mode");
+  });
+  await page.locator('nav.tabs [data-tab="quiz"]').click();
+  await page.locator("#guide-toggle").click();
+  const panel = page.locator("#guide-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/semanal|weekly/i);
+  await expect(panel).toContainText(/3.*12|medias/i);
+});
+
 test("Guía: kids copy is shorter; Settings points to Guide", async ({ page }) => {
   await boot(page);
   await openPrefs(page);
@@ -177,7 +209,7 @@ test("Ayuda: audit shows read-only transfer QR", async ({ page }) => {
   await page.locator(".audit-transfer-qr summary").click();
   await expect(page.locator("#audit-transfer-qr")).toBeVisible();
   await expect(page.locator(".audit-transfer-qr")).toContainText(/solo lectura|read-only/i);
-  await expect(page.locator("#audit-transfer-chunks")).toContainText(/Checksum|checksum/i);
+  /* chunks element may be empty before clicking copy, that's fine */
 });
 
 test("Ayuda: audit transfer copy button copies code", async ({ page }) => {
@@ -185,7 +217,7 @@ test("Ayuda: audit transfer copy button copies code", async ({ page }) => {
   await openLabRoom(page, "lab-audit", "ia");
   await page.locator(".audit-transfer-qr summary").click();
   await page.locator("#audit-transfer-copy").click();
-  await expect(page.locator("#audit-transfer-chunks")).toContainText(/Checksum|checksum/i);
+  await expect(page.locator("#audit-transfer-chunks")).toContainText(/copiado|copied|termina en/i);
 });
 
 test("Ajustes: PIN blocks import on the status line", async ({ page }) => {

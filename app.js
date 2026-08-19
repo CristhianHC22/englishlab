@@ -4,6 +4,8 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 const PROG_KEYS = window.ENLAB_PROG_KEYS || ["enlab-stats", "enlab-weak", "enlab-known", "enlab-cefr"];
 const PICK_MODES = ["uso", "ed", "art", "prep", "phrasal", "cond", "listen"];
 const FILTERS = { q: "", fam: "all", only: "level" };
+let _verbsForLevelCache = { key: "", list: [] };
+let _activeVerbInf = "";
 let quiz = { i: 0, score: 0, items: [], fails: [], mode: "choice" };
 let recState = { rec: null, chunks: [], stream: null, recStream: null, url: "", speech: null, said: "", speechOk: true, discard: false, surface: "hablar", lastBlob: null };
 let currentTab = "hoy";
@@ -24,6 +26,27 @@ function debounce(fn, ms) {
   };
 }
 
+function loadVerbFilterPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-verb-filters") || "{}");
+    if (raw && typeof raw === "object") {
+      if (typeof raw.only === "string") FILTERS.only = raw.only;
+      if (typeof raw.fam === "string") FILTERS.fam = raw.fam;
+      if (typeof raw.q === "string") FILTERS.q = raw.q;
+    }
+  } catch { /* ignore */ }
+}
+
+function saveVerbFilterPrefs() {
+  try {
+    localStorage.setItem("enlab-verb-filters", JSON.stringify({
+      only: FILTERS.only,
+      fam: FILTERS.fam,
+      q: FILTERS.q,
+    }));
+  } catch { /* ignore */ }
+}
+
 function starterSet() {
   return new Set(ENLAB.starter40 || []);
 }
@@ -42,13 +65,22 @@ function lvlNum() {
 
 function verbsForLevel() {
   const n = lvlNum();
-  if (n >= 4) return ENLAB.verbs;
+  const cacheKey = `${n}|${(ENLAB.verbs || []).length}`;
+  if (_verbsForLevelCache.key === cacheKey && _verbsForLevelCache.list.length) {
+    return _verbsForLevelCache.list;
+  }
+  if (n >= 4) {
+    _verbsForLevelCache = { key: cacheKey, list: ENLAB.verbs };
+    return ENLAB.verbs;
+  }
   const infs = new Set(
     n <= 1 ? (ENLAB.verbsA1 || [])
       : n === 2 ? (ENLAB.verbsA2 || [])
         : [...(ENLAB.starter40 || []), ...(ENLAB.verbsA2 || [])]
   );
-  return ENLAB.verbs.filter((v) => infs.has(v.inf) || (v.fam === "reg" && (v.min || 1) <= n));
+  const list = ENLAB.verbs.filter((v) => infs.has(v.inf) || (v.fam === "reg" && (v.min || 1) <= n));
+  _verbsForLevelCache = { key: cacheKey, list };
+  return list;
 }
 
 function isLevelVerb(v) {
@@ -423,6 +455,740 @@ function stats() {
   return raw;
 }
 
+function statsTotals() {
+  const s = stats();
+  let quiz = 0, heard = 0, spoke = 0;
+  Object.values(s.days || {}).forEach((d) => {
+    quiz += d.quiz || 0;
+    heard += d.heard || 0;
+    spoke += d.spoke || 0;
+  });
+  return { quiz, heard, spoke, days: Object.keys(s.days || {}).length };
+}
+
+function loadQuizUx() {
+  const raw = localStorage.getItem("enlab-quiz-ux") || "{}";
+  if (window._quizUxCacheRaw === raw && window._quizUxCache) return window._quizUxCache;
+  try {
+    const parsed = JSON.parse(raw);
+    window._quizUxCache = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    window._quizUxCache = {};
+  }
+  window._quizUxCacheRaw = raw;
+  return window._quizUxCache;
+}
+
+function saveQuizUx(map) {
+  window._quizUxCache = map || {};
+  invalidateCoachPlanCache();
+  const raw = JSON.stringify(window._quizUxCache);
+  window._quizUxCacheRaw = raw;
+  localStorage.setItem("enlab-quiz-ux", raw);
+}
+
+function loadQuizUxDaily() {
+  const raw = localStorage.getItem("enlab-quiz-ux-daily") || "{}";
+  if (window._quizUxDailyCacheRaw === raw && window._quizUxDailyCache) return window._quizUxDailyCache;
+  try {
+    const parsed = JSON.parse(raw);
+    window._quizUxDailyCache = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    window._quizUxDailyCache = {};
+  }
+  window._quizUxDailyCacheRaw = raw;
+  return window._quizUxDailyCache;
+}
+
+function saveQuizUxDaily(map) {
+  const keys = Object.keys(map || {}).sort();
+  const keep = keys.slice(-14);
+  const out = {};
+  keep.forEach((k) => { out[k] = map[k]; });
+  window._quizUxDailyCache = out;
+  const raw = JSON.stringify(out);
+  window._quizUxDailyCacheRaw = raw;
+  localStorage.setItem("enlab-quiz-ux-daily", raw);
+  invalidateQuickmixHotCache();
+}
+
+function bumpQuizUxDaily(mode, done, answered, correct, ms) {
+  const day = todayKey();
+  const map = loadQuizUxDaily();
+  const dayRow = map[day] || {};
+  const row = dayRow[mode] || { sessions: 0, completed: 0, abandoned: 0, answers: 0, correct: 0, ms: 0 };
+  row.sessions += 1;
+  row.answers += answered || 0;
+  row.correct += correct || 0;
+  row.ms += ms || 0;
+  if (done) row.completed += 1;
+  else row.abandoned += 1;
+  dayRow[mode] = row;
+  map[day] = dayRow;
+  saveQuizUxDaily(map);
+}
+
+function quizModeDropPct(mode) {
+  const row = loadQuizUx()[mode || ""] || {};
+  if ((row.sessions || 0) < 1) return 0;
+  return Math.round(((row.abandoned || 0) * 100) / Math.max(1, row.sessions || 0));
+}
+
+function topQuizFriction(limit = 3) {
+  return Object.entries(loadQuizUx())
+    .map(([mode, row]) => ({
+      mode,
+      sessions: Number(row?.sessions || 0),
+      drop: quizModeDropPct(mode),
+      avgSec: Math.round((Number(row?.ms || 0)) / Math.max(1, Number(row?.sessions || 0)) / 1000),
+    }))
+    .filter((r) => r.sessions >= 1)
+    .sort((a, b) => (b.drop - a.drop) || (b.sessions - a.sessions))
+    .slice(0, limit);
+}
+
+function frictionFromUxRaw(raw) {
+  try {
+    const ux = typeof raw === "string" ? JSON.parse(raw || "{}") : (raw || {});
+    const top = Object.entries(ux)
+      .map(([mode, row]) => ({
+        mode,
+        drop: Math.round(((Number(row?.abandoned || 0)) * 100) / Math.max(1, Number(row?.sessions || 0))),
+        sessions: Number(row?.sessions || 0),
+      }))
+      .filter((r) => r.sessions >= 1)
+      .sort((a, b) => (b.drop - a.drop) || (b.sessions - a.sessions))[0];
+    return top ? { mode: top.mode, drop: top.drop } : null;
+  } catch {
+    return null;
+  }
+}
+
+function dayFrictionHigh(dayKey) {
+  const dayRow = loadQuizUxDaily()[dayKey];
+  if (!dayRow) return false;
+  let sessions = 0;
+  let abandoned = 0;
+  Object.values(dayRow).forEach((row) => {
+    sessions += row?.sessions || 0;
+    abandoned += row?.abandoned || 0;
+  });
+  return sessions >= 2 && Math.round((abandoned * 100) / Math.max(1, sessions)) >= 40;
+}
+
+function perfFrictionWeekCompare() {
+  const map = loadQuizUxDaily();
+  const keys = Object.keys(map).sort();
+  if (keys.length < 4) return null;
+  const avgDrop = (days) => {
+    let ab = 0;
+    let s = 0;
+    days.forEach((day) => {
+      Object.values(map[day] || {}).forEach((row) => {
+        ab += row?.abandoned || 0;
+        s += row?.sessions || 0;
+      });
+    });
+    return s ? Math.round((ab * 100) / s) : null;
+  };
+  const now = avgDrop(keys.slice(-7));
+  const prev = avgDrop(keys.slice(-14, -7));
+  if (now == null || prev == null) return null;
+  return { now, prev, delta: now - prev };
+}
+
+function perfFrictionWeekHtml() {
+  const cmp = perfFrictionWeekCompare();
+  if (!cmp) return "";
+  const trend = cmp.delta <= -5 ? t("perfWeekBetter") : cmp.delta >= 5 ? t("perfWeekWorse") : t("perfWeekSame");
+  return `<p class="muted">${esc(t("perfWeekCompare", { now: cmp.now, prev: cmp.prev }))} · ${esc(trend)}</p>`;
+}
+
+function maybeAutoCoachVerbFilter() {
+  if (!isCoachVerbStep()) return false;
+  try {
+    if (sessionStorage.getItem("enlab-verb-coach-auto") === todayKey()) return false;
+    if (FILTERS.only === "coach") {
+      sessionStorage.setItem("enlab-verb-coach-auto", todayKey());
+      return false;
+    }
+    FILTERS.only = "coach";
+    sessionStorage.setItem("enlab-verb-coach-auto", todayKey());
+    saveVerbFilterPrefs();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function injectCoachPlanSrs(items, cap = 12) {
+  if (!coachPlanFlowOn() || !items?.length) return items || [];
+  if (items.some((it) => it?.srsId)) return items;
+  const due = makeSrsDueItems();
+  if (!due.length) return items;
+  const out = [...items];
+  out.splice(Math.min(1, out.length), 0, due[0]);
+  return out.slice(0, cap);
+}
+
+function invalidateCoachPlanCache() {
+  window._coachPlanStepsDay = "";
+  window._coachPlanSteps = null;
+}
+
+function quizEasyOn(mode) {
+  if (!mode || mode === "cierre" || mode === "weekly" || mode === "cert" || mode === "place") return false;
+  const row = loadQuizUx()[mode] || {};
+  if ((row.sessions || 0) < 2) return false;
+  if ((row.easyStreak || 0) >= 2) return false;
+  const drop = quizModeDropPct(mode);
+  if (drop < 45) return false;
+  return true;
+}
+
+function quizEasyRecoverHint(mode) {
+  if (!quizEasyOn(mode)) {
+    const row = loadQuizUx()[mode] || {};
+    if ((row.easyStreak || 0) >= 2 && quizModeDropPct(mode) >= 45) return t("quizEasyRecovered");
+    return "";
+  }
+  const row = loadQuizUx()[mode] || {};
+  if ((row.easyStreak || 0) === 1) return t("quizEasyRecoverHint");
+  return "";
+}
+
+function perfFrictionHeatmapHtml(limit = 2) {
+  const ux = loadQuizUx();
+  const modes = Object.entries(ux)
+    .map(([mode, row]) => ({ mode, drop: quizModeDropPct(mode), sessions: row?.sessions || 0 }))
+    .filter((r) => r.sessions >= 1)
+    .sort((a, b) => (b.drop - a.drop) || (b.sessions - a.sessions))
+    .slice(0, limit);
+  if (!modes.length) return "";
+  const map = loadQuizUxDaily();
+  const keys = Object.keys(map).sort().slice(-7);
+  if (!keys.length) return "";
+  return `<div class="perf-heat-wrap">${modes.map(({ mode, drop }) => {
+    const bars = keys.map((day) => {
+      const row = map[day]?.[mode];
+      const pct = row?.sessions ? Math.round(((row.abandoned || 0) * 100) / row.sessions) : 0;
+      const h = row?.sessions ? Math.max(8, Math.min(100, pct)) : 4;
+      return `<span class="perf-heat-bar${row?.sessions ? "" : " empty"}" style="height:${h}%" title="${esc(day)}: ${pct}%"></span>`;
+    }).join("");
+    return `<div class="perf-heat-row">
+      <span class="perf-heat-label">${esc(t(`quizModes.${mode}.t`) || mode)}</span>
+      <div class="perf-heat-bars" role="img" aria-label="${esc(t("perfHeatAria", { mode: t(`quizModes.${mode}.t`) || mode, drop }))}">${bars}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function quizUxTrend7(mode) {
+  const map = loadQuizUxDaily();
+  const keys = Object.keys(map).sort().slice(-7);
+  if (keys.length < 2) return null;
+  let recentAb = 0;
+  let recentS = 0;
+  let olderAb = 0;
+  let olderS = 0;
+  const mid = Math.max(1, Math.floor(keys.length / 2));
+  keys.forEach((day, i) => {
+    const row = map[day]?.[mode];
+    if (!row?.sessions) return;
+    if (i >= mid) {
+      recentAb += row.abandoned || 0;
+      recentS += row.sessions || 0;
+    } else {
+      olderAb += row.abandoned || 0;
+      olderS += row.sessions || 0;
+    }
+  });
+  if (recentS < 1 || olderS < 1) return null;
+  const recent = Math.round((recentAb * 100) / recentS);
+  const older = Math.round((olderAb * 100) / olderS);
+  if (recent + 4 < older) return "down";
+  if (recent > older + 4) return "up";
+  return "flat";
+}
+
+function quizUxStart(mode, total) {
+  window._quizUxNow = {
+    mode: mode || "choice",
+    total: Number(total) || 0,
+    answered: 0,
+    correct: 0,
+    startedAt: Date.now(),
+    ended: false,
+  };
+}
+
+function quizUxAnswer(ok) {
+  const now = window._quizUxNow;
+  if (!now || now.ended) return;
+  now.answered += 1;
+  if (ok) now.correct += 1;
+}
+
+function quizUxFinish(done) {
+  const now = window._quizUxNow;
+  if (!now || now.ended) return;
+  now.ended = true;
+  const map = loadQuizUx();
+  const mode = now.mode || "choice";
+  const row = map[mode] || { sessions: 0, completed: 0, abandoned: 0, answers: 0, correct: 0, ms: 0 };
+  row.sessions += 1;
+  row.answers += now.answered || 0;
+  row.correct += now.correct || 0;
+  row.ms += Math.max(0, Date.now() - (now.startedAt || Date.now()));
+  if (done) {
+    row.completed += 1;
+    row.easyStreak = (row.easyStreak || 0) + 1;
+  } else {
+    row.abandoned += 1;
+    row.easyStreak = 0;
+  }
+  map[mode] = row;
+  saveQuizUx(map);
+  bumpQuizUxDaily(mode, done, now.answered || 0, now.correct || 0, Math.max(0, Date.now() - (now.startedAt || Date.now())));
+  if (!done && typeof coachPlanFlowOn === "function" && coachPlanFlowOn()) {
+    saveCoachPlanAbandon(mode);
+    if (window.PLUS?.logPlanStepEvent) window.PLUS.logPlanStepEvent("abandon", mode);
+  }
+  if (typeof window.PLUS?.renderPerfHint === "function") window.PLUS.renderPerfHint();
+}
+
+function quizUxAbandonIfRunning() {
+  if (!window._quizUxNow || window._quizUxNow.ended) return;
+  quizUxFinish(false);
+}
+
+function quizUxHint(mode) {
+  const row = loadQuizUx()[mode || ""];
+  if (!row || row.sessions < 2) return "";
+  const avgSec = Math.round((row.ms || 0) / Math.max(1, row.sessions) / 1000);
+  const abandonPct = Math.round(((row.abandoned || 0) * 100) / Math.max(1, row.sessions));
+  return t("quizUxHint", { sessions: row.sessions, abandonPct, avgSec });
+}
+
+function quickmixPlanText(i) {
+  const block = Math.min(4, Math.floor(Math.max(0, i - 1) / 2) + 1);
+  return t("quickmixPlan", { block, total: 4 });
+}
+
+function quizCoachHint(mode) {
+  if (!mode || mode === "cierre") return "";
+  const ux = loadQuizUx();
+  const row = ux[mode];
+  if (!row || row.sessions < 2) return "";
+  const abandonPct = Math.round(((row.abandoned || 0) * 100) / Math.max(1, row.sessions));
+  if (mode === "quickmix") {
+    const focus = ["ear", "listen", "dict", "uso", "ed", "choice", "type"]
+      .map((m) => {
+        const r = ux[m] || {};
+        const d = (r.abandoned || 0) / Math.max(1, r.sessions || 0);
+        return { mode: m, drop: d };
+      })
+      .sort((a, b) => b.drop - a.drop)[0];
+    if (focus?.mode) return t("quizCoachQuickmix", { mode: t(`quizModes.${focus.mode}.t`) });
+  }
+  if (abandonPct >= 45) return t("quizCoachRetry", { mode: t(`quizModes.${mode}.t`) });
+  return t("quizCoachLevelUp", { mode: t(`quizModes.${mode}.t`) });
+}
+
+function quizCoachAction(mode) {
+  if (!mode || mode === "cierre") return null;
+  const ux = loadQuizUx();
+  if (mode === "quickmix") {
+    const focus = ["ear", "listen", "dict", "uso", "ed", "choice", "type"]
+      .map((m) => {
+        const r = ux[m] || {};
+        const d = (r.abandoned || 0) / Math.max(1, r.sessions || 0);
+        return { mode: m, drop: d, sessions: r.sessions || 0 };
+      })
+      .sort((a, b) => (b.drop - a.drop) || (b.sessions - a.sessions))[0];
+    return focus?.mode ? focus.mode : "choice";
+  }
+  const row = ux[mode] || {};
+  const abandonPct = Math.round(((row.abandoned || 0) * 100) / Math.max(1, row.sessions || 0));
+  if (abandonPct >= 45) return mode;
+  if (mode === "choice") return "type";
+  if (mode === "ear") return "exam";
+  if (mode === "uso") return "phrasal";
+  return "quickmix";
+}
+
+function quizCoachBtnsHtml(mode) {
+  const steps = quizCoachSteps(mode);
+  if (!steps.length) return "";
+  return `<div class="row quiz-coach-steps">${steps.map((m, i) =>
+    `<button type="button" class="btn${i ? " ghost sm" : " sm"}" data-quiz-start="${esc(m)}" data-quiz-coach="1">${esc(i === 0 ? t("quizCoachCta", { mode: t(`quizModes.${m}.t`) }) : t("quizCoachStep2", { mode: t(`quizModes.${m}.t`) }))}</button>`
+  ).join("")}</div>`;
+}
+
+function quizCoachSteps(mode) {
+  const first = quizCoachAction(mode);
+  if (!first) return [];
+  const ux = loadQuizUx();
+  const peers = quizPeerModes(first).map((m) => ({
+    mode: m,
+    drop: (ux[m]?.abandoned || 0) / Math.max(1, ux[m]?.sessions || 0),
+  })).sort((a, b) => b.drop - a.drop);
+  const second = peers.find((p) => p.mode !== first)?.mode || (first === "quickmix" ? "choice" : "quickmix");
+  return [first, second].filter((m, i, a) => m && a.indexOf(m) === i).slice(0, 2);
+}
+
+function quizCoachPlan8() {
+  const day = todayKey();
+  if (window._coachPlanStepsDay === day && window._coachPlanSteps) return window._coachPlanSteps;
+  const ux = loadQuizUx();
+  const dropOf = (m) => (ux[m]?.abandoned || 0) / Math.max(1, ux[m]?.sessions || 0);
+  const pick = (...modes) => [...modes].sort((a, b) => dropOf(b) - dropOf(a))[0];
+  window._coachPlanStepsDay = day;
+  window._coachPlanSteps = [
+    pick("ear", "listen", "dict") || "ear",
+    pick("uso", "ed", "art", "prep", "phrasal") || "uso",
+    pick("choice", "type") || "choice",
+  ];
+  return window._coachPlanSteps;
+}
+
+function persistCoachPlanMirror() {
+  try {
+    let plan = null;
+    try { plan = JSON.parse(sessionStorage.getItem("enlab-coach-plan") || "null"); } catch { plan = null; }
+    const flow = coachPlanFlowOn();
+    const today = todayKey();
+    if (plan?.day !== today) plan = null;
+    if (!plan && !flow) {
+      localStorage.removeItem("enlab-coach-plan-mirror");
+      return;
+    }
+    localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify({
+      day: today,
+      done: Number(plan?.done) || 0,
+      steps: plan?.steps || quizCoachPlan8(),
+      flow: flow ? 1 : 0,
+    }));
+  } catch { /* ignore */ }
+}
+
+function restoreCoachPlanFromMirror() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    if (raw?.day !== todayKey()) return;
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: raw.day, done: Number(raw.done) || 0, steps: raw.steps || quizCoachPlan8(),
+    }));
+    if (raw.flow) sessionStorage.setItem("enlab-coach-plan-flow", "1");
+    else sessionStorage.removeItem("enlab-coach-plan-flow");
+  } catch { /* ignore */ }
+}
+
+function coachPlanProgress() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-coach-plan") || "null");
+    if (raw?.day === todayKey()) return Number(raw.done) || 0;
+  } catch { /* ignore */ }
+  return 0;
+}
+
+function bumpCoachPlanProgress(mode) {
+  const steps = quizCoachPlan8();
+  const idx = steps.indexOf(mode);
+  if (idx < 0) return;
+  const done = Math.max(coachPlanProgress(), idx + 1);
+  try {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({ day: todayKey(), done, steps }));
+  } catch { /* ignore */ }
+  persistCoachPlanMirror();
+  clearCoachPlanAbandon();
+  invalidateYouAreChipsCache();
+  prunePlaceResult();
+  if (typeof syncPrefsBadge === "function") syncPrefsBadge();
+  if (typeof renderQuizNow === "function") renderQuizNow();
+  if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
+  if (typeof syncRemindToSw === "function") syncRemindToSw();
+  if (typeof fillYouAreDebounced === "function") fillYouAreDebounced();
+}
+
+function coachPlanStarted() {
+  return coachPlanProgress() > 0 || coachPlanFlowOn();
+}
+
+function coachPlanLeft() {
+  const done = coachPlanProgress();
+  return Math.max(0, quizCoachPlan8().length - done);
+}
+
+function coachPlanVerbMode() {
+  const done = coachPlanProgress();
+  const steps = quizCoachPlan8();
+  if (done >= steps.length) return null;
+  return steps[done];
+}
+
+function isCoachVerbStep() {
+  const m = coachPlanVerbMode();
+  return !!m && ["choice", "type", "ed"].includes(m);
+}
+
+function quickmixFrictionHigh() {
+  const top = topQuizFriction(1)[0];
+  return !!(top && top.sessions >= 2 && top.drop >= 40);
+}
+
+let _quickmixHotCache = { day: "", hot: false };
+
+function invalidateQuickmixHotCache() {
+  _quickmixHotCache.day = "";
+}
+
+function quickmixFrictionStreak(minDays = 3) {
+  const today = todayKey();
+  if (minDays === 3 && _quickmixHotCache.day === today) return _quickmixHotCache.hot;
+  let hot = true;
+  for (let i = 0; i < minDays; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (!dayFrictionHigh(dateKey(d))) { hot = false; break; }
+  }
+  if (minDays === 3) _quickmixHotCache = { day: today, hot };
+  return hot;
+}
+
+function syncQuickmixHotUi() {
+  const hot = quickmixFrictionStreak(3);
+  document.querySelectorAll('[data-quiz-mode="quickmix"]').forEach((btn) => {
+    btn.classList.toggle("mode-hot", hot);
+    if (hot) btn.setAttribute("title", t("quickmixHotHint"));
+    else btn.removeAttribute("title");
+  });
+  const quizTab = document.querySelector('nav.tabs [data-tab="quiz"]');
+  if (quizTab) quizTab.classList.toggle("quickmix-hot", hot);
+  const nowEl = $("#quiz-now");
+  if (nowEl && hot && !coachPlanStarted()) {
+    let hotHint = nowEl.querySelector(".quickmix-hot-hint");
+    if (!hotHint) {
+      hotHint = document.createElement("p");
+      hotHint.className = "muted quickmix-hot-hint";
+      nowEl.insertBefore(hotHint, nowEl.querySelector("#quiz-now-btn"));
+    }
+    hotHint.textContent = t("quickmixHotHint");
+    hotHint.hidden = false;
+  } else {
+    nowEl?.querySelector(".quickmix-hot-hint")?.remove();
+  }
+}
+
+function clearCoachPlanAbandon() {
+  try { sessionStorage.removeItem("enlab-coach-plan-abandon"); } catch { /* ignore */ }
+  _lastYouAreChipsKey = "";
+}
+
+function saveCoachPlanAbandon(mode) {
+  if (!coachPlanFlowOn()) return;
+  const m = mode || quiz?.mode || coachPlanNextMode();
+  try {
+    sessionStorage.setItem("enlab-coach-plan-abandon", JSON.stringify({ day: todayKey(), mode: m, at: Date.now() }));
+  } catch { /* ignore */ }
+  _lastYouAreChipsKey = "";
+}
+
+function loadCoachPlanAbandon() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-coach-plan-abandon") || "null");
+    if (raw?.day === todayKey()) return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function coachPlanAbandonChipHtml(cls = "btn sm next-act") {
+  const ab = loadCoachPlanAbandon();
+  if (!ab || coachPlanLeft() <= 0) return "";
+  const mode = ab.mode || coachPlanNextMode() || quizCoachPlan8()[0];
+  return `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}">${esc(t("coachPlanAbandonChip", { mode: t(`quizModes.${mode}.t`) }))}</button>`;
+}
+
+function maybeScrollCoachPlanChip(force) {
+  if (!force && localStorage.getItem("enlab-plan-scroll-day") === todayKey()) return;
+  const hoy = $("#hoy");
+  if (!hoy?.classList.contains("path-done")) return;
+  if (coachPlanLeft() === 0) return;
+  const target = $("#hoy-path-plan [data-coach-plan-go]")
+    || $("#hoy-done-mid [data-coach-plan-go]")
+    || $("#coach-plan-today [data-coach-plan-go]");
+  if (!target) return;
+  if (!force) localStorage.setItem("enlab-plan-scroll-day", todayKey());
+  requestAnimationFrame(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+}
+
+function handleAppHash(hash) {
+  const h = String(hash || "").replace("#", "").trim();
+  if (h !== "coach-plan") return false;
+  if (currentTab !== "hoy") showTab("hoy");
+  const run = () => {
+    if (typeof coachPlanLeft !== "function" || coachPlanLeft() === 0) return;
+    if (!coachPlanStarted() && typeof startCoachPlanQuiz === "function") startCoachPlanQuiz();
+    else maybeScrollCoachPlanChip(true);
+  };
+  if (window._enlabBootstrapped) run();
+  else window.addEventListener("enlab-packs-ready", run, { once: true });
+  return true;
+}
+
+function startCoachPlanQuiz(mode) {
+  const m = mode || coachPlanNextMode() || quizCoachPlan8()[0];
+  setCoachPlanArmed(true);
+  setCoachPlanFlow(true);
+  if (currentTab !== "quiz") showTab("quiz");
+  if ($("#quiz-mode")) $("#quiz-mode").value = m;
+  if (typeof syncQuizModePicks === "function") syncQuizModePicks();
+  if (typeof openQuizRoom === "function") openQuizRoom(m);
+  startQuiz();
+}
+
+function coachPlanChipHtml(cls = "btn sm") {
+  const done = coachPlanProgress();
+  const steps = quizCoachPlan8();
+  if (done >= steps.length) return "";
+  const mode = steps[done];
+  const label = done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume");
+  return `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}">${esc(label)}</button>`;
+}
+
+function coachPlanCierreHint() {
+  const miss = cierreMissGame();
+  const left = coachPlanLeft();
+  if (!miss || left <= 0) return "";
+  const stepMode = coachPlanVerbMode();
+  if (stepMode && miss.game === stepMode) {
+    return t("youAreCoachPlanStep", { mode: t(`quizModes.${miss.game}.t`), done: coachPlanProgress(), total: quizCoachPlan8().length });
+  }
+  return t("youAreCoachCierreMiss", { mode: t(`quizModes.${miss.game}.t`), left });
+}
+
+function coachPlanNextMode() {
+  const steps = quizCoachPlan8();
+  const done = coachPlanProgress();
+  if (done >= steps.length) return null;
+  return steps[done];
+}
+
+function coachPlanFlowOn() {
+  try { return sessionStorage.getItem("enlab-coach-plan-flow") === "1"; } catch { return false; }
+}
+
+function setCoachPlanFlow(on) {
+  try {
+    if (on) sessionStorage.setItem("enlab-coach-plan-flow", "1");
+    else sessionStorage.removeItem("enlab-coach-plan-flow");
+  } catch { /* ignore */ }
+  persistCoachPlanMirror();
+  invalidateYouAreChipsCache();
+}
+
+function clearCoachPlanFlow() {
+  if (window._coachPlanTimer) {
+    clearTimeout(window._coachPlanTimer);
+    window._coachPlanTimer = null;
+  }
+  setCoachPlanFlow(false);
+}
+
+function coachPlanArmed() {
+  try { return sessionStorage.getItem("enlab-coach-plan-armed") === "1"; } catch { return false; }
+}
+
+function setCoachPlanArmed(on) {
+  try {
+    if (on) sessionStorage.setItem("enlab-coach-plan-armed", "1");
+    else sessionStorage.removeItem("enlab-coach-plan-armed");
+  } catch { /* ignore */ }
+}
+
+function coachPlanAutoDelayMs() {
+  return coachPlanArmed() ? 200 : 1400;
+}
+
+function maybeContinueCoachPlanFlow() {
+  if (!coachPlanFlowOn()) return false;
+  const next = coachPlanNextMode();
+  if (!next) {
+    clearCoachPlanFlow();
+    return false;
+  }
+  if ($("#quiz-mode")) $("#quiz-mode").value = next;
+  if (typeof syncQuizModePicks === "function") syncQuizModePicks();
+  if (typeof openQuizRoom === "function") openQuizRoom(next);
+  startQuiz();
+  return true;
+}
+
+function quizCoachPlanHtml() {
+  const steps = quizCoachPlan8();
+  const done = coachPlanProgress();
+  const labels = [t("quizCoachPlanEar"), t("quizCoachPlanUso"), t("quizCoachPlanVerbs")];
+  const bar = steps.map((m, i) =>
+    `<span class="coach-plan-dot${i < done ? " on" : i === done ? " now" : ""}" title="${esc(t(`quizModes.${m}.t`))}"></span>`).join("");
+  const btns = steps.map((m, i) =>
+    `<button type="button" class="btn${i === done ? "" : " ghost"} sm" data-quiz-start="${esc(m)}" data-quiz-coach="1" data-coach-plan-step="${i}">${esc(labels[i] || t(`quizModes.${m}.t`))}</button>`).join("");
+  return `<div class="quiz-coach-plan">
+    <p class="kicker">${esc(t("quizCoachPlan8"))}</p>
+    <p class="muted">${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
+    <div class="coach-plan-bar" aria-hidden="true">${bar}</div>
+    <div class="row quiz-coach-steps">${btns}</div>
+  </div>`;
+}
+
+function quizCoachEndHtml(mode) {
+  if (!mode || mode === "cierre") return "";
+  if (mode === "weekly" || mode === "cert" || mode === "place") return quizCoachBtnsHtml(mode);
+  if (coachPlanStarted() || coachPlanFlowOn()) return quizCoachPlanHtml(mode);
+  return quizCoachBtnsHtml(mode);
+}
+
+function repasoCoachFilterOn() {
+  return repasoOn() && coachPlanStarted() && coachPlanLeft() > 0;
+}
+
+function coachPlanPendingModes() {
+  const done = coachPlanProgress();
+  return quizCoachPlan8().slice(done);
+}
+
+function bumpSrsQuizItem(it, ok) {
+  if (!it?.srsId) return;
+  const id = String(it.srsId);
+  const kind = id.split(":")[0] || "";
+  const key = id.slice(kind.length + 1);
+  if (kind && key) srsBump(kind, key, ok);
+}
+
+function srsExplainText(it) {
+  if (!it?.srsId) return "";
+  const row = loadSrs()[String(it.srsId)];
+  if (!row?.due) return "";
+  const today = todayKey();
+  const due = String(row.due);
+  const box = Number(row.box || 0);
+  const okBox = Math.min(5, box + 1);
+  const okIv = [1, 1, 2, 4, 7, 14][okBox] || 14;
+  let dueMsg = t("srsWhyDueToday");
+  if (due < today) {
+    const days = Math.max(1, Math.round((new Date(today).getTime() - new Date(due).getTime()) / 86400000));
+    dueMsg = t("srsWhyOverdueN", { n: days });
+  }
+  return `${t("srsWhyTitle")} · ${dueMsg} · ${t("srsWhyBox", { box })} · ${t("srsWhyNext", { ok: okIv })}`;
+}
+
+function srsDueOnDay(dayKey) {
+  return Object.values(loadSrs()).some((row) => row?.due === dayKey);
+}
+
+function statsYearDays() {
+  const year = String(new Date().getFullYear());
+  return Object.keys(stats().days || {}).filter((k) => k.startsWith(`${year}-`)).length;
+}
+
 function bump(kind) {
   const s = stats();
   const today = todayKey();
@@ -450,15 +1216,36 @@ function renderHomeStats() {
     weak: weakSet().size,
     strong: knownSet().size,
   });
+  /* totals chip — optional element */
+  const totEl = $("#home-stats-totals");
+  if (totEl) {
+    const tot = statsTotals();
+    const yearDays = statsYearDays();
+    totEl.hidden = tot.days < 2 && yearDays < 2;
+    if (!totEl.hidden) {
+      totEl.textContent = t("homeStatsTotals", {
+        days: tot.days,
+        quiz: tot.quiz,
+        heard: tot.heard,
+        spoke: tot.spoke,
+        yearDays,
+        year: new Date().getFullYear(),
+      });
+    }
+  }
 }
 
 function showTab(id) {
   if (currentTab === "hoy" && id !== "hoy") persistCierreNow();
   if (currentTab === "quiz" && id !== "quiz") {
+    if (quiz?.mode !== "cierre" && quiz?.items?.[quiz.i]) quizUxAbandonIfRunning();
+    clearCoachPlanFlow();
     persistWeeklyNow();
     window.PLUS?.persistPlaceNow?.();
   }
   currentTab = id;
+  _lastYouAreChipsKey = ""; /* invalidate chips cache on tab change */
+  _lastHoyReviewKey = ""; /* invalidate review cache on tab change */
   clearEarTimers();
   $$(".panel").forEach((p) => p.classList.toggle("active", p.id === id));
   $$("nav.tabs button").forEach((b) => {
@@ -516,8 +1303,9 @@ function paintTab(id) {
     }
     renderOidoResume();
   }
-  if (id === "verbos" && dirty.verbs) {
-    verbLimit = 24;
+  if (id === "verbos") {
+    if (dirty.verbs) verbLimit = 24;
+    maybeAutoCoachVerbFilter();
     renderVerbs();
     dirty.verbs = false;
   }
@@ -604,7 +1392,7 @@ function verbCard(v, compact = false) {
   const known = knownSet().has(v.inf);
   const fam = ENLAB.familyNames[v.fam] || v.fam;
   return `
-    <div class="verb" data-track="verb" data-verb="${esc(v.inf)}">
+    <div class="verb ${_activeVerbInf === v.inf ? "active" : ""}" data-track="verb" data-verb="${esc(v.inf)}" data-verb-card="${esc(v.inf)}" tabindex="0">
       <div>
         <strong>${esc(v.inf)}</strong>
         ${v.fam === "reg" ? '<span class="pill">-ed</span>' : (isStarter(v) ? '<span class="pill">40</span>' : "")}
@@ -1111,6 +1899,7 @@ function renderHome(force) {
   renderStreakChart();
   renderWeekReport();
   renderDueToday();
+  renderCoachPlanToday();
   renderSituations();
   renderPodcastToday();
   renderCierreToday();
@@ -1269,6 +2058,11 @@ function renderHoyPath() {
     else label = t("pathReady");
   } else if (i > last) {
     text = g.game ? t("pathDoneGame") : t("pathDoneExplore");
+    if (coachPlanStarted() && coachPlanLeft() > 0) {
+      text += ` · ${t("hoyPathPlanInline", { done: coachPlanProgress(), total: quizCoachPlan8().length })}`;
+    } else if (!coachPlanStarted() && coachPlanLeft() >= 3) {
+      text += ` · ${t("hoyPathPlanPendingInline")}`;
+    }
     label = t("pathRepeat");
   }
   if (i >= 0 && i <= last && path[i].id === "cierre"
@@ -1276,6 +2070,28 @@ function renderHoyPath() {
     label = t("cierreStay");
   }
   if (copy) copy.textContent = text;
+  let planEl = $("#hoy-path-plan");
+  if (!planEl && $("#hoy-path")) {
+    planEl = document.createElement("p");
+    planEl.id = "hoy-path-plan";
+    planEl.className = "hoy-path-plan row";
+    $("#hoy-path-copy")?.insertAdjacentElement("afterend", planEl);
+  }
+  if (planEl) {
+    const left = coachPlanLeft();
+    if (left > 0 && !repasoOn()) {
+      const done = coachPlanProgress();
+      const total = quizCoachPlan8().length;
+      const pulse = !coachPlanStarted() && localStorage.getItem("enlab-plan-pulse-day") !== todayKey();
+      const pulseCls = pulse ? " next-act" : "";
+      planEl.hidden = false;
+      planEl.innerHTML = `<button type="button" class="btn ghost sm${pulseCls}" data-coach-plan-go data-coach-plan-mode="${esc(coachPlanNextMode() || quizCoachPlan8()[0])}">${esc(t("hoyPathPlanChip", { done, total }))}</button>`;
+      if (pulse) localStorage.setItem("enlab-plan-pulse-day", todayKey());
+    } else {
+      planEl.hidden = true;
+      planEl.innerHTML = "";
+    }
+  }
   $$(".hoy-next").forEach((b) => { b.textContent = label; });
   $$(".hoy-path-foot .hoy-next").forEach((b) => b.classList.remove("next-act"));
   if (i >= 0 && i <= last) {
@@ -1293,7 +2109,13 @@ function renderHoyPath() {
   if (doneBox) {
     const done = hoy?.classList.contains("path-done");
     doneBox.hidden = !done;
-    if (done && doneCopy) doneCopy.textContent = t("hoyDoneCopy");
+    if (done && doneCopy) {
+      doneCopy.textContent = coachPlanLeft() > 0 && !coachPlanStarted()
+        ? `${t("hoyDoneCopy")} · ${t("hoyPathPlanPendingInline")}`
+        : coachPlanStarted() && coachPlanLeft() > 0
+          ? `${t("hoyDoneCopy")} · ${t("hoyPathPlanInline", { done: coachPlanProgress(), total: quizCoachPlan8().length })}`
+          : t("hoyDoneCopy");
+    }
     const r = loadCierreResult();
     const cierreLine = $("#hoy-done-cierre");
     if (cierreLine) {
@@ -1308,6 +2130,9 @@ function renderHoyPath() {
     if (usoBtn) usoBtn.hidden = !(done && r?.useFail);
     syncHoyDoneTimer();
     renderHoyDoneMid();
+    if (!coachPlanStarted() && coachPlanLeft() >= 3) {
+      maybeScrollCoachPlanChip();
+    }
     if (window.SV?.renderHoyStoryChip) window.SV.renderHoyStoryChip();
     const streakEl = $("#hoy-done-streak");
     if (streakEl) {
@@ -1968,24 +2793,150 @@ function filteredVerbs() {
     if (FILTERS.only === "work" && !v.work) return false;
     if (FILTERS.only === "weak" && !weak.has(v.inf)) return false;
     if (FILTERS.only === "unknown" && known.has(v.inf)) return false;
+    if (FILTERS.only === "coach") {
+      if (!isCoachVerbStep()) return false;
+      const deck = new Set((typeof todaysDeck === "function" ? todaysDeck() : []).map((x) => x.inf));
+      if (!weak.has(v.inf) && !deck.has(v.inf)) return false;
+    }
     if (!q) return true;
     return `${v.inf} ${v.past} ${v.pp} ${v.es}`.toLowerCase().includes(q);
   });
 }
 
+function verbFilterCounts() {
+  const weak = weakSet();
+  const known = knownSet();
+  const all = ENLAB.verbs || [];
+  let coach = 0;
+  if (isCoachVerbStep()) {
+    const deck = new Set((typeof todaysDeck === "function" ? todaysDeck() : []).map((x) => x.inf));
+    coach = all.filter((v) => weak.has(v.inf) || deck.has(v.inf)).length;
+  }
+  return {
+    level: verbsForLevel().length,
+    weak: all.filter((v) => weak.has(v.inf)).length,
+    unknown: all.filter((v) => !known.has(v.inf)).length,
+    work: all.filter((v) => v.work).length,
+    starter: all.filter((v) => isStarter(v)).length,
+    all: all.length,
+    coach,
+  };
+}
+
+function verbFilterSummary(listOverride) {
+  const counts = verbFilterCounts();
+  const scopeKey = {
+    level: "verbFilterLevel",
+    weak: "verbFilterWeak",
+    unknown: "verbFilterUnknown",
+    work: "verbFilterWork",
+    starter: "verbFilterStarter",
+    all: "verbFilterAll",
+    coach: "verbFilterCoach",
+  }[FILTERS.only] || "verbFilterLevel";
+  const scopeN = counts[FILTERS.only] ?? counts.level;
+  const scope = t(scopeKey, { n: scopeN });
+  const fam = FILTERS.fam !== "all"
+    ? (ENLAB.familyNames[FILTERS.fam] || FILTERS.fam)
+    : "";
+  const list = Array.isArray(listOverride) ? listOverride : filteredVerbs();
+  const parts = [scope];
+  if (fam) parts.push(fam);
+  parts.push(t("verbFilterShowing", { n: list.length }));
+  return parts.join(" · ");
+}
+
+function verbFamilyHeatmapHtml(list) {
+  if (!list?.length) return "";
+  const weak = weakSet();
+  const byFam = {};
+  list.forEach((v) => {
+    const fam = v.fam || "other";
+    byFam[fam] = byFam[fam] || { fam, total: 0, weak: 0 };
+    byFam[fam].total += 1;
+    if (weak.has(v.inf)) byFam[fam].weak += 1;
+  });
+  const rows = Object.values(byFam)
+    .sort((a, b) => (b.weak / Math.max(1, b.total)) - (a.weak / Math.max(1, a.total)))
+    .slice(0, 6);
+  if (!rows.length) return "";
+  return `<details class="fold verb-heatmap"><summary>${esc(t("verbHeatmapTitle"))}</summary>
+    <div class="verb-heatmap-list">
+      ${rows.map((r) => {
+        const ratio = Math.round((r.weak / Math.max(1, r.total)) * 100);
+        const label = ENLAB.familyNames?.[r.fam] || r.fam;
+        return `<div class="verb-heatmap-row">
+          <span class="verb-heatmap-label">${esc(label)}</span>
+          <span class="verb-heatmap-bar"><span style="width:${ratio}%"></span></span>
+          <span class="verb-heatmap-meta">${r.weak}/${r.total}</span>
+        </div>`;
+      }).join("")}
+    </div>
+  </details>`;
+}
+
+function smartVerbDrillInfs() {
+  const level = verbsForLevel();
+  const known = knownSet();
+  const weak = weakSet();
+  const theme = typeof dayTheme === "function" ? dayTheme() : {};
+  const themed = (theme.infs || []).filter(Boolean);
+  const out = [];
+  const push = (inf) => {
+    if (!inf || out.includes(inf)) return;
+    out.push(inf);
+  };
+  level.filter((v) => weak.has(v.inf)).slice(0, 6).forEach((v) => push(v.inf));
+  themed.forEach((inf) => push(inf));
+  level.filter((v) => !known.has(v.inf) && !weak.has(v.inf)).slice(0, 6).forEach((v) => push(v.inf));
+  shuffle(level).forEach((v) => push(v.inf));
+  return out.slice(0, 10);
+}
+
+function verbCompactOn() {
+  return localStorage.getItem("enlab-verb-compact") === "1";
+}
+
 function renderVerbFilters() {
+  const counts = verbFilterCounts();
+  const list = filteredVerbs();
   const fams = Object.entries(ENLAB.familyNames).map(([k, label]) =>
-    `<button class="chip ${FILTERS.fam === k ? "on" : ""}" data-fam="${k}">${esc(label)}</button>`).join("");
+    `<button type="button" class="chip sm ${FILTERS.fam === k ? "on" : ""}" data-fam="${k}">${esc(label)}</button>`).join("");
+  const scopeChip = (key, labelKey, count) =>
+    `<button type="button" class="chip ${FILTERS.only === key ? "on" : ""}" data-only="${key}" aria-pressed="${FILTERS.only === key ? "true" : "false"}">${esc(t(labelKey, count != null ? { n: count } : {}))}</button>`;
+  const hasExtra = FILTERS.fam !== "all" || FILTERS.only !== "level" || FILTERS.q.trim();
+  const showHint = localStorage.getItem("enlab-verb-hint-dismissed") !== "1";
   $("#verb-filters").innerHTML = `
-    <button class="chip ${FILTERS.fam === "all" ? "on" : ""}" data-fam="all">${esc(t("verbAll", { n: ENLAB.verbs.length }))}</button>
-    ${fams}
-    <button class="chip ${FILTERS.only === "level" ? "on" : ""}" data-only="level">${esc(t("verbFilterLevel", { n: verbsForLevel().length }))}</button>
-    <button class="chip ${FILTERS.only === "starter" ? "on" : ""}" data-only="starter">${esc(t("verbFilterStarter"))}</button>
-    <button class="chip ${FILTERS.only === "all" ? "on" : ""}" data-only="all">${esc(t("verbFilterAll", { n: ENLAB.verbs.length }))}</button>
-    <button class="chip ${FILTERS.only === "work" ? "on" : ""}" data-only="work">${esc(t("verbFilterWork"))}</button>
-    <button class="chip ${FILTERS.only === "weak" ? "on" : ""}" data-only="weak">${esc(t("verbFilterWeak"))}</button>
-    <button class="chip ${FILTERS.only === "unknown" ? "on" : ""}" data-only="unknown">${esc(t("verbFilterUnknown"))}</button>
-  `;
+    <div class="verb-filter-panel">
+      ${showHint ? `<p class="muted verb-filter-hint">${esc(t("verbFilterHint"))} <button type="button" class="chip sm" data-verb-hint-hide aria-label="${esc(t("closeGuide") || "Cerrar")}">×</button></p>` : ""}
+      <div class="verb-filter-group">
+        <p class="verb-filter-label">${esc(t("verbFilterShow"))}</p>
+        <div class="verb-filter-row" role="radiogroup" aria-label="${esc(t("verbFilterShow"))}">
+          ${scopeChip("level", "verbFilterLevel", counts.level)}
+          ${isCoachVerbStep() && counts.coach ? scopeChip("coach", "verbFilterCoach", counts.coach) : ""}
+          ${scopeChip("weak", "verbFilterWeakN", counts.weak)}
+          ${scopeChip("unknown", "verbFilterUnknownN", counts.unknown)}
+          ${scopeChip("work", "verbFilterWork", counts.work)}
+          ${scopeChip("starter", "verbFilterStarter", counts.starter)}
+          ${scopeChip("all", "verbFilterAll", counts.all)}
+        </div>
+      </div>
+      <details class="fold verb-filter-fam"${FILTERS.fam !== "all" ? " open" : ""}>
+        <summary>${esc(t("verbFilterPattern"))}</summary>
+        <div class="verb-filter-row" role="radiogroup" aria-label="${esc(t("verbFilterPattern"))}">
+          <button type="button" class="chip sm ${FILTERS.fam === "all" ? "on" : ""}" data-fam="all">${esc(t("verbFilterAnyPattern"))}</button>
+          ${fams}
+        </div>
+      </details>
+      <div class="verb-filter-row">
+        <p class="verb-filter-summary muted" id="verb-filter-summary">${esc(verbFilterSummary(list))}</p>
+        <button type="button" class="chip sm ${verbCompactOn() ? "on" : ""}" data-verb-compact>${esc(t("verbCompact"))}</button>
+        <button type="button" class="chip sm" data-verb-drill-smart>${esc(t("verbDrillSmart"))}</button>
+        <button type="button" class="chip sm" data-verb-drill10>${esc(t("verbDrill10"))}</button>
+      </div>
+      ${verbFamilyHeatmapHtml(list)}
+      ${hasExtra ? `<button type="button" class="btn ghost xs verb-filter-reset" data-verb-filter-reset>${esc(t("verbFilterReset"))}</button>` : ""}
+    </div>`;
 }
 
 function renderVerbs() {
@@ -1994,6 +2945,7 @@ function renderVerbs() {
   renderVerbFilters();
   const list = filteredVerbs();
   const slice = list.slice(0, verbLimit);
+  box.classList.toggle("compact", verbCompactOn());
   box.innerHTML = slice.map((v) => verbCard(v)).join("")
     || `<p class="muted">${esc(FILTERS.only === "weak" ? t("verbWeakEmpty") : t("verbNone"))}</p>`;
   if (slice.length && slice.length < list.length) {
@@ -2005,6 +2957,14 @@ function renderVerbs() {
     total: list.length,
     all: ENLAB.verbs.length,
   });
+  if (slice.length) {
+    const hasActive = _activeVerbInf && slice.some((v) => v.inf === _activeVerbInf);
+    if (!hasActive) _activeVerbInf = slice[0].inf;
+    const activeEl = box.querySelector(`[data-verb-card="${CSS.escape(_activeVerbInf)}"]`);
+    if (activeEl) activeEl.classList.add("active");
+  } else {
+    _activeVerbInf = "";
+  }
   renderVerbToday();
 }
 
@@ -2048,13 +3008,52 @@ function renderVerbToday() {
     </div>`;
 }
 
-function uniqueOpts(correct, pool) {
+function uniqueOpts(correct, pool, max = 4) {
+  const n = Math.max(2, Math.min(4, Number(max) || 4));
   const opts = [correct];
   for (const x of shuffle(pool)) {
     if (x !== correct && !opts.includes(x)) opts.push(x);
-    if (opts.length === 4) break;
+    if (opts.length >= n) break;
   }
   return shuffle(opts);
+}
+
+function applyQuizEasyItems(items, mode) {
+  if (!quizEasyOn(mode)) return items;
+  return items.map((it) => {
+    if (it.type === "choice" && Array.isArray(it.opts) && it.opts.length > 3) {
+      const trimmed = uniqueOpts(it.a, it.opts, 3);
+      return { ...it, opts: trimmed, easy: true };
+    }
+    if (it.type === "type" && !it.esHint && it.inf) {
+      const v = verbSource().find((x) => x.inf === it.inf);
+      if (v?.es) return { ...it, esHint: v.es, easy: true };
+    }
+    return it.easy ? it : { ...it, easy: true };
+  });
+}
+
+function makeVerbDrillItems(infs) {
+  const source = verbSource();
+  const picked = infs
+    .map((inf) => source.find((v) => v.inf === inf))
+    .filter(Boolean)
+    .slice(0, 10);
+  const pool = picked.length ? picked : shuffle(source).slice(0, 10);
+  return pool.map((v, idx) => {
+    const kind = idx % 2 === 0 ? "past" : "pp";
+    const answer = kind === "past" ? v.past : v.pp;
+    const all = kind === "past" ? source.map((x) => x.past) : source.map((x) => x.pp);
+    return {
+      type: "choice",
+      q: kind === "past" ? t("quizPastOf", { inf: v.inf }) : t("quizPpOf", { inf: v.inf }),
+      esHint: v.es,
+      a: answer,
+      opts: uniqueOpts(answer, all),
+      say: v.inf,
+      inf: v.inf,
+    };
+  });
 }
 
 function earKey(p) {
@@ -2181,39 +3180,108 @@ function spacedPreview(limit = 6) {
 function renderHoyReview() {
   const el = $("#hoy-review");
   if (!el) return;
-  const ears = worstEarPairs(4);
-  const verbs = [...weakSet()].slice(0, 4);
-  const uso = [...usoWeakSet()].slice(0, 3);
-  const ed = [...edWeakSet()].slice(0, 3);
-  const speak = [...speakWeakSet()].slice(0, 3);
-  const preview = spacedPreview();
+  /* bail early if nothing changed */
+  const reviewKey = [weakSet().size, usoWeakSet().size, edWeakSet().size, speakWeakSet().size, worstEarPairs(99).length, repasoOn(), coachPlanLeft(), coachPlanProgress()].join("|");
+  if (reviewKey === _lastHoyReviewKey && !el.hidden) return;
+  _lastHoyReviewKey = reviewKey;
+  const coachFilter = repasoCoachFilterOn();
+  const pending = coachFilter ? coachPlanPendingModes() : [];
+  const showEar = !coachFilter || pending.includes("ear");
+  const showUso = !coachFilter || pending.includes("uso");
+  const showVerbs = !coachFilter || pending.includes("choice");
+  const ears = showEar ? worstEarPairs(4) : [];
+  const verbs = showVerbs ? [...weakSet()].slice(0, 4) : [];
+  const uso = showUso ? [...usoWeakSet()].slice(0, 3) : [];
+  const ed = showVerbs ? [...edWeakSet()].slice(0, 3) : [];
+  const speak = !coachFilter ? [...speakWeakSet()].slice(0, 3) : [];
+  const preview = coachFilter ? [] : spacedPreview();
   const total = ears.length + verbs.length + uso.length + ed.length + speak.length;
-  if (!total && !preview.length) {
+  const coachRepaso = repasoOn() && coachPlanLeft() > 0
+    ? `<div class="review-section review-coach-plan">
+        <div class="review-section-head"><span class="muted">${esc(t("quizCoachPlan8"))}</span></div>
+        <div class="row">${coachPlanChipHtml("btn ghost sm")}</div>
+        ${repasoStepBudgetHtml()}
+        <p class="muted">${esc(coachFilter ? t("repasoCoachFilterHint") : t("repasoCoachHint"))}</p>
+      </div>`
+    : "";
+  if (!total && !preview.length && !coachRepaso) {
     el.hidden = true;
     el.innerHTML = "";
     return;
   }
-  const chip = (text, say) => say
-    ? `<button type="button" class="chip say" data-say="${esc(say)}">${esc(text)}</button>`
-    : `<span class="chip">${esc(text)}</span>`;
+  const chip = (text, say, quizMode) => {
+    const modeAttr = quizMode ? ` data-review-quiz="${esc(quizMode)}"` : "";
+    return say
+      ? `<button type="button" class="chip say" data-say="${esc(say)}"${modeAttr} title="${esc(t("reviewChipHint") || "Pulsa para oír; doble clic para quiz")}">${esc(text)}</button>`
+      : `<span class="chip">${esc(text)}</span>`;
+  };
+  const quizBtn = (mode, label) =>
+    `<button type="button" class="btn ghost xs review-quiz-btn" data-quiz-start="${esc(mode)}" title="${esc(label)}">▷ ${esc(t("reviewQuizType") || "Quiz")}</button>`;
   el.hidden = false;
+  const repasoPlanStart = repasoOn() && !coachPlanStarted() && coachPlanLeft() >= 3;
   const repasoBanner = repasoOn()
-    ? `<p class="pill ok">${esc(t("repasoActive"))}</p>`
+    ? `<p class="pill ok">${esc(coachFilter ? t("repasoPlanOnly") : repasoPlanStart ? t("repasoPlanStartHint") : t("repasoActive"))}${coachFilter ? ` · ${esc(t("repasoTimerCoach", { min: Math.round(repasoTimerSecs() / 60) }))}` : ""}</p>`
     : "";
+  const totalWeak = ears.length + verbs.length + uso.length + ed.length + speak.length;
+  const totalAll = weakSet().size + usoWeakSet().size + edWeakSet().size + speakWeakSet().size + worstEarPairs(99).length;
+  const totalBadge = totalAll > totalWeak
+    ? ` <span class="chip muted review-total-badge">${totalAll} ${esc(t("reviewTotalAll"))}</span>` : "";
+  const reviewSection = (label, items, chipFn, qMode) => {
+    if (!items.length) return "";
+    const fullSet = qMode === "verb" ? [...weakSet()]
+      : qMode === "uso" ? [...usoWeakSet()]
+      : qMode === "ed" ? [...edWeakSet()]
+      : qMode === "speak" ? [...speakWeakSet()]
+      : [];
+    const hasMore = fullSet.length > items.length;
+    const extraItems = hasMore ? fullSet.slice(items.length) : [];
+    const moreHint = hasMore ? ` <span class="muted review-more-count">${fullSet.length} ${esc(t("reviewTotalAll"))}</span>` : "";
+    const extraHtml = hasMore
+      ? `<details class="fold review-cat-expand"><summary>${esc(t("reviewShowMore", { n: extraItems.length }))}</summary><div class="review-chips review-chips-extra">${extraItems.map((x) => chip(x, x, qMode)).join("")}</div></details>`
+      : "";
+    return `<div class="review-section">
+      <div class="review-section-head">
+        <span class="muted">${esc(label)}${moreHint}</span>
+        ${qMode ? quizBtn(qMode, label) : ""}
+      </div>
+      <div class="review-chips">${items.map(chipFn).join("")}</div>
+      ${extraHtml}
+    </div>`;
+  };
   el.innerHTML = `
     ${repasoBanner}
-    <p class="kicker">Repasar</p>
-    ${preview.length ? `<p>Mañana salen primero: ${esc(preview.join(" · "))}</p>` : ""}
-    ${ears.length ? `<p class="muted">Oído</p><div class="review-chips">${ears.map((r) => {
-      const [a, b] = r.k.split("|");
-      return `${chip(a, a)}<span class="muted">vs</span>${chip(b, b)}`;
-    }).join(" ")}</div>` : ""}
-    ${verbs.length ? `<p class="muted">Verbos débiles</p><div class="review-chips">${verbs.map((v) => chip(v, v)).join("")}</div>` : ""}
-    ${uso.length ? `<p class="muted">Uso</p><div class="review-chips">${uso.map((x) => chip(x, x)).join("")}</div>` : ""}
-    ${ed.length ? `<p class="muted">-ed</p><div class="review-chips">${ed.map((x) => chip(x, x)).join("")}</div>` : ""}
-    ${speak.length ? `<p class="muted">Frases que no te entendió</p><div class="review-chips">${speak.map((x) => chip(x, x)).join("")}</div>` : ""}
-    ${repasoOn() ? `<p class="muted" style="margin-top:12px">Usa <strong>Quiz débiles</strong> arriba, o ve a Hablar.</p>` : ""}
-    <p class="muted" style="margin-top:10px">Pulsa para oír. En Juego y Hablar salen primero.</p>`;
+    ${coachRepaso}
+    <p class="kicker">${esc(t("reviewKicker"))}${totalBadge}</p>
+    ${preview.length ? `<p class="muted">${esc(t("reviewTomorrow", { items: preview.join(" · ") }))}</p>` : ""}
+    ${ears.length ? (() => {
+      const allEars = worstEarPairs(99);
+      const extraEars = allEars.slice(ears.length);
+      const earPairHtml = (r) => {
+        const [a, b] = r.k.split("|");
+        return `${chip(a, a, "ear")}<span class="muted">vs</span>${chip(b, b, "ear")}`;
+      };
+      const moreHint = extraEars.length ? ` <span class="muted review-more-count">${allEars.length} ${esc(t("reviewTotalAll"))}</span>` : "";
+      const extraHtml = extraEars.length
+        ? `<details class="fold review-cat-expand"><summary>${esc(t("reviewShowMore", { n: extraEars.length }))}</summary><div class="review-chips review-chips-extra">${extraEars.map(earPairHtml).join(" ")}</div></details>`
+        : "";
+      return `<div class="review-section">
+        <div class="review-section-head">
+          <span class="muted">${esc(t("reviewOido"))}${moreHint}</span>
+          ${quizBtn("ear", t("reviewOido"))}
+        </div>
+        <div class="review-chips">${ears.map(earPairHtml).join(" ")}</div>
+        ${extraHtml}
+      </div>`;
+    })() : ""}
+    ${reviewSection(t("reviewVerbs"), verbs, (v) => chip(v, v, "verb"), "verb")}
+    ${reviewSection(t("reviewUso"), uso, (x) => chip(x, x, "uso"), "uso")}
+    ${reviewSection(t("reviewEd"), ed, (x) => chip(x, x, "ed"), "ed")}
+    ${reviewSection(t("reviewSpeak"), speak, (x) => chip(x, x, "speak"), "speak")}
+    ${repasoOn()
+      ? `<p class="muted review-repaso-hint"><a href="#" data-quiz-start="weak" tabindex="0">${esc(t("reviewQuizWeak"))}</a> · ${esc(t("reviewOrHablar"))}</p>`
+      : ""}
+    <p class="muted review-hint">${esc(t("reviewHint"))}</p>
+    ${totalAll > 8 ? `<details class="fold review-more"><summary>${esc(t("reviewSeeAll", { n: totalAll }))}</summary></details>` : ""}`;
 }
 
 function earBank() {
@@ -2442,8 +3510,18 @@ function weeklyExamDone() {
 }
 
 function markWeeklyExamDone(score, total) {
-  localStorage.setItem("enlab-weekly-exam", weekStartKey());
-  localStorage.setItem("enlab-weekly-score", JSON.stringify({ week: weekStartKey(), score, total, at: todayKey() }));
+  const wk = weekStartKey();
+  localStorage.setItem("enlab-weekly-exam", wk);
+  const entry = { week: wk, score, total, at: todayKey() };
+  localStorage.setItem("enlab-weekly-score", JSON.stringify(entry));
+  /* accumulate history for the last 8 weeks */
+  try {
+    const hist = JSON.parse(localStorage.getItem("enlab-weekly-history") || "[]");
+    const idx = hist.findIndex((r) => r.week === wk);
+    if (idx >= 0) hist[idx] = entry; else hist.push(entry);
+    hist.sort((a, b) => String(b.week).localeCompare(String(a.week)));
+    localStorage.setItem("enlab-weekly-history", JSON.stringify(hist.slice(0, 8)));
+  } catch { /* ignore */ }
 }
 
 function weeklyMidChipHtml() {
@@ -2459,18 +3537,86 @@ function weeklyMidChipHtml() {
 
 function hoyMidSessionChipsHtml() {
   const parts = [];
+  const kids = typeof kidsOn === "function" && kidsOn();
+
+  /* cert time-up → warm-up o plan cert */
+  if (!kids && certTimedOutToday() && !window.NR?.loadCertNow?.()) {
+    if (coachPlanStarted() && coachPlanLeft() > 0) {
+      parts.unshift(`<button type="button" class="btn sm" data-cert-coach-plan>${esc(t("certCoachPlanBtn"))}</button>`);
+    } else {
+      const warm = certWarmupChipHtml("btn ghost sm");
+      if (warm) parts.unshift(warm);
+    }
+  }
+
+  /* coach plan 8 min */
+  const planChip = placementPlanChipHtml("btn sm") || weeklyFailPlanChipHtml("btn sm") || coachPlanChipHtml("btn sm");
+  if (planChip) parts.unshift(planChip);
+
+  /* cierre / weekly / placement siempre primero */
   const c = loadCierreNow();
   if (c) parts.push(`<button type="button" class="btn sm" data-cierre-resume>${esc(t("cierreResume", { i: c.i + 1, total: c.items.length }))}</button>`);
   const w = loadWeeklyNow();
   if (w) parts.push(`<button type="button" class="btn sm" data-weekly-resume>${esc(t("weeklyResume", { i: w.i + 1, total: w.items.length }))}</button>`);
   const p = window.PLUS?.loadPlaceNow?.();
   if (p) parts.push(`<button type="button" class="btn sm" data-place-resume>${esc(t("placeResume", { i: p.i + 1, total: p.items.length }))}</button>`);
+
+  /* cert a medias (no time-up) */
+  if (!kids) {
+    const certNow = window.NR?.loadCertNow?.();
+    if (certNow && !certNow.timeUp) {
+      parts.push(`<button type="button" class="btn sm" data-cert-resume>${esc(t("certResume", { n: certNow.i + 1, total: certNow.items.length }))}</button>`);
+    }
+  }
+
+  /* podcast a medias */
+  try {
+    const pod = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null");
+    if (pod?.id && pod.seg > 0) {
+      const podObj = (ENLAB.podcasts || []).find((x) => x.id === pod.id);
+      if (podObj && pod.seg < (podObj.segments || []).length) {
+        parts.push(`<button type="button" class="chip" data-podcast="${esc(pod.id)}" data-pod-seg="${pod.seg}">${esc(t("podcastResume", { n: pod.seg + 1, total: (podObj.segments || []).length }))} · ${esc(podObj.title)}</button>`);
+      }
+    }
+  } catch { /* ignore */ }
+
+  /* duo a medias */
+  if (!kids && window.NR?.duoYouAreChipHtml) {
+    const duo = window.NR.duoYouAreChipHtml();
+    if (duo) parts.push(duo);
+  }
+
+  /* historia a medias */
+  if (!kids && window.SV?.findContinuableStory) {
+    const hit = window.SV.findContinuableStory();
+    if (hit) parts.push(`<button type="button" class="btn sm" data-story-resume="${esc(hit.id)}">${esc(t("hoyStoryContinue", { title: hit.story.title }))}</button>`);
+  }
+
   return parts.join(" ");
+}
+
+let _lastHoyDoneMidKey = "";
+
+function hoyDoneMidKey() {
+  const done = $("#hoy")?.classList.contains("path-done");
+  if (!done) return "off";
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const cert = !kids && certTimedOutToday() && !window.NR?.loadCertNow?.();
+  const plan = coachPlanLeft() > 0 ? `${coachPlanProgress()}|${coachPlanStarted()}` : "0";
+  let pod = "";
+  try {
+    const p = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null");
+    pod = p?.id ? `${p.id}:${p.seg}` : "";
+  } catch { /* ignore */ }
+  return [done, kids, cert, plan, !!loadCierreNow(), !!loadWeeklyNow(), !!window.PLUS?.loadPlaceNow?.(), pod].join("|");
 }
 
 function renderHoyDoneMid() {
   const el = $("#hoy-done-mid");
   if (!el) return;
+  const key = hoyDoneMidKey();
+  if (key === _lastHoyDoneMidKey && el.innerHTML && key !== "off") return;
+  _lastHoyDoneMidKey = key;
   const done = $("#hoy")?.classList.contains("path-done");
   const chips = done ? hoyMidSessionChipsHtml() : "";
   el.hidden = !chips;
@@ -2488,16 +3634,53 @@ function renderWeeklyQuizResume() {
   pruneWeeklyNow();
   const now = loadWeeklyNow();
   const stale = !now ? loadWeeklyStale() : null;
+  if (stale) {
+    el.hidden = false;
+    el.innerHTML = `
+      <p class="muted">${esc(t("weeklyStaleHint", { i: stale.i + 1, total: stale.total }))}</p>
+      <button type="button" class="btn ghost sm" data-quiz-mode="weekly">${esc(t("weeklyStartFresh"))}</button>`;
+    return;
+  }
   if (!now) {
     el.hidden = true;
-    el.innerHTML = stale ? `<p class="muted">${esc(t("weeklyStaleHint", { i: stale.i + 1, total: stale.total }))}</p>` : "";
-    el.hidden = !stale;
+    el.innerHTML = "";
     return;
   }
   el.hidden = false;
   el.innerHTML = `
     <p class="muted">${esc(t("weeklyResumeHint"))}</p>
     ${weeklyMidChipHtml()}`;
+}
+
+function renderWeeklyHistory() {
+  const el = $("#weekly-history");
+  if (!el) return;
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem("enlab-weekly-history") || "[]"); } catch { /* ignore */ }
+  if (!hist.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  el.hidden = false;
+  const rows = hist.slice(0, 4);
+  const maxScore = Math.max(...rows.map((r) => r.total || 1));
+  el.innerHTML = `
+    <p class="kicker">${esc(t("weeklyHistoryTitle"))}</p>
+    <div class="weekly-history-bars">
+      ${rows.map((r) => {
+        const pct = Math.round((r.score / (r.total || 1)) * 100);
+        const barW = Math.max(4, Math.round((r.score / maxScore) * 100));
+        const label = r.week ? r.week.replace(/^(\d{4})-?W?(\d+)/, "W$2 $1") : r.at || "";
+        return `<div class="wh-row">
+          <span class="wh-label muted">${esc(label)}</span>
+          <div class="wh-bar-wrap">
+            <div class="wh-bar ${pct >= 80 ? "wh-bar-good" : pct >= 60 ? "wh-bar-ok" : "wh-bar-low"}" style="width:${barW}%"></div>
+          </div>
+          <span class="wh-score">${r.score}/${r.total} <span class="muted">${pct}%</span></span>
+        </div>`;
+      }).join("")}
+    </div>`;
 }
 
 function hoyMidSessionLine() {
@@ -2663,6 +3846,7 @@ function makeWeeklyExamItems() {
 }
 
 function startWeeklyExam(opts) {
+  quizUxAbandonIfRunning();
   if (recState.rec && recState.rec.state === "recording") stopRecording(false);
   const resume = opts?.resume ? loadWeeklyNow() : null;
   if (resume) {
@@ -2673,80 +3857,222 @@ function startWeeklyExam(opts) {
     renderWeeklyToday();
     quiz = { i: 0, score: 0, items: makeWeeklyExamItems(), fails: [], mode: "weekly", host: "#quiz-box" };
   }
+  quizUxStart("weekly", quiz.items.length);
   showTab("quiz");
   if (typeof openQuizRoom === "function") openQuizRoom("weekly");
   renderQuiz();
   quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function makeQuizItems() {
-  if (quiz.mode === "ear" || quiz.mode === "exam") return makeEarItems(quiz.mode === "exam");
-  if (quiz.mode === "uso") return makeUsoItems();
-  if (quiz.mode === "ed") return makeEdItems();
-  if (quiz.mode === "art") return makePickBankItems(ENLAB.artQuiz, "art");
-  if (quiz.mode === "prep") return makePickBankItems(ENLAB.prepQuiz, "prep");
-  if (quiz.mode === "phrasal") return makePickBankItems(ENLAB.phrasalQuiz, "phrasal");
-  if (quiz.mode === "cond") return makePickBankItems(ENLAB.condQuiz, "cond");
-  if (quiz.mode === "dict") return makeDictItems();
-  if (quiz.mode === "listen") return makeListenItems();
-  if (quiz.mode === "weekly") return makeWeeklyExamItems();
-  if (quiz.mode === "story") return makeStoryItems();
-  if (quiz.mode === "emailtone") return makeEmailToneItems();
-  if (quiz.mode === "place") return window.PLUS?.makePlacementItems?.() || [];
-  if (quiz.mode === "cert") return window.NR?.makeCertExamItems?.() || [];
-  const hideEs = hideEsOn();
+function makeSrsDueItems() {
+  const due = srsDueList(20);
+  if (!due.length) return [];
+  const items = [];
+  const today = todayKey();
+  for (const { id, label } of due) {
+    const kind = id.split(":")[0] || "";
+    /* verb SRS → choice quiz */
+    if (kind === "verb") {
+      const inf = label.split(" / ")[0].trim();
+      const source = verbSource();
+      const v = source.find((x) => x.inf === inf);
+      if (v) {
+        items.push({
+          type: "choice",
+          q: t("quizPastOf", { inf: v.inf }),
+          esHint: v.es,
+          a: v.past,
+          opts: uniqueOpts(v.past, source.map((x) => x.past)),
+          say: v.inf,
+          inf: v.inf,
+          srsId: id,
+        });
+        continue;
+      }
+    }
+    /* uso/ed/art/prep/phrasal/cond → feed through existing makes */
+    if (kind === "uso") {
+      const uItems = makeUsoItems(1);
+      if (uItems.length) { items.push({ ...uItems[0], srsId: id }); continue; }
+    }
+    if (kind === "ed") {
+      const eItems = makeEdItems(1);
+      if (eItems.length) { items.push({ ...eItems[0], srsId: id }); continue; }
+    }
+    /* ear / dict / listen / speak / story → say chip */
+    if (["ear", "dict", "listen", "speak", "story"].includes(kind)) {
+      items.push({
+        type: "choice",
+        q: t("srsReviewPrompt", { label }),
+        a: label.split(" / ")[0].trim(),
+        opts: [label.split(" / ")[0].trim()],
+        say: label.split(" / ")[0].trim(),
+        srsId: id,
+        srsLabel: true,
+      });
+      continue;
+    }
+    /* fallback: hear-it */
+    items.push({
+      type: "ear",
+      a: label,
+      say: label.split(" / ")[0].trim(),
+      srsId: id,
+      srsLabel: true,
+    });
+  }
+  return items.slice(0, 15);
+}
+
+function makeQuickMixItems() {
+  const ux = loadQuizUx();
+  const pickHeavy = (...modes) => modes
+    .map((m) => ({ mode: m, row: ux[m] || {} }))
+    .sort((a, b) => {
+      const ad = (a.row.abandoned || 0) / Math.max(1, a.row.sessions || 0);
+      const bd = (b.row.abandoned || 0) / Math.max(1, b.row.sessions || 0);
+      return bd - ad;
+    })
+    .map((x) => x.mode);
+  const hardEar = pickHeavy("ear", "dict", "listen")[0] || "ear";
+  const hardUse = pickHeavy("uso", "ed", "art", "prep", "phrasal", "cond")[0] || "uso";
+  const hardVerb = pickHeavy("choice", "type")[0] || "choice";
+  const items = [];
+  if (hardVerb === "type") items.push(...makeQuizItemsForMode("type", 2));
+  else items.push(...makeQuizItemsForMode("choice", 2));
+  items.push(...makeQuizItemsForMode(hardUse, 2));
+  items.push(...makeQuizItemsForMode(hardEar, 2));
+  items.push(...makeQuizItemsForMode("srs", 2));
+  return items.filter(Boolean).slice(0, 8);
+}
+
+function makeQuizItemsForMode(mode, cap = 12) {
+  if (mode === "srs") return makeSrsDueItems().slice(0, cap);
+  if (mode === "ear" || mode === "exam") return makeEarItems(mode === "exam").slice(0, cap);
+  if (mode === "uso") return makeUsoItems().slice(0, cap);
+  if (mode === "ed") return makeEdItems().slice(0, cap);
+  if (mode === "art") return makePickBankItems(ENLAB.artQuiz, "art").slice(0, cap);
+  if (mode === "prep") return makePickBankItems(ENLAB.prepQuiz, "prep").slice(0, cap);
+  if (mode === "phrasal") return makePickBankItems(ENLAB.phrasalQuiz, "phrasal").slice(0, cap);
+  if (mode === "cond") return makePickBankItems(ENLAB.condQuiz, "cond").slice(0, cap);
+  if (mode === "dict") return makeDictItems().slice(0, cap);
+  if (mode === "listen") return makeListenItems().slice(0, cap);
+  if (mode === "weekly") return makeWeeklyExamItems().slice(0, cap);
+  if (mode === "story") return makeStoryItems().slice(0, cap);
+  if (mode === "emailtone") return makeEmailToneItems().slice(0, cap);
+  if (mode === "place") return (window.PLUS?.makePlacementItems?.() || []).slice(0, cap);
+  if (mode === "cert") return (window.NR?.makeCertExamItems?.() || []).slice(0, cap);
   const source = verbSource();
   const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
-  let pool;
-  if (repasoOn() && weak.length && (quiz.mode === "choice" || quiz.mode === "type")) {
-    pool = shuffle(weak).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
-  } else {
-    pool = shuffle([...weak, ...shuffle(source)]).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
-  }
-  const items = [];
-  for (const v of pool) {
-    const mode = Math.random();
-    if (quiz.mode === "type") {
-      const kind = mode < 0.5 ? "past" : "pp";
-      items.push({
+  const pool = shuffle([...weak, ...shuffle(source)])
+    .filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i)
+    .slice(0, Math.max(12, cap));
+  if (mode === "type") {
+    return pool.slice(0, cap).map((v, idx) => {
+      const kind = idx % 2 === 0 ? "past" : "pp";
+      return {
         type: "type",
         q: kind === "past" ? t("quizTypePast", { inf: v.inf }) : t("quizTypePp", { inf: v.inf }),
         esHint: kind === "past" ? v.es : "",
         a: kind === "past" ? v.past : v.pp,
         say: v.inf,
         inf: v.inf,
-      });
-    } else if (mode < 0.35 || (hideEs && mode >= 0.65)) {
-      items.push({
-        type: "choice",
-        q: t("quizPastOf", { inf: v.inf }),
-        esHint: v.es,
-        a: v.past,
-        opts: uniqueOpts(v.past, verbSource().map((x) => x.past)),
-        say: v.inf,
-        inf: v.inf,
-      });
-    } else if (mode < 0.65) {
-      items.push({
-        type: "choice",
-        q: t("quizPpOf", { inf: v.inf }),
-        a: v.pp,
-        opts: uniqueOpts(v.pp, verbSource().map((x) => x.pp)),
-        say: v.inf,
-        inf: v.inf,
-      });
+      };
+    });
+  }
+  return pool.slice(0, cap).map((v, idx) => {
+    const kind = idx % 2 === 0 ? "past" : "pp";
+    const answer = kind === "past" ? v.past : v.pp;
+    const all = kind === "past" ? source.map((x) => x.past) : source.map((x) => x.pp);
+    return {
+      type: "choice",
+      q: kind === "past" ? t("quizPastOf", { inf: v.inf }) : t("quizPpOf", { inf: v.inf }),
+      esHint: v.es,
+      a: answer,
+      opts: uniqueOpts(answer, all),
+      say: v.inf,
+      inf: v.inf,
+    };
+  });
+}
+
+function makeQuizItems() {
+  let items;
+  if (quiz.mode === "quickmix") items = makeQuickMixItems();
+  else if (quiz.mode === "srs") items = makeSrsDueItems();
+  else if (quiz.mode === "ear" || quiz.mode === "exam") items = makeEarItems(quiz.mode === "exam");
+  else if (quiz.mode === "uso") items = makeUsoItems();
+  else if (quiz.mode === "ed") items = makeEdItems();
+  else if (quiz.mode === "art") items = makePickBankItems(ENLAB.artQuiz, "art");
+  else if (quiz.mode === "prep") items = makePickBankItems(ENLAB.prepQuiz, "prep");
+  else if (quiz.mode === "phrasal") items = makePickBankItems(ENLAB.phrasalQuiz, "phrasal");
+  else if (quiz.mode === "cond") items = makePickBankItems(ENLAB.condQuiz, "cond");
+  else if (quiz.mode === "dict") items = makeDictItems();
+  else if (quiz.mode === "listen") items = makeListenItems();
+  else if (quiz.mode === "weekly") items = makeWeeklyExamItems();
+  else if (quiz.mode === "story") items = makeStoryItems();
+  else if (quiz.mode === "emailtone") items = makeEmailToneItems();
+  else if (quiz.mode === "place") items = window.PLUS?.makePlacementItems?.() || [];
+  else if (quiz.mode === "cert") items = window.NR?.makeCertExamItems?.() || [];
+  else {
+    const hideEs = hideEsOn();
+    const source = verbSource();
+    const weak = [...weakSet()].map((inf) => source.find((v) => v.inf === inf)).filter(Boolean);
+    let pool;
+    if (repasoOn() && weak.length && (quiz.mode === "choice" || quiz.mode === "type")) {
+      pool = shuffle(weak).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
     } else {
-      items.push({
-        type: "choice",
-        q: `¿Qué significa “${v.inf} / ${v.past} / ${v.pp}”?`,
-        a: v.es,
-        opts: uniqueOpts(v.es, verbSource().map((x) => x.es)),
-        say: speakForms(v),
-        inf: v.inf,
-      });
+      pool = shuffle([...weak, ...shuffle(source)]).filter((v, i, a) => a.findIndex((x) => x.inf === v.inf) === i).slice(0, 12);
+    }
+    items = [];
+    for (const v of pool) {
+      const mode = Math.random();
+      if (quiz.mode === "type") {
+        const kind = mode < 0.5 ? "past" : "pp";
+        items.push({
+          type: "type",
+          q: kind === "past" ? t("quizTypePast", { inf: v.inf }) : t("quizTypePp", { inf: v.inf }),
+          esHint: kind === "past" ? v.es : "",
+          a: kind === "past" ? v.past : v.pp,
+          say: v.inf,
+          inf: v.inf,
+        });
+      } else if (mode < 0.35 || (hideEs && mode >= 0.65)) {
+        items.push({
+          type: "choice",
+          q: t("quizPastOf", { inf: v.inf }),
+          esHint: v.es,
+          a: v.past,
+          opts: uniqueOpts(v.past, verbSource().map((x) => x.past)),
+          say: v.inf,
+          inf: v.inf,
+        });
+      } else if (mode < 0.65) {
+        items.push({
+          type: "choice",
+          q: t("quizPpOf", { inf: v.inf }),
+          a: v.pp,
+          opts: uniqueOpts(v.pp, verbSource().map((x) => x.pp)),
+          say: v.inf,
+          inf: v.inf,
+        });
+      } else {
+        items.push({
+          type: "choice",
+          q: `¿Qué significa “${v.inf} / ${v.past} / ${v.pp}”?`,
+          a: v.es,
+          opts: uniqueOpts(v.es, verbSource().map((x) => x.es)),
+          say: speakForms(v),
+          inf: v.inf,
+        });
+      }
     }
   }
-  return items;
+  let out = applyQuizEasyItems(items || [], quiz.mode);
+  if (coachPlanFlowOn() && !["quickmix", "srs", "weekly", "cert", "place", "cierre"].includes(quiz.mode)) {
+    out = injectCoachPlanSrs(out, out.length + 1);
+  }
+  return out;
 }
 
 function norm(s) {
@@ -2830,7 +4156,11 @@ function quizHeadHtml(it, extra) {
     return `<p class="kicker cierre-kicker">${esc(t("cierreKicker"))}</p><div class="muted">${esc(t("cierreQ", { i, n, kind: cierreKindOf(it) }))}${miss}</div>`;
   }
   const line = extra || esc(t("quizProgress", { i, n, score: quiz.score }));
-  return `<div class="muted">${line}${miss}</div>`;
+  const srsBadge = quiz.mode === "srs" ? `<span class="pill ok">${esc(t("quizSrsBadge"))}</span> ` : "";
+  const easyBadge = quizEasyOn(quiz.mode) ? `<span class="pill warn">${esc(t("quizEasyBadge"))}</span> ` : "";
+  const plan = quiz.mode === "quickmix" ? `<p class="muted quiz-quickmix-plan">${esc(quickmixPlanText(i))}</p>` : "";
+  const why = srsExplainText(it);
+  return `<div class="muted">${srsBadge}${easyBadge}${line}${miss}</div>${plan}${why ? `<p class="muted quiz-srs-why">${esc(why)}</p>` : ""}`;
 }
 
 function paintQuizMissLive() {
@@ -2873,7 +4203,7 @@ function renderQuiz() {
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
-    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story" || quiz.mode === "emailtone" || quiz.mode === "place";
+    const pick = PICK_MODES.includes(quiz.mode) || quiz.mode === "dict" || quiz.mode === "weekly" || quiz.mode === "cert" || quiz.mode === "story" || quiz.mode === "emailtone" || quiz.mode === "place" || quiz.mode === "quickmix";
     const weekly = quiz.mode === "weekly";
     const cert = quiz.mode === "cert";
     if (cierre) {
@@ -2904,6 +4234,7 @@ function renderQuiz() {
     }
     if (weekly) {
       markWeeklyExamDone(quiz.score, quiz.items.length);
+      saveWeeklyFailsForCoach();
       clearWeeklyNow();
       renderWeeklyToday();
     }
@@ -2912,6 +4243,13 @@ function renderQuiz() {
       window.PLUS?.renderPlaceToday?.();
     }
     if (!quiz.fails.length) buzz(true);
+    if (quiz.mode !== "cierre") {
+      quizUxFinish(true);
+      if (coachPlanFlowOn() && quiz.fails.length && window.PLUS?.logPlanStepEvent) {
+        window.PLUS.logPlanStepEvent("fail", quiz.mode);
+      }
+      bumpCoachPlanProgress(quiz.mode);
+    }
     const g = todayGame();
     const extraGame = cierre && g.game
       ? `<p><button type="button" class="btn" data-hoy-game="${esc(g.game)}">${esc(g.label)}</button></p>`
@@ -2921,6 +4259,9 @@ function renderQuiz() {
     const backHoy = fromHoy
       ? `<button type="button" class="btn ghost sm" data-go-tab="hoy">${esc(t("quizBackHoy"))}</button>`
       : "";
+    const coachBtn = !cierre ? quizCoachEndHtml(quiz.mode) : "";
+    const warmPlanBtn = !cierre && !cert && !weekly && quiz.mode !== "place" ? certWarmupPlanHtml(quiz.mode) : "";
+    const placePlanBtn = quiz.mode === "place" ? placementCoachPlanHtml() : "";
     box.innerHTML = `<div class="card">
       ${cierre ? `<p class="kicker cierre-kicker">${esc(t("cierreKicker"))}</p>` : ""}
       <h3>${cierre ? t("quizClosed") : weekly ? t("quizWeeklyDone") : cert ? t("quizCertDone") : t("quizDone")}</h3>
@@ -2933,6 +4274,9 @@ function renderQuiz() {
             ? t("quizFailsReview", { list: quiz.fails.join(" · ") })
             : t("quizFailsWeak", { list: quiz.fails.join(", ") }))
         : t("quizNoFails")}</p>
+      ${!cierre && quizUxHint(quiz.mode) ? `<p class="muted">${esc(quizUxHint(quiz.mode))}</p>` : ""}
+      ${!cierre && quizCoachHint(quiz.mode) ? `<p class="muted">${esc(quizCoachHint(quiz.mode))}</p>` : ""}
+      ${!cierre && quizEasyRecoverHint(quiz.mode) ? `<p class="muted">${esc(quizEasyRecoverHint(quiz.mode))}</p>` : ""}
       ${ear ? `<p class="muted">${t("quizTipEar")}</p>` : ""}
       ${quiz.mode === "uso" ? `<p class="muted">${t("quizTipUso")}</p>` : ""}
       ${quiz.mode === "art" ? `<p class="muted">${t("quizTipArt")}</p>` : ""}
@@ -2946,6 +4290,9 @@ function renderQuiz() {
       ${cierre ? `<p class="muted">${t("quizTipCierre")}</p>` : ""}
       ${extraGame}
       <button class="btn${cierre ? " ghost" : ""}" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
+      ${warmPlanBtn}
+      ${placePlanBtn}
+      ${coachBtn}
       ${backHoy}
       ${quizPeerHtml()}
     </div>`;
@@ -2956,7 +4303,18 @@ function renderQuiz() {
       renderCierreToday();
     }
     syncRemindToSw();
-    $("#quiz-again")?.addEventListener("click", cierre ? startCierreQuiz : weekly ? startWeeklyExam : startQuiz);
+    const clearPlanTimer = () => {
+      if (window._coachPlanTimer) {
+        clearTimeout(window._coachPlanTimer);
+        window._coachPlanTimer = null;
+      }
+    };
+    $("#quiz-again")?.addEventListener("click", () => {
+      clearPlanTimer();
+      if (cierre) startCierreQuiz();
+      else if (weekly) startWeeklyExam();
+      else startQuiz();
+    });
     renderVerbs();
     if (cierre) {
       renderHoyCheck();
@@ -2968,12 +4326,54 @@ function renderQuiz() {
     }
     if (quiz.mode === "place" && window.PLUS?.scoreToCefr && !box.querySelector("#place-apply")) {
       const sug = window.PLUS.scoreToCefr(quiz.score, quiz.items.length);
+      const pct = quiz.score / quiz.items.length;
       localStorage.setItem("enlab-place-result", JSON.stringify({
-        score: quiz.score, n: quiz.items.length, cefr: sug, at: Date.now(),
+        score: quiz.score, n: quiz.items.length, cefr: sug, at: Date.now(), day: todayKey(),
       }));
+      invalidateYouAreChipsCache();
       box.querySelector(".card")?.insertAdjacentHTML("beforeend", `<p class="row" style="margin-top:10px">
         <button type="button" class="btn" id="place-apply" data-cefr="${esc(sug)}">${esc(t("placeApply", { level: sug.toUpperCase() }))}</button>
       </p>`);
+      if (pct < 0.5 && !coachPlanStarted() && coachPlanLeft() >= 3) {
+        setCoachPlanFlow(true);
+        setCoachPlanArmed(true);
+      }
+    }
+    if (!cierre && !weekly && !cert && quiz.mode !== "place" && warmPlanBtn
+      && certWarmupStreak() >= 2 && !coachPlanFlowOn()) {
+      setCoachPlanFlow(true);
+      setCoachPlanArmed(true);
+    }
+    if (!cierre && !weekly && !cert && coachPlanFlowOn()) {
+      const next = coachPlanNextMode();
+      if (next) {
+        const pctPlace = quiz.mode === "place" && quiz.items?.length
+          ? Math.round((quiz.score / quiz.items.length) * 100) : null;
+        const certWarmAuto = warmPlanBtn && certWarmupStreak() >= 2;
+        const autoMsg = pctPlace != null && pctPlace < 50
+          ? t("placeCoachPlanAuto", { pct: pctPlace, mode: t(`quizModes.${next}.t`) })
+          : certWarmAuto
+            ? t("certWarmupPlanAuto", { mode: t(`quizModes.${next}.t`) })
+            : t("quizCoachPlanAuto", { mode: t(`quizModes.${next}.t`) });
+        box.querySelector(".card")?.insertAdjacentHTML("beforeend",
+          `<p class="muted quiz-plan-auto">${esc(autoMsg)}</p>
+           <button type="button" class="btn ghost sm" id="coach-plan-skip">${esc(t("quizCoachPlanSkip"))}</button>`);
+        window._coachPlanTimer = setTimeout(() => {
+          window._coachPlanTimer = null;
+          maybeContinueCoachPlanFlow();
+        }, coachPlanAutoDelayMs());
+        $("#coach-plan-skip")?.addEventListener("click", () => {
+          clearPlanTimer();
+          clearCoachPlanFlow();
+          box.querySelector(".quiz-plan-auto")?.remove();
+          $("#coach-plan-skip")?.remove();
+        });
+      } else {
+        clearCoachPlanFlow();
+        box.querySelector(".card")?.insertAdjacentHTML("beforeend",
+          `<p class="muted quiz-plan-done">${esc(t("quizCoachPlanDone"))}</p>`);
+        if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
+      }
     }
     return;
   }
@@ -2993,10 +4393,12 @@ function renderQuiz() {
       const ok = it.type === "dict" ? speakHeardOk(val, it.a) || answersMatch(val, it.a) : answersMatch(val, it.a);
       $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
+      quizUxAnswer(ok);
       if (ok) quiz.score += 1;
       else quizMarkFail(it.inf);
       if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: it.type || "type", expected: it.a, said: val, prompt: it.q, why: "" });
       if (it.type === "dict") srsBump("dict", it.inf, ok);
+      bumpSrsQuizItem(it, ok);
       bump("quiz");
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 900);
     };
@@ -3040,10 +4442,12 @@ function renderQuiz() {
       const ok = speakHeardOk(val, it.a) || answersMatch(val, it.a);
       $("#quiz-typed").textContent = ok ? t("correct") : t("incorrect", { a: it.a });
       $("#quiz-typed").className = `status ${ok ? "ok" : "bad"}`;
+      quizUxAnswer(ok);
       if (ok) quiz.score += 1;
       else quizMarkFail(it.inf);
       if (!ok && window.PLUS?.logError) window.PLUS.logError({ mode: "dict", expected: it.a, said: val, prompt: it.q, why: "" });
       srsBump("dict", it.inf, ok);
+      bumpSrsQuizItem(it, ok);
       bump("quiz");
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 1100);
     };
@@ -3150,12 +4554,14 @@ function noteQuizFirstFail() {
 }
 
 function startQuiz() {
+  quizUxAbandonIfRunning();
   const mode = $("#quiz-mode")?.value || "choice";
   if (typeof openQuizRoom === "function") openQuizRoom(mode);
   if (mode === "cert" && window.NR?.startCertExam) return window.NR.startCertExam();
   if (mode === "place" && window.PLUS?.startPlacement) return window.PLUS.startPlacement();
   quiz = { i: 0, score: 0, items: [], fails: [], mode, host: "#quiz-box" };
   quiz.items = makeQuizItems();
+  quizUxStart(mode, quiz.items.length);
   renderQuiz();
   quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -3191,6 +4597,7 @@ function makeCierreItems() {
 }
 
 function startCierreQuiz(opts) {
+  quizUxAbandonIfRunning();
   const resume = opts?.resume ? loadCierreNow() : null;
   if (!resume && quiz.mode === "cierre" && quiz.i < (quiz.items || []).length && quiz.items.length) {
     quizBox()?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3980,6 +5387,38 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  if (e.target.closest("[data-place-nudge-dismiss]")) {
+    dismissPlaceNudge();
+    fillYouAreDebounced();
+    return;
+  }
+
+  if (e.target.closest("[data-coach-plan-go]")) {
+    const btn = e.target.closest("[data-coach-plan-go]");
+    startCoachPlanQuiz(btn.dataset.coachPlanMode);
+    return;
+  }
+
+  if (e.target.closest("[data-cert-coach-plan]")) {
+    const miss = cierreMissGame();
+    startCoachPlanQuiz(miss?.game);
+    return;
+  }
+
+  if (e.target.closest("[data-cert-warmup]")) {
+    const mode = e.target.closest("[data-cert-warmup]")?.dataset.certWarmup;
+    if (mode) {
+      setCoachPlanArmed(true);
+      setCertWarmupMode(mode);
+      showTab("quiz");
+      if ($("#quiz-mode")) $("#quiz-mode").value = mode;
+      if (typeof syncQuizModePicks === "function") syncQuizModePicks();
+      if (typeof openQuizRoom === "function") openQuizRoom(mode);
+      startQuiz();
+    }
+    return;
+  }
+
   if (e.target.closest("[data-cierre-resume]")) {
     const i = hoyPath().findIndex((s) => s.id === "cierre");
     if (i >= 0) goHoyStep(i, { cierreResume: true });
@@ -4014,6 +5453,10 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("#repaso-quiz-btn")) {
+    if (coachPlanLeft() > 0) {
+      startCoachPlanQuiz();
+      return;
+    }
     showTab("quiz");
     const sel = $("#quiz-mode");
     if (sel) sel.value = "choice";
@@ -4036,13 +5479,31 @@ document.addEventListener("click", (e) => {
   const nudgeTo = e.target.closest("[data-nudge-to]");
   if (nudgeTo) setCefr(nudgeTo.dataset.nudgeTo);
 
+  const srsDay = e.target.closest("[data-streak-day]");
+  if (srsDay) {
+    if (srsDay.dataset.frictionDay === "1") {
+      showTab("quiz");
+      if ($("#quiz-mode")) $("#quiz-mode").value = "quickmix";
+      syncQuizModePicks();
+      startQuiz();
+      return;
+    }
+    if (srsDay.dataset.srsDue === "1") {
+      showTab("quiz");
+      if ($("#quiz-mode")) $("#quiz-mode").value = "srs";
+      syncQuizModePicks();
+      startQuiz();
+      return;
+    }
+  }
+
   if (e.target.closest("[data-nudge-later]")) {
     hideNudge(7);
     renderLevelNudge();
   }
 
   const fam = e.target.closest("[data-fam]");
-  if (fam) { FILTERS.fam = fam.dataset.fam; verbLimit = 24; renderVerbs(); }
+  if (fam) { FILTERS.fam = fam.dataset.fam; verbLimit = 24; saveVerbFilterPrefs(); renderVerbs(); }
 
   const cefr = e.target.closest("[data-cefr]");
   if (cefr) {
@@ -4050,12 +5511,53 @@ document.addEventListener("click", (e) => {
   }
 
   const only = e.target.closest("[data-only]");
-  if (only) { FILTERS.only = only.dataset.only; verbLimit = 24; renderVerbs(); }
+  if (only) { FILTERS.only = only.dataset.only; verbLimit = 24; saveVerbFilterPrefs(); renderVerbs(); }
+
+  if (e.target.closest("[data-verb-filter-reset]")) {
+    FILTERS.fam = "all";
+    FILTERS.only = "level";
+    FILTERS.q = "";
+    verbLimit = 24;
+    const search = $("#verb-search");
+    if (search) search.value = "";
+    saveVerbFilterPrefs();
+    renderVerbs();
+  }
+  if (e.target.closest("[data-verb-hint-hide]")) {
+    localStorage.setItem("enlab-verb-hint-dismissed", "1");
+    renderVerbs();
+  }
+  if (e.target.closest("[data-verb-compact]")) {
+    localStorage.setItem("enlab-verb-compact", verbCompactOn() ? "0" : "1");
+    renderVerbs();
+  }
+  if (e.target.closest("[data-verb-drill10]")) {
+    const infs = filteredVerbs().slice(0, 10).map((v) => v.inf);
+    quiz = { i: 0, score: 0, items: makeVerbDrillItems(infs), fails: [], mode: "choice", host: "#quiz-box" };
+    showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("choice");
+    renderQuiz();
+    return;
+  }
+  if (e.target.closest("[data-verb-drill-smart]")) {
+    const infs = smartVerbDrillInfs();
+    quiz = { i: 0, score: 0, items: makeVerbDrillItems(infs), fails: [], mode: "choice", host: "#quiz-box" };
+    showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("choice");
+    renderQuiz();
+    return;
+  }
 
   if (e.target.closest("[data-verb-more]")) {
     verbLimit += 24;
     dirty.verbs = false;
     renderVerbs();
+  }
+
+  const verbCard = e.target.closest("[data-verb-card]");
+  if (verbCard && !e.target.closest("button, a, input, select, textarea")) {
+    _activeVerbInf = verbCard.dataset.verbCard || "";
+    $("#verb-list")?.querySelectorAll("[data-verb-card]").forEach((el) => el.classList.toggle("active", el === verbCard));
   }
 
   const weakBtn = e.target.closest("[data-weak]");
@@ -4170,6 +5672,8 @@ document.addEventListener("click", (e) => {
       renderEarMisses();
       renderHoyReview();
     }
+    quizUxAnswer(val === it.a);
+    bumpSrsQuizItem(it, val === it.a);
     bump("quiz");
     const wait = it.type === "ear" ? 1300 : (it.type === "choice" ? 700 : 2000);
     setTimeout(() => { quiz.i += 1; renderQuiz(); }, wait);
@@ -4227,6 +5731,8 @@ document.addEventListener("click", (e) => {
 
   const qStart = e.target.closest("[data-quiz-start]");
   if (qStart && $("#quiz-mode")) {
+    if (qStart.dataset.coachPlanStep != null || qStart.dataset.quizCoach === "1") setCoachPlanFlow(true);
+    else clearCoachPlanFlow();
     $("#quiz-mode").value = qStart.dataset.quizStart;
     syncQuizModePicks();
     startQuiz();
@@ -4246,6 +5752,7 @@ function syncQuizModePicks() {
 $("#verb-search")?.addEventListener("input", debounce((e) => {
   FILTERS.q = e.target.value;
   verbLimit = 24;
+  saveVerbFilterPrefs();
   renderVerbs();
 }, 200));
 $("#quiz-start")?.addEventListener("click", startQuiz);
@@ -4277,6 +5784,14 @@ $("#prog-file")?.addEventListener("change", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
+  if (e.key === "Escape") {
+    const panel = document.querySelector(".panel.active.lab-in");
+    if (panel) {
+      e.preventDefault();
+      closeLabRoom(panel);
+      return;
+    }
+  }
   const live = quiz.items[quiz.i] && (currentTab === "quiz" || (quiz.mode === "cierre" && currentTab === "hoy"));
   const it = live ? quiz.items[quiz.i] : null;
   const host = quiz.host || "#quiz-box";
@@ -4304,6 +5819,81 @@ document.addEventListener("keydown", (e) => {
     const btn = $$(`${host} .choices button`)[idx];
     if (btn && !btn.disabled) btn.click();
     return;
+  }
+  /* global: R toggles repaso mode (Hoy + no kids + no input focus) */
+  if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (currentTab === "hoy" && !(typeof kidsOn === "function" && kidsOn())) {
+      e.preventDefault();
+      if (repasoOn()) clearRepasoMode();
+      else if (weakSet().size > 0) startRepasoMode();
+      return;
+    }
+  }
+  /* global: P starts coach plan from repaso when button offers plan */
+  if ((e.key === "p" || e.key === "P") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (currentTab === "hoy" && repasoOn() && typeof coachPlanLeft === "function" && coachPlanLeft() > 0) {
+      const btn = $("#repaso-quiz-btn");
+      const planBtn = btn && /repasoQuizPlan/i.test(btn.dataset.i18n || "");
+      if (planBtn) {
+        e.preventDefault();
+        btn.click();
+        return;
+      }
+    }
+  }
+  /* Alt+1–6 switches tabs globally (any tab, no quiz active) */
+  if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= "1" && e.key <= "6") {
+    const tabIds = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
+    const tabBtn = document.querySelector(`nav.tabs [data-tab="${tabIds[Number(e.key) - 1]}"]`);
+    if (tabBtn) { e.preventDefault(); tabBtn.click(); return; }
+  }
+  if (currentTab === "verbos" && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    const key = String(e.key || "").toLowerCase();
+    if (key === "arrowdown" || key === "arrowup") {
+      const cards = [...($("#verb-list")?.querySelectorAll("[data-verb-card]") || [])];
+      if (!cards.length) return;
+      const i = Math.max(0, cards.findIndex((c) => c.dataset.verbCard === _activeVerbInf));
+      const nextI = key === "arrowdown" ? Math.min(cards.length - 1, i + 1) : Math.max(0, i - 1);
+      const next = cards[nextI];
+      if (next) {
+        _activeVerbInf = next.dataset.verbCard || _activeVerbInf;
+        cards.forEach((c) => c.classList.toggle("active", c === next));
+        next.scrollIntoView({ block: "nearest" });
+      }
+      e.preventDefault();
+      return;
+    }
+    if (["w", "f", "d"].includes(key)) {
+      const cards = $("#verb-list")?.querySelectorAll("[data-verb-card]") || [];
+      if (!cards.length) return;
+      if (!_activeVerbInf) _activeVerbInf = cards[0].dataset.verbCard || "";
+      const inf = _activeVerbInf;
+      if (!inf) return;
+      const w = weakSet();
+      const s = knownSet();
+      if (key === "w") {
+        if (w.has(inf)) w.delete(inf); else w.add(inf);
+        s.delete(inf);
+        saveSet("enlab-weak", w);
+        saveSet("enlab-known", s);
+        srsBump("verb", inf, !w.has(inf));
+      } else if (key === "f") {
+        if (s.has(inf)) s.delete(inf); else s.add(inf);
+        w.delete(inf);
+        saveSet("enlab-known", s);
+        saveSet("enlab-weak", w);
+        if (s.has(inf)) srsBump("verb", inf, true);
+      } else {
+        w.delete(inf);
+        s.delete(inf);
+        saveSet("enlab-weak", w);
+        saveSet("enlab-known", s);
+      }
+      e.preventDefault();
+      renderVerbs();
+      renderHome();
+      return;
+    }
   }
   if (currentTab !== "hoy") return;
   if (e.key === " " || e.code === "Space") {
@@ -4456,6 +6046,7 @@ function ayudaHubItems() {
 function renderQuizHub() {
   renderLabHub("quiz-hub", quizHubItems());
   renderQuizNow();
+  syncQuickmixHotUi();
   window.PLUS?.renderPlaceQuizResume?.();
 }
 function renderHablarHub() { renderLabHub("hablar-hub", hablarHubItems()); }
@@ -4481,17 +6072,282 @@ function cierreMissGame() {
   return null;
 }
 
+function certWarmupChipHtml(cls = "btn ghost sm") {
+  const miss = cierreMissGame();
+  if (!miss?.game) return "";
+  return `<button type="button" class="${cls}" data-cert-warmup="${esc(miss.game)}">${esc(t("certWarmupBtn", { mode: t(`quizModes.${miss.game}.t`) }))}</button>`;
+}
+
+function certWarmupMode() {
+  try { return sessionStorage.getItem("enlab-cert-warmup") || ""; } catch { return ""; }
+}
+
+function setCertWarmupMode(mode) {
+  try {
+    if (mode) sessionStorage.setItem("enlab-cert-warmup", mode);
+    else sessionStorage.removeItem("enlab-cert-warmup");
+  } catch { /* ignore */ }
+}
+
+function coachPlanStepForMode(mode) {
+  const steps = quizCoachPlan8();
+  if (steps.includes(mode)) return mode;
+  if (["dict", "listen", "exam"].includes(mode)) return "ear";
+  if (["art", "prep", "phrasal", "cond", "emailtone", "story"].includes(mode)) return "uso";
+  if (["type", "ed"].includes(mode)) return "choice";
+  return coachPlanNextMode() || steps[0];
+}
+
+function certWarmupStreak() {
+  pruneCertWarmupStreak();
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-cert-warmup") || "null");
+    if (raw?.day === todayKey()) return Number(raw.n) || 0;
+  } catch { /* ignore */ }
+  return 0;
+}
+
+function pruneCertWarmupStreak() {
+  try {
+    const today = todayKey();
+    const raw = JSON.parse(localStorage.getItem("enlab-cert-warmup") || "null");
+    if (raw?.day && raw.day !== today) localStorage.removeItem("enlab-cert-warmup");
+    sessionStorage.removeItem("enlab-cert-warmup-n");
+    sessionStorage.removeItem("enlab-cert-warmup-day");
+  } catch { /* ignore */ }
+}
+
+function bumpCertWarmupStreak() {
+  pruneCertWarmupStreak();
+  const n = certWarmupStreak() + 1;
+  try { localStorage.setItem("enlab-cert-warmup", JSON.stringify({ day: todayKey(), n })); } catch { /* ignore */ }
+  return n;
+}
+
+function certWarmupPlanHtml(completedMode) {
+  const warm = certWarmupMode();
+  if (!warm || warm !== completedMode) return "";
+  setCertWarmupMode("");
+  if (coachPlanProgress() >= quizCoachPlan8().length) return "";
+  const streak = bumpCertWarmupStreak();
+  if (streak >= 2 && coachPlanLeft() > 0) {
+    return `<p class="muted cert-warmup-plan">${esc(t("certWarmupPlanFull"))}</p>
+      <button type="button" class="btn sm" data-coach-plan-go data-coach-plan-mode="${esc(quizCoachPlan8()[0])}">${esc(t("quizCoachPlanStart"))}</button>`;
+  }
+  const step = coachPlanStepForMode(completedMode);
+  return `<p class="muted cert-warmup-plan">${esc(t("certWarmupPlanHint", { mode: t(`quizModes.${step}.t`) }))}</p>
+    <button type="button" class="btn sm" data-coach-plan-go data-coach-plan-mode="${esc(step)}">${esc(t("certWarmupPlanBtn", { mode: t(`quizModes.${step}.t`) }))}</button>`;
+}
+
+function placementCoachStep(pct) {
+  if (pct < 0.5) return "ear";
+  if (pct < 0.65) return "uso";
+  return "choice";
+}
+
+function loadPlaceResult() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-place-result") || "null");
+    if (!raw?.n) return null;
+    return raw;
+  } catch { return null; }
+}
+
+function placeResultPct(pr) {
+  if (!pr?.n) return null;
+  return pr.score / pr.n;
+}
+
+function placeNudgeDismissed() {
+  try { return sessionStorage.getItem("enlab-place-nudge-hide") === todayKey(); } catch { return false; }
+}
+
+function dismissPlaceNudge() {
+  try { sessionStorage.setItem("enlab-place-nudge-hide", todayKey()); } catch { /* ignore */ }
+  invalidateYouAreChipsCache();
+  if (typeof syncRemindToSw === "function") syncRemindToSw();
+}
+
+function placePlanNudgeOn() {
+  if (placeNudgeDismissed() || coachPlanStarted() || coachPlanLeft() <= 0) return false;
+  const pr = loadPlaceResult();
+  const pct = placeResultPct(pr);
+  return pct != null && pct < 0.65;
+}
+
+function prunePlaceResult() {
+  try {
+    if (coachPlanProgress() >= quizCoachPlan8().length) {
+      localStorage.removeItem("enlab-place-result");
+      invalidateYouAreChipsCache();
+      return;
+    }
+    const raw = loadPlaceResult();
+    if (!raw?.at) return;
+    if (Date.now() - raw.at > 7 * 86400000) {
+      localStorage.removeItem("enlab-place-result");
+      invalidateYouAreChipsCache();
+    }
+  } catch { /* ignore */ }
+}
+
+function placementPlanChipHtml(cls = "btn sm") {
+  if (typeof kidsOn === "function" && kidsOn()) return "";
+  if (placeNudgeDismissed() || coachPlanStarted() || coachPlanLeft() <= 0) return "";
+  const pr = loadPlaceResult();
+  if (!pr) return "";
+  const pct = pr.score / pr.n;
+  if (pct >= 0.65) return "";
+  const step = placementCoachStep(pct);
+  const btn = `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(step)}">${esc(t("placeCoachPlanChip", { pct: Math.round(pct * 100) }))}</button>`;
+  return `<span class="you-are-chip-row">${btn}<button type="button" class="chip sm" data-place-nudge-dismiss title="${esc(t("placeNudgeDismiss"))}">×</button></span>`;
+}
+
+function placementCoachPlanHtml() {
+  if (!quiz?.items?.length) return "";
+  const pct = quiz.score / quiz.items.length;
+  const step = placementCoachStep(pct);
+  if (coachPlanProgress() >= quizCoachPlan8().length) return "";
+  return `<p class="muted">${esc(t("placeCoachPlanHint", { step: t(`quizModes.${step}.t`), pct: Math.round(pct * 100) }))}</p>
+    <button type="button" class="btn sm" data-coach-plan-go data-coach-plan-mode="${esc(step)}">${esc(t("placeCoachPlanBtn"))}</button>`;
+}
+
+function repasoStepBudgetHtml() {
+  if (!repasoCoachFilterOn()) return "";
+  const pending = coachPlanPendingModes();
+  if (!pending.length) return "";
+  const totalMin = Math.round(repasoTimerSecs() / 60);
+  const each = Math.max(1, Math.round(totalMin / pending.length));
+  const labels = pending.map((m) => t(`quizModes.${m}.t`)).join(" · ");
+  return `<p class="muted repaso-step-budget">${esc(t("repasoStepBudget", { min: each, modes: labels }))}</p>`;
+}
+
+function pruneWeeklyFails() {
+  try {
+    const wf = JSON.parse(localStorage.getItem("enlab-weekly-fails") || "null");
+    if (!wf) return;
+    const age = wf.at != null ? Date.now() - wf.at : 0;
+    const staleDay = wf.day && wf.day !== todayKey();
+    if (age > 7 * 86400000 || (staleDay && age > 86400000)) {
+      localStorage.removeItem("enlab-weekly-fails");
+    }
+  } catch { /* ignore */ }
+}
+
+function loadWeeklyFailsForCoach() {
+  pruneWeeklyFails();
+  try {
+    const wf = JSON.parse(localStorage.getItem("enlab-weekly-fails") || "null");
+    if (wf?.day === todayKey() && Array.isArray(wf.modes)) return wf;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function weeklyFailPlanChipHtml(cls = "btn sm") {
+  if (typeof coachPlanLeft !== "function" || coachPlanLeft() <= 0) return "";
+  const wf = loadWeeklyFailsForCoach();
+  if (!wf?.modes?.length) return "";
+  const pending = coachPlanPendingModes();
+  let step = "";
+  wf.modes.forEach((m) => {
+    const s = coachPlanStepForMode(m);
+    if (pending.includes(s) && !step) step = s;
+  });
+  if (!step && !coachPlanStarted() && coachPlanLeft() >= 3) {
+    step = coachPlanNextMode() || quizCoachPlan8()[0];
+  }
+  if (!step) return "";
+  return `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(step)}">${esc(t("weeklyFailPlanChip", { mode: t(`quizModes.${step}.t`) }))}</button>`;
+}
+
+function transferPlanHintSuffix() {
+  if (typeof coachPlanLeft !== "function") return "";
+  const done = coachPlanProgress();
+  const total = quizCoachPlan8().length;
+  if (done >= total) return "";
+  if (!coachPlanStarted() && coachPlanLeft() >= 3) return ` ${t("transferPlanPending")}`;
+  if (coachPlanLeft() > 0) return ` ${t("transferPlanProgress", { done, total })}`;
+  return "";
+}
+
+function saveWeeklyFailsForCoach() {
+  if (quiz.mode !== "weekly" || !quiz.fails?.length) return;
+  const modes = [];
+  quiz.fails.forEach((inf) => {
+    const it = quiz.items.find((x) => x.inf === inf);
+    const mode = it?.type === "email" ? "listen" : (it?.type || "uso");
+    modes.push(mode);
+  });
+  try {
+    localStorage.setItem("enlab-weekly-fails", JSON.stringify({ day: todayKey(), modes, at: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+function repasoTimerSecs() {
+  if (coachPlanStarted() && coachPlanLeft() > 0) {
+    const left = coachPlanLeft();
+    return Math.min(600, Math.max(360, left * 240));
+  }
+  return 600;
+}
+
+function prevWeekStartKey() {
+  const d = new Date();
+  const diff = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diff - 7);
+  return dateKey(d);
+}
+
+function renderCoachPlanToday() {
+  const el = $("#coach-plan-today");
+  if (!el) return;
+  const done = coachPlanProgress();
+  const steps = quizCoachPlan8();
+  const key = `${done}|${steps.length}|${quickmixFrictionHigh()}`;
+  if (key === _coachPlanTodayKey) return;
+  _coachPlanTodayKey = key;
+  if (done >= steps.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const mode = steps[done];
+  const label = done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume");
+  const qm = quickmixFrictionHigh()
+    ? `<button type="button" class="btn ghost sm" data-coach-plan-go data-coach-plan-mode="quickmix">${esc(t("quickmixToday"))}</button>`
+    : "";
+  el.hidden = false;
+  el.innerHTML = `
+    <p class="kicker">${esc(t("quizCoachPlan8"))}</p>
+    <p class="muted">${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
+    <div class="row">${coachPlanChipHtml("btn sm")}${qm}</div>`;
+}
+
 function renderQuizNow() {
   const el = $("#quiz-now");
   if (!el) return;
   const g = playableTodayGame();
   const miss = cierreMissGame();
+  const planDone = coachPlanProgress();
+  const planSteps = quizCoachPlan8();
+  const key = `${g.game}|${miss?.game || ""}|${planDone}|${planSteps.length}`;
+  if (key === _quizNowKey && el.innerHTML) return;
+  _quizNowKey = key;
+  let planChip = "";
+  if (planDone > 0 && planDone < planSteps.length) {
+    planChip = `<p class="muted quiz-plan-now">${esc(t("quizCoachPlanNow", { done: planDone, total: planSteps.length }))}</p>
+       <button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[planDone])}" data-quiz-coach="1" data-coach-plan-step="${planDone}">${esc(t("quizCoachPlanResume"))}</button>`;
+  } else if (planDone === 0) {
+    planChip = `<p class="muted quiz-plan-now">${esc(t("quizCoachPlanStartHint"))}</p>
+       <button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[0])}" data-quiz-coach="1" data-coach-plan-step="0">${esc(t("quizCoachPlanStart"))}</button>`;
+  }
   const missBtn = miss
     ? `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(miss.game)}">${esc(miss.label)}</button>`
     : "";
   el.innerHTML = `<p class="kicker">${esc(t("quizNowKicker"))}</p>
     <p><strong>${esc(g.label)}</strong></p>
     <p class="muted">${esc(g.hint)}</p>
+    ${planChip}
     <button type="button" class="btn" id="quiz-now-btn">${esc(t("quizNowPlay"))}</button>
     ${missBtn}`;
 }
@@ -4510,7 +6366,7 @@ function quizRoomFor(mode) {
     ear: "quiz-ear", exam: "quiz-ear", dict: "quiz-ear", listen: "quiz-ear",
     uso: "quiz-uso", art: "quiz-uso", prep: "quiz-uso", phrasal: "quiz-uso",
     cond: "quiz-uso", emailtone: "quiz-uso", story: "quiz-uso",
-    place: "quiz-exams", weekly: "quiz-exams", cert: "quiz-exams",
+    quickmix: "quiz-exams", place: "quiz-exams", weekly: "quiz-exams", cert: "quiz-exams",
   };
   return map[mode] || "quiz-verbs";
 }
@@ -4525,7 +6381,7 @@ function quizPeerModes(mode) {
     "quiz-verbs": ["choice", "type", "ed"],
     "quiz-ear": ["ear", "exam", "dict", "listen"],
     "quiz-uso": ["uso", "art", "prep", "phrasal", "cond", "emailtone", "story"],
-    "quiz-exams": ["place", "weekly", ...(typeof kidsOn === "function" && kidsOn() ? [] : ["cert"])],
+    "quiz-exams": ["quickmix", "srs", "place", "weekly", ...(typeof kidsOn === "function" && kidsOn() ? [] : ["cert"])],
   };
   return (groups[room] || []).filter((m) => m !== mode);
 }
@@ -4569,6 +6425,14 @@ function openLabRoom(jumpId) {
   panel.querySelectorAll(".lab-topic").forEach((el) => el.classList.toggle("on", el === topic));
   const titleEl = panel.querySelector(".lab-room-title");
   if (titleEl) titleEl.textContent = topic.querySelector("h3")?.textContent || "";
+  if (panel.id === "quiz" && topic.dataset.lab === "quiz-exams"
+    && quickmixFrictionStreak(3) && !coachPlanFlowOn()) {
+    const qm = $("#quiz-mode");
+    if (qm && !["quickmix", "srs"].includes(qm.value)) {
+      qm.value = "quickmix";
+      syncQuizModePicks();
+    }
+  }
   if (panel.id === "vocales") {
     $$("#oido-toc .lab-hub-group").forEach((g) => g.classList.remove("lab-hub-now"));
     $$("#oido-toc .oido-pick-hint").forEach((el) => el.remove());
@@ -4581,6 +6445,7 @@ function openLabRoom(jumpId) {
   if (topic.dataset.lab === "quiz-exams") {
     window.PLUS?.renderPlaceQuizResume?.();
     renderWeeklyQuizResume();
+    renderWeeklyHistory();
   }
   if (topic.dataset.lab === "duo-card") window.NR?.renderDuoResumeHablar?.();
   return true;
@@ -4730,6 +6595,19 @@ function renderClock() {
     el.textContent = `${pad2(Math.floor(left / 60))}:${pad2(Math.floor(left % 60))}`;
     el.classList.toggle("done", left <= 0 && !timerState().running);
   }
+  let repasoHint = $("#hoy-repaso-plan-timer");
+  if (!repasoHint && el?.parentElement) {
+    repasoHint = document.createElement("span");
+    repasoHint.id = "hoy-repaso-plan-timer";
+    repasoHint.className = "hoy-repaso-plan-timer muted";
+    el.insertAdjacentElement("afterend", repasoHint);
+  }
+  if (repasoHint) {
+    const show = repasoOn() && coachPlanStarted() && coachPlanLeft() > 0;
+    repasoHint.hidden = !show;
+    if (show) repasoHint.textContent = t("repasoTimerCoach", { min: Math.round(repasoTimerSecs() / 60) });
+  }
+  if (typeof syncPrefsBadge === "function") syncPrefsBadge();
   const btn = $("#hoy-timer-btn");
   if (btn) {
     if (left <= 0 && !timerState().running) btn.textContent = t("timerAgain");
@@ -4903,17 +6781,29 @@ function isStandalone() {
     || window.navigator.standalone === true;
 }
 
-function syncRemindToSw() {
-  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+function syncRemindPayload() {
   const dueCount = typeof srsDueList === "function" ? srsDueList(99).length : 0;
-  const payload = {
+  const planLeft = typeof coachPlanLeft === "function" ? coachPlanLeft() : 0;
+  return {
     on: remindOn(),
     time: remindTime(),
     complete: sessionCompleteToday() ? todayKey() : "",
     today: todayKey(),
     dueCount,
+    coachPlanLeft: planLeft,
+    coachPlanStarted: typeof coachPlanStarted === "function" ? coachPlanStarted() : false,
+    certWarmupNudge: typeof certWarmupStreak === "function"
+      && certWarmupStreak() >= 1 && !(typeof coachPlanStarted === "function" && coachPlanStarted())
+      && planLeft >= 3,
+    quickmixHot: typeof quickmixFrictionStreak === "function" ? quickmixFrictionStreak(3) : false,
+    placePlanNudge: typeof placePlanNudgeOn === "function" ? placePlanNudgeOn() : false,
     lang: typeof uiLang === "function" ? uiLang() : "es",
   };
+}
+
+function syncRemindToSwNow() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  const payload = syncRemindPayload();
   navigator.serviceWorker.ready.then((reg) => {
     reg.active?.postMessage({ type: "enlab-remind", payload });
     if (remindOn() && "periodicSync" in reg) {
@@ -4922,6 +6812,8 @@ function syncRemindToSw() {
     if (remindOn()) ensurePushSubscription().catch(() => {});
   }).catch(() => {});
 }
+
+const syncRemindToSw = debounce(syncRemindToSwNow, 400);
 
 function paintPwaButtons() {
   const standalone = isStandalone();
@@ -4935,7 +6827,13 @@ function fireRemind() {
   localStorage.setItem("enlab-remind-last", todayKey());
   buzz(true);
   const due = typeof srsDueList === "function" ? srsDueList(99).length : 0;
-  const body = due >= 3 ? t("pushDueBody", { due }) : t("pushDailyBody");
+  const planLeft = typeof coachPlanLeft === "function" ? coachPlanLeft() : 0;
+  const planStarted = typeof coachPlanStarted === "function" ? coachPlanStarted() : false;
+  const hot = typeof quickmixFrictionStreak === "function" ? quickmixFrictionStreak(3) : false;
+  const placeNudge = typeof placePlanNudgeOn === "function" ? placePlanNudgeOn() : false;
+  const certWarm = typeof certWarmupStreak === "function" && certWarmupStreak() >= 1
+    && !planStarted && planLeft >= 3;
+  const body = remindPushBody(due, planLeft, planStarted, hot, placeNudge, certWarm);
   try {
     new Notification(t("pushTitle"), {
       body,
@@ -4943,6 +6841,15 @@ function fireRemind() {
       tag: "enlab-daily",
     });
   } catch { /* ignore */ }
+}
+
+function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge) {
+  if (placeNudge && !planStarted && planLeft >= 3) return t("pushPlacePlanBody");
+  if (certWarmupNudge) return t("pushCertWarmupPlanBody");
+  if (quickmixHot && !planStarted && planLeft >= 3) return t("pushQuickmixHotBody");
+  if (!planStarted && planLeft >= 3) return t("pushCoachPlanStartBody");
+  if (planStarted && planLeft > 0 && planLeft < 3) return t("pushCoachPlanBody", { left: planLeft });
+  return due >= 3 ? t("pushDueBody", { due }) : t("pushDailyBody");
 }
 
 function tickRemind() {
@@ -5130,6 +7037,61 @@ function guideFillEntry() {
       s: [rep, ...(entry.s || [])].slice(0, 4),
     };
   }
+  if (repasoCoachFilterOn()) {
+    const pending = coachPlanPendingModes();
+    if (pending.length) {
+      const totalMin = Math.round(repasoTimerSecs() / 60);
+      const each = Math.max(1, Math.round(totalMin / pending.length));
+      const labels = pending.map((m) => t(`quizModes.${m}.t`)).join(" · ");
+      const hint = t("repasoStepBudget", { min: each, modes: labels });
+      entry = {
+        ...entry,
+        w: entry.w ? `${hint} ${entry.w}` : hint,
+        s: [hint, ...(entry.s || [])].slice(0, 4),
+      };
+    }
+  }
+  if (currentTab === "hoy" && repasoOn() && coachPlanStarted() && coachPlanLeft() > 0) {
+    const hint = t("guideRepasoPlanTimer", { min: Math.round(repasoTimerSecs() / 60) });
+    entry = {
+      ...entry,
+      w: entry.w ? `${hint} ${entry.w}` : hint,
+      s: [hint, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  const hoyPanel = $("#hoy");
+  const pathDone = currentTab === "hoy" && hoyPanel?.classList.contains("path-done");
+  if (pathDone && !coachPlanStarted() && coachPlanLeft() >= 3 && !placePlanNudgeOn()) {
+    const hint = t("guideCoachPlanPending");
+    entry = {
+      ...entry,
+      w: entry.w ? `${hint} ${entry.w}` : hint,
+      s: [hint, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  if (document.querySelector("#class-task-banner")?.classList.contains("class-task-must")) {
+    const hint = t("guideClassTaskMust");
+    entry = {
+      ...entry,
+      w: entry.w ? `${hint} ${entry.w}` : hint,
+      s: [hint, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  if (currentTab === "hoy" && !coachPlanStarted() && coachPlanLeft() > 0 && !placeNudgeDismissed()) {
+    const pr = loadPlaceResult();
+    if (pr) {
+      const pct = pr.score / pr.n;
+      if (pct < 0.65) {
+        const hint = t("guidePlaceCoachPlan", { pct: Math.round(pct * 100), step: t(`quizModes.${placementCoachStep(pct)}.t`) });
+        const dismiss = t("guidePlaceNudgeDismiss");
+        entry = {
+          ...entry,
+          w: entry.w ? `${hint} ${dismiss} ${entry.w}` : `${hint} ${dismiss}`,
+          s: [hint, dismiss, ...(entry.s || [])].slice(0, 4),
+        };
+      }
+    }
+  }
   const placeNow = window.PLUS?.loadPlaceNow?.();
   if (placeNow && (place === "quiz-exams" || place === "place" || currentTab === "quiz")) {
     const hint = typeof kidsOn === "function" && kidsOn()
@@ -5140,6 +7102,53 @@ function guideFillEntry() {
       w: entry.w ? `${hint} ${entry.w}` : hint,
       s: [hint, ...(entry.s || [])].slice(0, 4),
     };
+  }
+  /* kids: weekly a medias en Exámenes */
+  if (typeof kidsOn === "function" && kidsOn()) {
+    pruneWeeklyNow();
+    const weeklyNow = loadWeeklyNow();
+    if (weeklyNow && (place === "quiz-exams" || currentTab === "quiz")) {
+      const hint = t("guideWeeklyResumeKids", { i: weeklyNow.i + 1, total: weeklyNow.items.length });
+      entry = {
+        ...entry,
+        w: entry.w ? `${hint} ${entry.w}` : hint,
+        s: [hint, ...(entry.s || [])].slice(0, 4),
+      };
+    }
+  }
+  if (pathDone && certTimedOutToday() && cierreMissGame() && !coachPlanStarted()) {
+    const miss = cierreMissGame();
+    const hint = t("guideCertWarmup", { mode: t(`quizModes.${miss.game}.t`) });
+    entry = {
+      ...entry,
+      w: entry.w ? `${hint} ${entry.w}` : hint,
+      s: [hint, ...(entry.s || [])].slice(0, 4),
+    };
+  }
+  if (place === "quiz-exams" || (currentTab === "quiz" && $("#quiz")?.classList.contains("lab-in")
+    && document.querySelector("#quiz .lab-topic.on")?.dataset?.lab === "quiz-exams")) {
+    let hint = "";
+    if (placePlanNudgeOn()) {
+      const pr = loadPlaceResult();
+      const pct = placeResultPct(pr);
+      hint = t("guidePlaceCoachPlan", { pct: Math.round(pct * 100), step: t(`quizModes.${placementCoachStep(pct)}.t`) });
+      hint = `${hint} ${t("guidePlaceNudgeDismiss")}`;
+    } else if (typeof quickmixFrictionStreak === "function" && quickmixFrictionStreak(3)) {
+      hint = t("guideQuizExamsQuickmix");
+    } else if (certTimedOutToday()) {
+      hint = t("guideQuizExamsCert");
+    } else if (coachPlanLeft() > 0 && !coachPlanStarted()) {
+      hint = t("guideQuizExamsPlan");
+    } else if (typeof coachPlanStarted === "function" && coachPlanStarted() && coachPlanLeft() > 0) {
+      hint = t("guideQuizExamsPlanResume", { left: coachPlanLeft() });
+    }
+    if (hint) {
+      entry = {
+        ...entry,
+        w: entry.w ? `${hint} ${entry.w}` : hint,
+        s: [hint, ...(entry.s || [])].slice(0, 4),
+      };
+    }
   }
   return entry;
 }
@@ -5162,25 +7171,58 @@ function markGuideSeen(place) {
 }
 
 function fillGuide() {
-  const entry = guideFillEntry();
+  const entry = guideFillEntryCached() || guideFillEntry();
   if (!entry) return;
-  const title = $("#guide-title");
-  const why = $("#guide-why");
-  const steps = $("#guide-steps");
-  const done = $("#guide-done");
-  if (title) title.textContent = entry.t || "";
-  if (why) why.textContent = entry.w || "";
-  if (steps) {
-    const list = Array.isArray(entry.s) ? entry.s : [];
-    steps.innerHTML = list.map((line) => `<li>${esc(line)}</li>`).join("");
+  const paintKey = [guidePlace(), currentTab, entry.t, entry.w, (entry.s || []).join("|"), entry.d || ""].join("|");
+  if (paintKey !== _lastGuidePaintKey) {
+    _lastGuidePaintKey = paintKey;
+    const title = $("#guide-title");
+    const why = $("#guide-why");
+    const steps = $("#guide-steps");
+    const done = $("#guide-done");
+    if (title) title.textContent = entry.t || "";
+    if (why) why.textContent = entry.w || "";
+    if (steps) {
+      const list = Array.isArray(entry.s) ? entry.s : [];
+      steps.innerHTML = list.map((line) => `<li>${esc(line)}</li>`).join("");
+    }
+    if (done) {
+      done.hidden = !entry.d;
+      done.textContent = entry.d ? `${t("guideWhen")} ${entry.d}` : "";
+    }
+    fillGuideKeyboardHints();
+    fillGuideMap();
+    fillGuideLab();
   }
-  if (done) {
-    done.hidden = !entry.d;
-    done.textContent = entry.d ? `${t("guideWhen")} ${entry.d}` : "";
-  }
-  fillGuideMap();
-  fillGuideLab();
   fillYouAre();
+}
+
+function fillGuideKeyboardHints() {
+  const box = $("#guide-keys");
+  if (!box) return;
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  const tab = currentTab;
+  const repasoPlan = repasoOn() && typeof coachPlanLeft === "function" && coachPlanLeft() > 0;
+  const keysKey = `${lang}|${tab}|${repasoPlan ? "p" : ""}`;
+  if (keysKey === _lastGuideKeysKey && box.innerHTML) return;
+  _lastGuideKeysKey = keysKey;
+  const shortcuts = [
+    { keys: "Alt+1–6", desc: t("guideKeyAltTabs") },
+    { keys: "Espacio", desc: t("guideKeySpace") },
+    { keys: "1–5", desc: t("guideKeyNumbers") },
+    { keys: "1–9", desc: t("guideKeyNumbersQuiz") },
+    { keys: "↑ / ↓", desc: t("guideKeyArrows") },
+    { keys: "W / D / F", desc: t("guideKeyWdf") },
+    { keys: "R", desc: t("guideKeyR") },
+    ...(repasoPlan ? [{ keys: "P", desc: t("guideKeyRepasoPlan") }] : []),
+    { keys: "Esc", desc: t("guideKeyEscape") },
+  ].filter((s) => s.desc);
+  box.innerHTML = `<details class="fold guide-keys-details">
+    <summary class="muted">${esc(t("guideKeyboardTitle"))}</summary>
+    <table class="guide-keys-table">
+      ${shortcuts.map((s) => `<tr><td class="guide-key-cell"><kbd>${esc(s.keys)}</kbd></td><td class="muted">${esc(s.desc)}</td></tr>`).join("")}
+    </table>
+  </details>`;
 }
 
 function fillYouAreWhen(entry) {
@@ -5198,22 +7240,186 @@ function fillYouAreWhen(entry) {
   when.textContent = d ? `${t("guideWhen")} ${d}` : "";
 }
 
+let _lastYouAreChipsKey = "";
+let _lastHoyReviewKey = "";
+let _fillYouAreTimer = null;
+let _coachPlanTodayKey = "";
+let _quizNowKey = "";
+
+function invalidateCoachUiCache() {
+  _coachPlanTodayKey = "";
+  _quizNowKey = "";
+  _lastHoyDoneMidKey = "";
+  window._perfHintKey = "";
+}
+
+function invalidateYouAreChipsCache() {
+  _lastYouAreChipsKey = "";
+  _guideFillEntryKey = "";
+  _guideFillEntryCache = null;
+  _lastYouAreMainKey = "";
+  _lastGuidePaintKey = "";
+  _lastGuideMapKey = "";
+  _lastGuideLabKey = "";
+  _lastGuideKeysKey = "";
+  invalidateCoachUiCache();
+}
+
+function syncRepasoQuizBtn() {
+  const btn = $("#repaso-quiz-btn");
+  if (!btn || typeof coachPlanLeft !== "function") return;
+  const left = coachPlanLeft();
+  const started = typeof coachPlanStarted === "function" ? coachPlanStarted() : false;
+  const total = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+  if (left > 0 && !started) {
+    btn.textContent = t("repasoQuizPlanStart");
+    btn.dataset.i18n = "repasoQuizPlanStart";
+  } else if (left > 0 && started) {
+    btn.textContent = t("repasoQuizPlanResume", { done: coachPlanProgress(), total });
+    btn.dataset.i18n = "repasoQuizPlanResume";
+  } else {
+    btn.textContent = t("quizWeak");
+    btn.dataset.i18n = "quizWeak";
+  }
+}
+
+let _guideFillEntryKey = "";
+let _guideFillEntryCache = null;
+let _lastGuidePaintKey = "";
+let _lastGuideMapKey = "";
+let _lastGuideLabKey = "";
+let _lastGuideKeysKey = "";
+
+function guideFillEntryCached() {
+  const hoy = $("#hoy");
+  const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
+  const key = [
+    currentTab,
+    guidePlace(),
+    pathDone,
+    repasoOn(),
+    coachPlanProgress(),
+    coachPlanFlowOn(),
+    placeNudgeDismissed(),
+    placePlanNudgeOn(),
+    certTimedOutToday(),
+    quickmixFrictionStreak(3),
+    coachPlanLeft(),
+    coachPlanStarted(),
+    certWarmupStreak(),
+    document.querySelector("#class-task-banner")?.classList.contains("class-task-must") ? "1" : "0",
+  ].join("|");
+  if (key === _guideFillEntryKey && _guideFillEntryCache) return _guideFillEntryCache;
+  _guideFillEntryKey = key;
+  _guideFillEntryCache = guideFillEntry();
+  return _guideFillEntryCache;
+}
+function fillYouAreDebounced() {
+  if (_fillYouAreTimer) return;
+  _fillYouAreTimer = requestAnimationFrame(() => {
+    _fillYouAreTimer = null;
+    fillYouAre();
+  });
+}
 function fillYouAreChips() {
   const box = $("#you-are-chips");
   if (!box) return;
   const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
+  const kids = typeof kidsOn === "function" && kidsOn();
   const parts = [];
   const hoy = $("#hoy");
   const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
-  if (pathDone && certTimedOutToday()) {
-    parts.push(`<button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`);
+
+  /* retomar plan abandonado */
+  if (!kids && loadCoachPlanAbandon() && coachPlanLeft() > 0) {
+    const abChip = coachPlanAbandonChipHtml();
+    if (abChip) parts.unshift(abChip);
   }
+
+  /* coach plan — cualquier pestaña si hay pasos pendientes */
+  if (!kids && typeof coachPlanLeft === "function" && coachPlanLeft() > 0) {
+    const placeChip = placementPlanChipHtml("btn sm");
+    const weeklyChip = weeklyFailPlanChipHtml("btn sm");
+    const chip = placeChip || weeklyChip || coachPlanChipHtml("btn sm");
+    if (chip) parts.unshift(chip);
+  }
+
+  /* cert: time-up → retry o plan cert, a medias → resume */
+  if (!kids && pathDone) {
+    const certNow = window.NR?.loadCertNow?.();
+    if (certNow && !certNow.timeUp) {
+      parts.push(`<button type="button" class="btn sm" data-cert-resume>${esc(t("certResume", { n: certNow.i + 1, total: certNow.items.length }))}</button>`);
+    } else if (certTimedOutToday()) {
+      if (typeof coachPlanStarted === "function" && coachPlanStarted() && coachPlanLeft() > 0) {
+        parts.push(`<button type="button" class="btn sm" data-cert-coach-plan>${esc(t("certCoachPlanBtn"))}</button>`);
+      } else {
+        const warm = certWarmupChipHtml("btn ghost sm");
+        if (warm) parts.push(warm);
+        parts.push(`<button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`);
+      }
+    }
+  }
+
+  /* cierre a medias fuera del camino */
+  if (currentTab !== "hoy" || (!pathDone && !$("#hoy")?.classList.contains("path-on"))) {
+    const c = loadCierreNow();
+    if (c) parts.push(`<button type="button" class="btn sm" data-cierre-resume>${esc(t("cierreResume", { i: c.i + 1, total: c.items.length }))}</button>`);
+  }
+
+  /* historia a medias — cualquier pestaña (no kids) */
+  if (!kids && window.SV?.findContinuableStory) {
+    const hit = window.SV.findContinuableStory();
+    if (hit) {
+      const pct = window.SV.storyProgressPct ? window.SV.storyProgressPct(hit.id) : 0;
+      const pctHint = pct > 0 ? ` · ${pct}%` : "";
+      parts.push(`<button type="button" class="btn sm" data-story-resume="${esc(hit.id)}">${esc(t("hoyStoryContinue", { title: hit.story.title }))}${pctHint}</button>`);
+    }
+  }
+
+  /* podcast a medias — cualquier pestaña (no kids) */
+  if (!kids) {
+    try {
+      const pod = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null");
+      if (pod?.id && pod.seg > 0) {
+        const p = (ENLAB.podcasts || []).find((x) => x.id === pod.id);
+        if (p) {
+          const segs = p.segments || [];
+          if (pod.seg < segs.length) {
+            parts.push(`<button type="button" class="chip" data-podcast="${esc(pod.id)}" data-pod-seg="${pod.seg}">${esc(t("podcastResume", { n: pod.seg + 1, total: segs.length }))} · ${esc(p.title)}</button>`);
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  /* duo — solo en Hablar */
   if (currentTab === "hablar" && window.NR?.duoYouAreChipHtml) {
     const duo = window.NR.duoYouAreChipHtml();
     if (duo) parts.push(duo);
   }
+
+  const pr = loadPlaceResult();
+  const placeKey = pr ? `${pr.score}/${pr.n}:${placeNudgeDismissed()}` : "";
+  const wf = loadWeeklyFailsForCoach();
+  const wfKey = wf?.modes?.join(",") || "";
+  const abKey = loadCoachPlanAbandon()?.mode || "";
+  const key = `${guideOpen}|${currentTab}|${pathDone}|${coachPlanProgress()}|${coachPlanFlowOn()}|${placeKey}|${wfKey}|${abKey}|${parts.join("|")}`;
+  if (key === _lastYouAreChipsKey) return;
+  _lastYouAreChipsKey = key;
   box.hidden = guideOpen || !parts.length;
-  box.innerHTML = parts.join("");
+  box.innerHTML = parts.length ? `<div role="status" aria-live="polite" aria-label="${esc(t("youAreChipsAria") || "Seguir")}" class="you-are-chips-inner">${parts.join("")}</div>` : "";
+}
+
+let _lastYouAreMainKey = "";
+
+function paintYouAreLine(text, line, entry) {
+  const key = `${currentTab}|${line}|${entry?.t || ""}|${entry?.w || ""}`;
+  if (key !== _lastYouAreMainKey) {
+    _lastYouAreMainKey = key;
+    text.textContent = line;
+  }
+  fillYouAreWhen(entry);
+  fillYouAreChips();
 }
 
 function fillYouAre() {
@@ -5222,8 +7428,9 @@ function fillYouAre() {
   if (!btn || !text) return;
   const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
   btn.hidden = !!guideOpen;
+  delete btn.dataset.streakBadge;
   if (jumpNote && currentTab !== "quiz") jumpNote = "";
-  const entry = guideFillEntry() || guideEntry(guidePlace());
+  const entry = guideFillEntryCached() || guideEntry(guidePlace());
   const hoy = $("#hoy");
   const pathOn = currentTab === "hoy"
     && hoy?.classList.contains("path-on")
@@ -5237,60 +7444,112 @@ function fillYouAre() {
       }
     } catch { /* ignore */ }
     if (!line) {
+      const coachHint = coachPlanCierreHint();
+      if (coachHint) line = coachHint;
+    }
+    if (!line) {
       const oidoTitle = oidoLastTitle();
       if (oidoTitle) line = t("youAreOidoLast", { title: oidoTitle });
     }
-    if (!line && certTimedOutToday()) line = t("youAreCertTimeUp");
+    if (!line) {
+      /* cert: resume en chips (v62), aquí solo time-up sin chip */
+      const certNow = window.NR?.loadCertNow?.();
+      if (!certNow && certTimedOutToday()) {
+        line = coachPlanStarted() && coachPlanLeft() > 0
+          ? t("youAreCertCoachPlan", { left: coachPlanLeft() })
+          : t("youAreCertTimeUp");
+      }
+    }
     if (!line) {
       const n = stats().streak || 0;
       line = n > 0 ? t("youAreHoyDoneStreak", { n }) : (entry?.t || t("hoyDoneKicker"));
+      /* show streak badge on button */
+      if (n >= 2) {
+        const youAreBtn = $("#you-are");
+        if (youAreBtn) {
+          youAreBtn.dataset.streakBadge = n >= 7 ? "🔥" + n : n;
+        }
+      }
     }
-    text.textContent = line;
-    fillYouAreWhen(entry);
-    fillYouAreChips();
+    paintYouAreLine(text, line, entry);
     return;
   }
   if (currentTab === "hoy" && !pathOn && !pathDone) {
     const mid = hoyMidSessionLine();
     if (mid) {
-      text.textContent = mid;
-      fillYouAreWhen(entry);
-      fillYouAreChips();
+      paintYouAreLine(text, mid, entry);
       return;
     }
   }
   const pathCopy = $("#hoy-path-copy")?.textContent?.trim();
   if (pathOn && pathCopy) {
     if (quiz?.mode === "cierre" && quiz.items?.length && quiz.i < quiz.items.length) {
-      text.textContent = t("cierreQ", { i: quiz.i + 1, n: quiz.items.length, kind: cierreKindOf(quiz.items[quiz.i]) });
+      paintYouAreLine(text, t("cierreQ", { i: quiz.i + 1, n: quiz.items.length, kind: cierreKindOf(quiz.items[quiz.i]) }), entry);
     } else {
-      text.textContent = pathCopy;
+      paintYouAreLine(text, pathCopy, entry);
     }
-    fillYouAreWhen(entry);
-    fillYouAreChips();
     return;
   }
   if (jumpNote && currentTab === "quiz") {
-    text.textContent = jumpNote;
-    fillYouAreWhen(entry);
-    fillYouAreChips();
+    paintYouAreLine(text, jumpNote, entry);
     return;
   }
   if (repasoOn()) {
-    text.textContent = t("youAreRepaso");
-    fillYouAreWhen(entry);
-    fillYouAreChips();
+    paintYouAreLine(text, t("youAreRepaso"), entry);
     return;
   }
-  text.textContent = entry?.t || "";
-  fillYouAreWhen(entry);
-  fillYouAreChips();
+  /* modo viaje: pasos a medias */
+  if (window.NR?.travelYouAreHint) {
+    const hint = window.NR.travelYouAreHint();
+    if (hint) {
+      paintYouAreLine(text, hint, entry);
+      return;
+    }
+  }
+  /* podcast a medias: informa dónde lo dejaste */
+  try {
+    const pod = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null");
+    if (pod?.id && pod.seg > 0) {
+      const podObj = (ENLAB.podcasts || []).find((x) => x.id === pod.id);
+      if (podObj && pod.seg < (podObj.segments || []).length) {
+        paintYouAreLine(text, t("youArePodcastMid", { title: podObj.title, n: pod.seg + 1, total: (podObj.segments || []).length }), entry);
+        return;
+      }
+    }
+  } catch { /* ignore */ }
+  /* in a lab room: show room title if not already covered */
+  if (currentTab !== "hoy") {
+    const panel = document.getElementById(currentTab);
+    const inRoom = panel?.classList.contains("lab-in");
+    if (inRoom) {
+      const place = guidePlace();
+      const card = panel?.querySelector(`[data-lab-jump="${CSS.escape(place)}"] strong, [data-lab-jump="${CSS.escape(place)}"] .card-title`);
+      const roomName = card?.textContent?.trim();
+      if (roomName) {
+        paintYouAreLine(text, t("youAreInRoom", { room: roomName }), entry);
+        return;
+      }
+    }
+  }
+  /* SRS: si hay cards vencidas hoy, mencionarlo como último recurso */
+  if (typeof srsDueList === "function") {
+    const srsN = srsDueList(99).length;
+    if (srsN > 0) {
+      paintYouAreLine(text, t("youAreSRSDue", { n: srsN }), entry);
+      return;
+    }
+  }
+  paintYouAreLine(text, entry?.t || "", entry);
 }
 
 function fillGuideMap() {
   const box = $("#guide-map");
   if (!box) return;
-  if (currentTab === "hoy" && $("#hoy")?.classList.contains("path-done")) {
+  const pathDone = currentTab === "hoy" && $("#hoy")?.classList.contains("path-done");
+  const mapKey = `${currentTab}|${guidePlace()}|${pathDone}|${$("#quiz")?.classList.contains("lab-in")}`;
+  if (mapKey === _lastGuideMapKey && box.innerHTML) return;
+  _lastGuideMapKey = mapKey;
+  if (pathDone) {
     box.hidden = true;
     box.innerHTML = "";
     return;
@@ -5309,8 +7568,13 @@ function fillGuideMap() {
       box.innerHTML = "";
       return;
     }
+    const hereTitle = hereCard?.querySelector("strong")?.textContent?.trim() || "";
+    const hereBlurb = hereCard?.querySelector(".muted")?.textContent?.trim() || "";
     box.hidden = false;
-    box.innerHTML = `<p class="kicker">${esc(t("guideAlso"))}</p><div class="guide-lab-row">`
+    box.innerHTML = (hereTitle
+      ? `<p class="guide-here-line"><span class="guide-here-pill">${esc(t("guideHere"))}</span> <strong>${esc(hereTitle)}</strong>${hereBlurb ? ` <span class="muted">— ${esc(hereBlurb)}</span>` : ""}</p>`
+      : "")
+      + `<p class="kicker">${esc(t("guideAlso"))}</p><div class="guide-lab-row">`
       + sibs.map((c) => guideCardChip(c)).join("")
       + `</div>`;
     return;
@@ -5343,13 +7607,18 @@ function fillGuideMap() {
 
 function guideCardChip(c) {
   const jump = c.dataset.labJump || c.dataset.jump || "";
-  const name = c.querySelector("strong")?.textContent || "";
-  return `<button type="button" class="chip sm" data-guide-jump="${esc(jump)}">${esc(name)}</button>`;
+  const name = c.querySelector("strong")?.textContent?.trim() || "";
+  const blurb = c.querySelector(".muted")?.textContent?.trim() || "";
+  const blurbAttr = blurb ? ` title="${esc(blurb)}"` : "";
+  return `<button type="button" class="chip sm guide-map-chip" data-guide-jump="${esc(jump)}"${blurbAttr}>${esc(name)}</button>`;
 }
 
 function fillGuideLab() {
   const box = $("#guide-lab");
   if (!box) return;
+  const labKey = uiLang();
+  if (labKey === _lastGuideLabKey && box.innerHTML) return;
+  _lastGuideLabKey = labKey;
   const lang = uiLang();
   const tabs = ENLAB.ui?.[lang]?.tabs || ENLAB.ui?.es?.tabs || {};
   const order = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
@@ -5403,6 +7672,76 @@ function syncPrefsBadge() {
   if (!btn) return;
   const active = kidsOn() || hideEsOn() || uiLang() === "en" || localStorage.getItem("enlab-travel") === "1" || !!classroomPin();
   btn.classList.toggle("has-on", active);
+  /* badge "repaso activo" en tab Hoy */
+  const hoyTab = document.querySelector('nav.tabs [data-tab="hoy"]');
+  if (hoyTab) {
+    hoyTab.classList.toggle("repaso-on", repasoOn());
+    const repasoPlan = repasoOn() && coachPlanStarted() && coachPlanLeft() > 0;
+    hoyTab.classList.toggle("repaso-plan-on", repasoPlan);
+    if (repasoPlan) {
+      hoyTab.setAttribute("data-repaso-plan-min", String(Math.round(repasoTimerSecs() / 60)));
+    } else {
+      hoyTab.removeAttribute("data-repaso-plan-min");
+    }
+    if (typeof coachPlanProgress === "function") {
+      const done = coachPlanProgress();
+      const total = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+      const on = !repasoPlan && done > 0 && done < total;
+      const pending = !repasoPlan && !coachPlanStarted() && done === 0 && coachPlanLeft() >= 3;
+      hoyTab.classList.toggle("coach-plan-on", on);
+      hoyTab.classList.toggle("coach-plan-pending-on", pending);
+      if (on) {
+        hoyTab.setAttribute("data-coach-plan", `${done}/${total}`);
+        hoyTab.setAttribute("aria-label", t("tabCoachPlanProgress", { done, total }));
+      } else if (pending) {
+        hoyTab.setAttribute("data-coach-plan", `0/${total}`);
+        hoyTab.setAttribute("aria-label", t("tabCoachPlanPending", { total }));
+      } else {
+        hoyTab.removeAttribute("data-coach-plan");
+        hoyTab.removeAttribute("aria-label");
+      }
+    }
+  }
+  /* badge plan pendiente en Quiz también */
+  const quizTab = document.querySelector('nav.tabs [data-tab="quiz"]');
+  if (quizTab && typeof coachPlanProgress === "function") {
+    const done = coachPlanProgress();
+    const total = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+    const on = done > 0 && done < total;
+    const pending = !coachPlanStarted() && done === 0 && coachPlanLeft() >= 3;
+    quizTab.classList.toggle("coach-plan-on", on);
+    quizTab.classList.toggle("coach-plan-pending-on", pending && !on);
+    if (on) {
+      quizTab.setAttribute("data-coach-plan", `${done}/${total}`);
+      quizTab.setAttribute("aria-label", t("tabCoachPlanProgress", { done, total }));
+    } else if (pending) {
+      quizTab.setAttribute("data-coach-plan", `0/${total}`);
+      quizTab.setAttribute("aria-label", t("tabCoachPlanPending", { total }));
+    } else {
+      quizTab.removeAttribute("data-coach-plan");
+      quizTab.removeAttribute("aria-label");
+    }
+  }
+  if (quizTab && typeof srsDueList === "function") {
+    const dueCount = srsDueList(1).length;
+    quizTab.classList.toggle("srs-due", dueCount > 0);
+  }
+  if (typeof syncRepasoQuizBtn === "function") syncRepasoQuizBtn();
+  const kids = typeof kidsOn === "function" && kidsOn();
+  if (kids) {
+    [hoyTab, quizTab].forEach((tab) => {
+      if (!tab) return;
+      const planBadge = tab.classList.contains("coach-plan-on")
+        || tab.classList.contains("coach-plan-pending-on");
+      tab.classList.toggle("coach-plan-kids-on", planBadge);
+      if (planBadge) tab.setAttribute("data-coach-plan", "●");
+    });
+  } else {
+    document.querySelectorAll("nav.tabs .coach-plan-kids-on").forEach((tab) => {
+      tab.classList.remove("coach-plan-kids-on");
+    });
+  }
+  if (typeof syncQuickmixHotUi === "function") syncQuickmixHotUi();
 }
 
 function applyUiLang() {
@@ -5600,12 +7939,14 @@ function startRepasoMode() {
   renderHoyReview();
   const box = $("#hoy-review");
   if (box) box.hidden = false;
-  persistTimer({ running: true, remaining: 10 * 60, until: Date.now() + 10 * 60 * 1000 });
+  const repasoSecs = repasoTimerSecs();
+  persistTimer({ running: true, remaining: repasoSecs, until: Date.now() + repasoSecs * 1000 });
   startTimerLoop();
   requestWake();
   renderClock();
   const exitBtn = $("#repaso-exit");
   if (exitBtn) exitBtn.hidden = false;
+  syncPrefsBadge();
   buzz(true);
 }
 
@@ -5637,6 +7978,15 @@ function clearRepasoMode() {
   $$(".hoy-next").forEach((b) => { b.hidden = false; });
   const exitBtn = $("#repaso-exit");
   if (exitBtn) exitBtn.hidden = true;
+  syncPrefsBadge();
+  /* enfocar el panel de repaso si quedan verbos */
+  requestAnimationFrame(() => {
+    const box = $("#hoy-review");
+    if (box && !box.hidden) {
+      box.setAttribute("tabindex", "-1");
+      box.focus({ preventScroll: false });
+    }
+  });
 }
 
 function loadVoiceLog() {
@@ -5743,26 +8093,43 @@ function renderStreakChart() {
     const quizN = day.quiz || 0;
     const spoke = day.spoke || 0;
     const score = heard + quizN + spoke;
-    days.push({ key, score, heard, quiz: quizN, spoke, hot: score > 0 });
+    days.push({ key, score, heard, quiz: quizN, spoke, hot: score > 0, srsDue: srsDueOnDay(key), frictionHigh: dayFrictionHigh(key) });
   }
   const hotN = days.filter((d) => d.hot).length;
+  const srsDays = days.filter((d) => d.srsDue).length;
+  const frictionDays = days.filter((d) => d.frictionHigh).length;
   const max = Math.max(1, ...days.map((d) => d.score));
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90</p>
+    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90${srsDays ? ` · ${srsDays} ${esc(t("chart90SrsDays"))}` : ""}${frictionDays ? ` · ${frictionDays} ${esc(t("chart90FrictionDays"))}` : ""}</p>
     <div class="streak-bars streak-90" role="img" aria-label="${hotN} ${esc(t("streak90Aria"))}">
       ${days.map((d) => {
         const h = Math.max(d.score ? 20 : 8, Math.round((d.score / max) * 100));
-        return `<span class="streak-day ${d.hot ? "hot" : ""}" style="height:${h}%" title="${esc(d.key)}: ${d.heard} ${t("logHeard")} · ${d.quiz} ${t("logQuiz")} · ${d.spoke} ${t("logVoice")}"></span>`;
+        const cls = [d.hot ? "hot" : "", d.srsDue ? "srs-due-day" : "", d.frictionHigh ? "friction-day" : ""].filter(Boolean).join(" ");
+        const srsHint = d.srsDue ? ` · ${t("chart90SrsDue")}` : "";
+        const frHint = d.frictionHigh ? ` · ${t("chart90FrictionDue")}` : "";
+        return `<button type="button" class="streak-day ${cls}" data-streak-day="${esc(d.key)}" data-srs-due="${d.srsDue ? "1" : "0"}" data-friction-day="${d.frictionHigh ? "1" : "0"}" style="height:${h}%" title="${esc(d.key)}: ${d.heard} ${t("logHeard")} · ${d.quiz} ${t("logQuiz")} · ${d.spoke} ${t("logVoice")}${srsHint}${frHint}" aria-label="${esc(d.key)}"></button>`;
       }).join("")}
     </div>
-    <p class="muted chart90-legend">${esc(t("chart90Legend"))}</p>`;
+    <p class="muted chart90-legend">${esc(t("chart90Legend"))}${srsDays ? ` · ${esc(t("chart90SrsLegend"))}` : ""}${frictionDays ? ` · ${esc(t("chart90FrictionLegend"))}` : ""}</p>`;
 }
 
 function buildTransferPayload() {
   const payload = { v: 2, savedAt: new Date().toISOString() };
   PROG_KEYS.forEach((k) => { payload[k] = localStorage.getItem(k); });
+  payload.cs = transferPayloadChecksum(payload);
   return payload;
+}
+
+function transferPayloadChecksum(payload) {
+  const copy = { ...payload };
+  delete copy.cs;
+  const raw = JSON.stringify(copy);
+  let sum = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    sum = (sum + (raw.charCodeAt(i) * (i + 1))) % 1000003;
+  }
+  return sum;
 }
 
 function transferEncode(payload) {
@@ -5822,7 +8189,8 @@ function renderTransferCode() {
   const ta = $("#transfer-code");
   if (!ta) return;
   try {
-    const code = transferEncode(buildTransferPayload());
+    const payload = buildTransferPayload();
+    const code = transferEncode(payload);
     ta.value = code;
     drawTransferQr(code.slice(0, 400));
     let hint = $("#transfer-chunks");
@@ -5832,8 +8200,21 @@ function renderTransferCode() {
       hint.className = "muted";
       ta.insertAdjacentElement("afterend", hint);
     }
-    const n = Math.ceil(code.length / 3);
-    hint.textContent = t("transferQrHint", { len: code.length, cs: code.length % 997 });
+    hint.textContent = t("transferQrHint", { len: code.length, cs: payload.cs || (code.length % 997) })
+      + transferPlanHintSuffix();
+    /* show creation date near QR */
+    let dateHint = document.querySelector("#transfer-date-hint");
+    if (!dateHint) {
+      dateHint = document.createElement("p");
+      dateHint.id = "transfer-date-hint";
+      dateHint.className = "muted transfer-date-hint";
+      const qrCanvas = $("#transfer-qr");
+      if (qrCanvas) qrCanvas.insertAdjacentElement("afterend", dateHint);
+      else hint.insertAdjacentElement("afterend", dateHint);
+    }
+    const now = new Date();
+    const dateStr = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    dateHint.textContent = t("transferDateHint", { date: dateStr });
   } catch {
     ta.value = "";
   }
@@ -5863,6 +8244,10 @@ function importTransferCode(raw, quiet) {
     payload = transferDecode(trimmed);
   } catch (err) {
     say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"));
+    return;
+  }
+  if (typeof payload?.cs === "number" && payload.cs !== transferPayloadChecksum(payload)) {
+    say(t("transferChecksumFail"));
     return;
   }
   if (transferTailMismatch(trimmed)) {
@@ -5980,6 +8365,7 @@ function makeEmailToneItems() {
 }
 
 function startStoryQuiz() {
+  quizUxAbandonIfRunning();
   quiz = { i: 0, score: 0, items: makeStoryItems(), fails: [], mode: "story", host: "#quiz-box" };
   if (!quiz.items.length) {
     const box = quizBox();
@@ -5989,6 +8375,7 @@ function startStoryQuiz() {
     return;
   }
   showTab("quiz");
+  quizUxStart("story", quiz.items.length);
   const sel = $("#quiz-mode");
   if (sel) sel.value = "story";
   syncQuizModePicks();
@@ -6082,6 +8469,12 @@ function renderDueToday() {
       return `<button type="button" class="chip say due-${esc(kind)}" data-due-kind="${esc(kind)}" data-say="${esc(x.label.split(" / ")[0])}"><span class="due-tag">${esc(kind)}</span> ${esc(x.label)}</button>`;
     }).join("")}</div>
     <p class="muted">${esc(typeof t === "function" ? t("dueHint") : "Pulsa una etiqueta para jugar ese modo. Sale primero en Juego.")}</p>`;
+  if (typeof syncPrefsBadge === "function") syncPrefsBadge();
+  /* update SRS quiz mode-pick button count */
+  const srsBtn = document.querySelector("#quiz-mode-srs span");
+  if (srsBtn) {
+    srsBtn.textContent = t("quizModes.srs.s") + (due.length ? ` · ${due.length}` : "");
+  }
 }
 
 function renderWeekReport() {
@@ -6181,12 +8574,17 @@ function syncHoyTransferPaste() {
   syncTransferPaste($("#transfer-paste")?.value, $("#transfer-hoy-status"), 'data-hoy-transfer-go');
 }
 
+function transferStatusReady(st) {
+  return !!st?.querySelector?.("[data-prefs-transfer-go], [data-hoy-transfer-go]");
+}
+
 function sayTransferCopied(st, code) {
   if (!st) return;
-  st.hidden = false;
-  st.textContent = t("prefsTransferCopied", { tail: transferTail(code) });
   prefsTransferTail = transferTail(code);
   prefsTransferEcho = "";
+  if (transferStatusReady(st)) return;
+  st.hidden = false;
+  st.textContent = t("prefsTransferCopied", { tail: prefsTransferTail });
 }
 
 function copyTransferFromPrefs() {
@@ -6203,9 +8601,8 @@ function copyTransferFromPrefs() {
     done(t("prefsTransferEmpty"));
     return;
   }
-  const ok = () => sayTransferCopied(st, code);
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).then(ok).catch(ok);
-  else ok();
+  sayTransferCopied(st, code);
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).catch(() => {});
 }
 
 function classroomPin() {
@@ -6267,10 +8664,12 @@ function printClassSheet() {
   if (!area) return;
   const due = srsDueList(12);
   const verbs = [...weakSet()].slice(0, 10);
+  const friction = typeof topQuizFriction === "function" ? topQuizFriction(3) : [];
   area.hidden = false;
   area.innerHTML = `
     <h1>${esc(t("classSheetTitle"))}</h1>
     <p>${todayKey()} · ${level().toUpperCase()}</p>
+    ${friction.length ? `<h2>${esc(t("perfFrictionTitle"))}</h2><ul>${friction.map((r) => `<li>${esc(t("perfFrictionRow", { mode: t(`quizModes.${r.mode}.t`) || r.mode, drop: r.drop, sec: r.avgSec }))}</li>`).join("")}</ul>` : ""}
     ${due.length ? `<h2>${esc(t("classSheetDue"))}</h2><ul>${due.map((x) => `<li>${esc(x.label)}</li>`).join("")}</ul>` : ""}
     ${verbs.length ? `<h2>${esc(t("classSheetWeak"))}</h2><ul>${verbs.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>` : ""}
     <h2>${esc(t("classSheetHoy"))}</h2>
@@ -6517,11 +8916,17 @@ function init() {
   applyKidsMode();
   applyUiLang();
   applyLevel({ skipHome: true, skipPaint: true });
+  loadVerbFilterPrefs();
+  const vs = $("#verb-search");
+  if (vs) vs.value = FILTERS.q || "";
   const allowed = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
   const fromHash = (location.hash || "").replace("#", "");
-  const fromMem = localStorage.getItem("enlab-tab") || "";
-  const id = allowed.includes(fromHash) ? fromHash : (allowed.includes(fromMem) ? fromMem : "hoy");
-  showTab(id);
+  if (!handleAppHash(fromHash)) {
+    const fromMem = localStorage.getItem("enlab-tab") || "";
+    const id = allowed.includes(fromHash) ? fromHash : (allowed.includes(fromMem) ? fromMem : "hoy");
+    showTab(id);
+  }
+  window.addEventListener("hashchange", () => handleAppHash(location.hash));
   renderHome(true);
   if (timerState().running) {
     startTimerLoop();
@@ -6531,11 +8936,14 @@ function init() {
   syncQuizModePicks();
   setupRemind();
   syncNetWarn();
+  pruneCertWarmupStreak();
+  prunePlaceResult();
+  pruneWeeklyFails();
   const welcome = $("#welcome");
   prepareWelcome();
   if (welcome && localStorage.getItem("enlab-onboard-v3") !== "1" && localStorage.getItem("enlab-welcome-v2") !== "1") welcome.hidden = false;
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSw()).catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then(() => syncRemindToSwNow()).catch(() => {});
   }
   if (window.ENLAB_IDB?.restoreMissing) {
     window.ENLAB_IDB.restoreMissing().then((ok) => {
@@ -6543,7 +8951,10 @@ function init() {
         renderDueToday();
         if (typeof renderHome === "function") renderHome();
       }
+      if (typeof restoreCoachPlanFromMirror === "function") restoreCoachPlanFromMirror();
     });
+  } else if (typeof restoreCoachPlanFromMirror === "function") {
+    restoreCoachPlanFromMirror();
   }
   setupPwaInstall();
   renderClassPin();
@@ -6654,8 +9065,8 @@ function copyTransferFromQr(statusEl, pasteEl, syncFn) {
   if (typeof renderTransferCode === "function") renderTransferCode();
   const code = $("#transfer-code")?.value || "";
   if (!code) return;
-  navigator.clipboard.writeText(code).catch(() => {});
   if (statusEl) sayTransferCopied(statusEl, code);
+  navigator.clipboard.writeText(code).catch(() => {});
   if (pasteEl) {
     pasteEl.value = code;
     if (typeof syncFn === "function") syncFn();

@@ -1,6 +1,18 @@
 const { test, expect } = require("@playwright/test");
 const { boot, openHoyExtras, openQuizMode, openLabRoom } = require("./helpers/boot");
 
+test("Plus: journal shows plan step tag", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    if (window.PLUS?.logPlanStepEvent) window.PLUS.logPlanStepEvent("abandon", "ear");
+    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
+  });
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#error-journal .journal-plan-tag")).toBeVisible();
+  await expect(page.locator("#error-journal")).toContainText(/plan 8 min|8-min plan/i);
+});
+
 test("Plus: placement bank and CEFR bands", async ({ page }) => {
   await boot(page);
   const info = await page.evaluate(() => ({
@@ -31,6 +43,26 @@ test("Plus: error journal and Anki export in Ayuda", async ({ page }) => {
   await page.evaluate(() => {
     window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
     window.PLUS.logError({ mode: "uso", expected: "are", said: "is", prompt: "How ___ you?", why: "you are" });
+    localStorage.setItem("enlab-quiz-ux", JSON.stringify({
+      ear: { sessions: 4, completed: 2, abandoned: 2, answers: 12, correct: 7, ms: 44000 },
+      uso: { sessions: 3, completed: 1, abandoned: 2, answers: 8, correct: 5, ms: 39000 },
+    }));
+    const today = (() => {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    })();
+    const daily = {};
+    for (let i = 0; i < 10; i += 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const p = (n) => String(n).padStart(2, "0");
+      const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      daily[key] = {
+        ear: { sessions: i < 5 ? 2 : 4, abandoned: i < 5 ? 0 : 3, completed: 1, answers: 6, correct: 3, ms: 20000 },
+      };
+    }
+    localStorage.setItem("enlab-quiz-ux-daily", JSON.stringify(daily));
   });
   await page.locator('[data-tab="ia"]').click();
   await openLabRoom(page, "error-journal", "ia");
@@ -50,6 +82,60 @@ test("Plus: error journal and Anki export in Ayuda", async ({ page }) => {
   await openLabRoom(page, "perf-panel", "ia");
   await expect(page.locator("#perf-panel")).toContainText(/paquete|pack/i);
   await expect(page.locator("#perf-panel")).toContainText(/KB/i);
+  await expect(page.locator("#perf-panel")).toContainText(/Fricción|friction/i);
+  await expect(page.locator("#perf-panel")).toContainText(/abandono|drop-off/i);
+  await expect(page.locator("#perf-panel")).toContainText(/tendencia|trend/i);
+  await expect(page.locator("#perf-panel .perf-heat-bars").first()).toBeVisible();
+  await expect(page.locator("#perf-friction-csv")).toBeVisible();
+  await expect(page.locator("#perf-panel")).toContainText(/Abandono 7d|7d drop-off/i);
+});
+
+test("Plus: Anki plan-pending header when plan not started", async ({ page }) => {
+  await boot(page);
+  const header = await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    const lines = ["#separator:tab", "#html:true"];
+    if (typeof coachPlanLeft === "function" && coachPlanLeft() >= 3
+      && typeof coachPlanStarted === "function" && !coachPlanStarted()) {
+      lines.push("# plan-pending: 0/3");
+    }
+    return lines.join("\n");
+  });
+  expect(header).toContain("plan-pending");
+});
+
+test("Plus: Anki placement-low tag matches coach step", async ({ page }) => {
+  await boot(page);
+  const tag = await page.evaluate(() => {
+    localStorage.setItem("enlab-place-result", JSON.stringify({ score: 6, n: 20, at: Date.now() }));
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    const pr = loadPlaceResult();
+    const placePct = pr.score / pr.n;
+    const pending = coachPlanPendingModes();
+    const mode = "ear";
+    const coachTag = pending.includes(coachPlanStepForMode(mode)) ? " #coach-pending" : "";
+    const placeTag = placePct < 0.65 && placementCoachStep(placePct) === coachPlanStepForMode(mode)
+      ? " #placement-low" : "";
+    return `${coachTag}${placeTag}`.trim();
+  });
+  expect(tag).toContain("placement-low");
+});
+
+test("Plus: journal coach plan button", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 1, steps: ["ear", "uso", "choice"],
+    }));
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.renderErrorJournal();
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#journal-coach-plan")).toBeVisible();
 });
 
 test("Plus: journal Practice this opens the miss mode", async ({ page }) => {
@@ -220,12 +306,20 @@ test("Plus: IDB mirrors transfer keys", async ({ page }) => {
       n: prog.length,
       roster: keys.includes("enlab-class-roster"),
       place: keys.includes("enlab-place-result"),
+      coachMirror: prog.includes("enlab-coach-plan-mirror"),
+      frictionWeek: prog.includes("enlab-class-friction-week"),
+      weeklyFails: prog.includes("enlab-weekly-fails"),
+      certWarmup: prog.includes("enlab-cert-warmup"),
       same: prog.every((k) => keys.includes(k)),
     };
   });
   expect(ok.n).toBeGreaterThan(40);
   expect(ok.roster).toBe(true);
   expect(ok.place).toBe(true);
+  expect(ok.coachMirror).toBe(true);
+  expect(ok.frictionWeek).toBe(true);
+  expect(ok.weeklyFails).toBe(true);
+  expect(ok.certWarmup).toBe(true);
   expect(ok.same).toBe(true);
 });
 
@@ -239,4 +333,39 @@ test("Plus: speak hooks are native, not wrappers", async ({ page }) => {
   expect(ok.hooks).toBe(true);
   expect(ok.noWrapVerdict).toBe(true);
   expect(ok.noWrapRec).toBe(true);
+});
+
+test("Plus: journal coach plan weights weekly fails", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-weekly-fails", JSON.stringify({
+      day: todayKey(), modes: ["choice", "choice", "choice"],
+    }));
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    window.PLUS.renderErrorJournal();
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await page.locator("#journal-coach-plan").click();
+  await expect(page.locator("#quiz-mode")).toHaveValue("choice");
+});
+
+test("Plus: journal coach plan picks mode from recent errors", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.PLUS.logError({ mode: "ear", expected: "ship", said: "sheep", prompt: "ship / sheep", why: "short i" });
+    window.PLUS.logError({ mode: "dict", expected: "I am", said: "I em", prompt: "I am", why: "am" });
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    window.PLUS.renderErrorJournal();
+  });
+  await page.locator('[data-tab="ia"]').click();
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#journal-coach-plan")).toBeVisible();
+  await page.locator("#journal-coach-plan").click();
+  await expect(page.locator("#quiz.panel.active")).toBeVisible();
+  await expect(page.locator("#quiz-mode")).toHaveValue("ear");
 });

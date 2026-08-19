@@ -47,7 +47,11 @@
       const rep = !!document.querySelector("#repaso-btn");
       const path = !!document.querySelector(".hoy-next");
       const weakQuiz = !!document.querySelector("#repaso-quiz-btn");
-      return { ok: rep && path && weakQuiz, detail: "Camino + repaso + quiz débiles", tip: "Repaso activa solo débiles en Hablar y verbos" };
+      const planFn = typeof coachPlanLeft === "function" && typeof coachPlanProgress === "function";
+      const planDetail = planFn
+        ? ` · plan ${coachPlanProgress()}/${typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3}`
+        : "";
+      return { ok: rep && path && weakQuiz && planFn, detail: `Camino + repaso + quiz/plan${planDetail}`, tip: "Repaso: quiz débiles o Plan 8 min según pendiente" };
     }},
     { id: "C", name: "Historial voz + modo niño", check: () => {
       const hist = !!document.querySelector("#voice-history");
@@ -209,8 +213,22 @@
         <td class="muted">${esc(r.tip || "")}</td>
       </tr>`).join("");
     const auditTitle = typeof t === "function" ? t("audit") : "Auditoría A–Z";
+    /* compute lifetime totals for the stats section */
+    const auditStats = typeof statsTotals === "function" ? statsTotals() : null;
+    const planDone = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
+    const planTotal = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
+    const planStat = planDone > 0 && planDone < planTotal ? `${planDone}/${planTotal}` : planDone >= planTotal ? "✓" : "0/3";
+    const statsHtml = auditStats && auditStats.days > 0 ? `
+      <div class="audit-stats-row">
+        <span class="audit-stat-cell"><strong>${auditStats.days}</strong> <span class="muted">${esc(typeof t === "function" ? t("auditStatDays") : "días")}</span></span>
+        <span class="audit-stat-cell"><strong>${auditStats.heard}</strong> <span class="muted">${esc(typeof t === "function" ? t("auditStatHeard") : "pares oídos")}</span></span>
+        <span class="audit-stat-cell"><strong>${auditStats.quiz}</strong> <span class="muted">${esc(typeof t === "function" ? t("auditStatQuiz") : "respuestas")}</span></span>
+        <span class="audit-stat-cell"><strong>${auditStats.spoke}</strong> <span class="muted">${esc(typeof t === "function" ? t("auditStatSpoke") : "grabaciones")}</span></span>
+        ${typeof coachPlanProgress === "function" ? `<span class="audit-stat-cell"><strong>${esc(planStat)}</strong> <span class="muted">${esc(typeof t === "function" ? t("auditStatPlan") : "plan 8 min")}</span></span>` : ""}
+      </div>` : "";
     host.innerHTML = `
       <p class="kicker">${esc(auditTitle)}</p>
+      ${statsHtml}
       <p>${esc(typeof t === "function" ? t("auditSummary", { ok: okN, total: LOT_AUDIT.length }) : `${okN}/${LOT_AUDIT.length} lotes en verde.`)}</p>
       <div class="audit-scroll">
         <table class="audit-table">
@@ -230,9 +248,10 @@
     const code = document.querySelector("#transfer-code")?.value || "";
     const hint = document.querySelector("#audit-transfer-chunks");
     if (hint && code) {
-      hint.textContent = typeof t === "function"
+      const planSuffix = typeof transferPlanHintSuffix === "function" ? transferPlanHintSuffix() : "";
+      hint.textContent = (typeof t === "function"
         ? t("transferQrHint", { len: code.length, cs: code.length % 997 })
-        : `${code.length} chars · checksum ${code.length % 997}`;
+        : `${code.length} chars · checksum ${code.length % 997}`) + planSuffix;
     }
   }
 
@@ -282,6 +301,12 @@
     try {
       if (done || !id) {
         localStorage.removeItem("enlab-podcast-now");
+        if (done && id) {
+          /* mark as fully listened */
+          const d = JSON.parse(localStorage.getItem("enlab-podcast-done") || "{}");
+          d[id] = Date.now();
+          localStorage.setItem("enlab-podcast-done", JSON.stringify(d));
+        }
       } else {
         localStorage.setItem("enlab-podcast-now", JSON.stringify({
           id, seg, day: typeof todayKey === "function" ? todayKey() : "", at: Date.now(),
@@ -289,6 +314,7 @@
       }
     } catch { /* ignore */ }
     if (typeof renderPodcastToday === "function") renderPodcastToday();
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
   }
 
   function stopPodcast(quiet) {
@@ -312,9 +338,15 @@
     const renderSeg = () => {
       box.innerHTML = `
         <p class="kicker">${esc(t("podKicker", { title: pod.title }))}</p>
-        <p class="podcast-progress">${segI + 1}/${pod.segments.length}</p>
+        <div class="podcast-progress-bar-wrap" role="progressbar" aria-valuenow="${segI + 1}" aria-valuemin="1" aria-valuemax="${pod.segments.length}" aria-label="${esc(t("podcastProgressAria", { n: segI + 1, total: pod.segments.length }))}">
+          <div class="podcast-progress-bar" style="width:${Math.round(((segI + 1) / pod.segments.length) * 100)}%"></div>
+          <span class="podcast-progress-label">${segI + 1} / ${pod.segments.length}</span>
+        </div>
         <div class="podcast-transcript">${pod.segments.map((s, i) =>
-          `<p class="pod-seg ${i === segI ? "on" : ""}"><span class="en">${esc(s.en)}</span><span class="es-line">${esc(s.es)}</span></p>`).join("")}</div>
+          `<p class="pod-seg ${i === segI ? "on" : ""}" data-seg-i="${i}">
+            <span class="en">${esc(s.en)}</span><span class="es-line">${esc(s.es)}</span>
+            ${i === segI ? `<button type="button" class="btn ghost xs pod-repeat-btn" data-pod-repeat="${i}" title="${esc(t("podRepeat") || "Repetir frase")}">↺</button>` : ""}
+          </p>`).join("")}</div>
         <div class="row">
           <button type="button" class="btn sm" id="pod-stop">${esc(t("podStop"))}</button>
           <button type="button" class="btn ghost sm" id="pod-replay">${esc(t("podReplay"))}</button>
@@ -327,11 +359,21 @@
         if (line && window.PLUS?.runPhraseShadow) window.PLUS.runPhraseShadow(line);
         else if (line && typeof speak === "function") speak(line, true);
       });
+      /* repeat current line button */
+      document.querySelectorAll(".pod-repeat-btn[data-pod-repeat]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const line = pod.segments[segI]?.en;
+          if (line && typeof speak === "function") speak(line, true);
+        });
+      });
       renderPodcastList();
     };
     const next = () => {
       if (segI >= pod.segments.length) {
-        box.innerHTML += `<p class="muted">${esc(t("podEnd"))}</p>
+        const wordN = pod.segments.reduce((n, s) => n + String(s.en || "").split(/\s+/).filter(Boolean).length, 0);
+        box.innerHTML += `<p class="muted pod-words-done">${esc(t("podWordsPracticed", { n: wordN }))}</p>
+          <p class="muted">${esc(t("podEnd"))}</p>
           ${pod.qs?.length ? `<button type="button" class="btn sm" id="podcast-quiz-go">${esc(t("podQuiz"))}</button>` : ""}`;
         document.querySelector("#podcast-quiz-go")?.addEventListener("click", () => startPodcastQuiz(pod));
         try {
@@ -380,21 +422,49 @@
     const pods = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= n);
     const series = (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n);
     const resumeBanner = renderPodcastResumeBanner();
-    const seriesHtml = series.map((s) => `
-      <div class="card podcast-series">
-        <p class="kicker">${esc(s.title)} · 3 eps</p>
+    /* track which podcasts have been listened to completion */
+    let podDone = {};
+    try { podDone = JSON.parse(localStorage.getItem("enlab-podcast-done") || "{}"); } catch { /* ignore */ }
+    let podNowId = null;
+    try { podNowId = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null")?.id; } catch { /* ignore */ }
+    const seriesHtml = series.map((s) => {
+      const epsDone = s.episodes.filter((id) => !!podDone[id]).length;
+      const epsTotal = s.episodes.length;
+      const seriesPct = epsTotal ? Math.round((epsDone / epsTotal) * 100) : 0;
+      const wordsDone = s.episodes.reduce((acc, id) => {
+        if (!podDone[id]) return acc;
+        const pod = pods.find((x) => x.id === id);
+        if (!pod?.segments?.length) return acc;
+        return acc + pod.segments.reduce((n, seg) => n + String(seg.en || "").split(/\s+/).filter(Boolean).length, 0);
+      }, 0);
+      const seriesProgressHtml = epsTotal > 0 ? `
+        <div class="series-progress-wrap" role="progressbar" aria-valuenow="${epsDone}" aria-valuemin="0" aria-valuemax="${epsTotal}" aria-label="${esc(typeof t === "function" ? t("podcastSeriesProgress", { n: epsDone, total: epsTotal }) : `${epsDone}/${epsTotal}`)}">
+          <div class="series-progress-bar" style="width:${seriesPct}%"></div>
+          <span class="series-progress-label">${epsDone}/${epsTotal}</span>
+        </div>
+        ${wordsDone ? `<p class="muted series-words-done">${esc(t("podcastSeriesWords", { n: wordsDone }))}</p>` : ""}` : "";
+      return `<div class="card podcast-series">
+        <p class="kicker">${esc(s.title)} · ${epsTotal} eps${epsDone === epsTotal && epsTotal > 0 ? " ✓" : ""}</p>
+        ${seriesProgressHtml}
         <p class="muted">${esc(s.titleEs || "")}</p>
         <div class="row">${s.episodes.map((id) => {
           const p = pods.find((x) => x.id === id);
-          return p ? `<button type="button" class="chip" data-podcast="${esc(id)}">${esc(p.title)}</button>` : "";
+          if (!p) return "";
+          const epDone = !!podDone[id];
+          return `<button type="button" class="chip${epDone ? " podcast-done" : ""}" data-podcast="${esc(id)}">${esc(p.title)}${epDone ? " ✓" : ""}</button>`;
         }).join("")}</div>
         <button type="button" class="btn sm" data-series-quiz="${esc(s.id)}">${esc(typeof t === "function" ? t("seriesQuizGo") : "Quiz de la serie (9 preg.)")}</button>
-      </div>`).join("");
-    el.innerHTML = resumeBanner + seriesHtml + pods.map((p) => `
-      <button type="button" class="card podcast-card" data-podcast="${esc(p.id)}">
-        <strong>${esc(p.title)}</strong>
-        <span class="muted">${esc(p.duration)} · ${p.segments.length} frases${p.seriesEp ? ` · ep ${p.seriesEp}/3` : ""}</span>
-      </button>`).join("") || `<p class="muted">${esc(typeof t === "function" ? t("podcastLevelUp") : "Sube de nivel para más podcasts.")}</p>`;
+      </div>`;
+    }).join("");
+    el.innerHTML = resumeBanner + seriesHtml + pods.map((p) => {
+      const done = !!podDone[p.id];
+      const inProgress = podNowId === p.id && !done;
+      const badge = done ? ` <span class="podcast-done-badge" aria-label="completado">✓</span>` : (inProgress ? ` <span class="podcast-progress-badge">▶</span>` : "");
+      return `<button type="button" class="card podcast-card${done ? " podcast-done" : ""}${inProgress ? " podcast-in-progress" : ""}" data-podcast="${esc(p.id)}">
+        <strong>${esc(p.title)}${badge}</strong>
+        <span class="muted">${esc(p.duration)} · ${p.segments.length} ${esc(typeof t === "function" ? t("podcastSegments") : "frases")}${p.seriesEp ? ` · ep ${p.seriesEp}/3` : ""}</span>
+      </button>`;
+    }).join("") || `<p class="muted">${esc(typeof t === "function" ? t("podcastLevelUp") : "Sube de nivel para más podcasts.")}</p>`;
   }
 
   function startSeriesQuiz(seriesId) {
@@ -539,7 +609,10 @@
     if (typeof currentTab !== "undefined" && currentTab !== "hablar") return "";
     const now = loadDuoNow();
     if (!now || duoState.active || (typeof kidsOn === "function" && kidsOn())) return "";
-    return `<button type="button" class="btn sm" data-duo-resume>${esc(t("duoResume", { turn: now.turn + 1 }))}</button>`;
+    const score = (now.scoreA || 0) || (now.scoreB || 0)
+      ? ` · A:${now.scoreA || 0}/B:${now.scoreB || 0}` : "";
+    const label = t("duoResume", { turn: now.turn + 1 }) + score;
+    return `<button type="button" class="btn sm" aria-label="${esc(label)}" data-duo-resume>${esc(label)}</button>`;
   }
 
   function renderDuoResumeHablar() {
@@ -787,6 +860,8 @@
       }));
     } catch { /* ignore */ }
     renderCertToday();
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+    if (typeof renderHoyDoneMid === "function") renderHoyDoneMid();
   }
 
   function clearCertNow() {
@@ -804,11 +879,12 @@
     const now = loadCertNow();
     if (!now) {
       if (typeof certTimedOutToday === "function" && certTimedOutToday()) {
+        const warm = typeof certWarmupChipHtml === "function" ? certWarmupChipHtml("btn ghost sm") : "";
         el.hidden = false;
         el.innerHTML = `
           <p class="kicker">${esc(t("certTimeUpKicker"))}</p>
           <p class="muted">${esc(t("certTimeUpHint"))}</p>
-          <button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`;
+          <div class="row">${warm}<button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button></div>`;
         return;
       }
       el.hidden = true;
@@ -817,16 +893,31 @@
     }
     el.hidden = false;
     if (now.timeUp) {
+      const warm = typeof certWarmupChipHtml === "function" ? certWarmupChipHtml("btn ghost sm") : "";
       el.innerHTML = `
         <p class="kicker">${esc(t("certTimeUpKicker"))}</p>
         <p class="muted">${esc(t("certTimeUpHint"))}</p>
-        <button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button>`;
+        <div class="row">${warm}<button type="button" class="btn sm" data-cert-retry>${esc(t("certRetryBtn"))}</button></div>`;
       return;
     }
+    const certPct = Math.round((now.i / now.items.length) * 100);
+    const r = 16, circ = Math.round(2 * Math.PI * r);
+    const dash = Math.round(circ * now.i / now.items.length);
+    const ringHtml = `<svg class="cert-progress-ring" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="${r}" fill="none" stroke="var(--line)" stroke-width="3"/>
+      <circle cx="20" cy="20" r="${r}" fill="none" stroke="var(--accent)" stroke-width="3"
+        stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${Math.round(circ / 4)}" stroke-linecap="round"/>
+      <text x="20" y="24" text-anchor="middle" font-size="9" fill="var(--fg)">${certPct}%</text>
+    </svg>`;
     el.innerHTML = `
-      <p class="kicker">${esc(t("certResumeKicker"))}</p>
-      <p class="muted">${esc(t("certResumeHint"))}</p>
-      <button type="button" class="btn sm" data-cert-resume>${esc(t("certResume", { n: now.i + 1, total: now.items.length }))}</button>`;
+      <div class="cert-resume-row">
+        ${ringHtml}
+        <div>
+          <p class="kicker">${esc(t("certResumeKicker"))}</p>
+          <p class="muted">${esc(t("certResumeHint"))}</p>
+          <button type="button" class="btn sm" data-cert-resume>${esc(t("certResume", { n: now.i + 1, total: now.items.length }))}</button>
+        </div>
+      </div>`;
   }
 
   function finishCertExam(timeUp) {
@@ -844,6 +935,8 @@
       clearCertNow();
     }
     renderCertToday();
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+    if (typeof renderHoyDoneMid === "function") renderHoyDoneMid();
     const score = quiz.score;
     const total = quiz.items.length;
     const pct = total ? Math.round((score / total) * 100) : 0;
@@ -979,7 +1072,23 @@
     window._drawTransferQrOrig = drawTransferQr;
     window.drawTransferQr = function (text) {
       document.querySelectorAll("#transfer-qr, #prefs-transfer-qr, #audit-transfer-qr").forEach((canvas) => {
-        if (canvas) drawRealQr(text, canvas);
+        if (canvas) {
+          drawRealQr(text, canvas);
+          /* make canvas clickable: copy code to clipboard on click (useful on mobile) */
+          canvas.style.cursor = "pointer";
+          canvas.title = typeof t === "function" ? t("transferQrCopy") : "Copiar código";
+          canvas.onclick = () => {
+            const code = document.querySelector("#transfer-code")?.value
+              || document.querySelector("#prefs-transfer-code")?.value || "";
+            if (!code) return;
+            if (navigator.clipboard?.writeText) {
+              navigator.clipboard.writeText(code).catch(() => { /* ignore */ });
+            }
+            /* brief visual feedback */
+            canvas.style.outline = "2px solid var(--accent, #5b8dd9)";
+            setTimeout(() => { canvas.style.outline = ""; }, 700);
+          };
+        }
       });
     };
     if (typeof renderTransferCode === "function") renderTransferCode();
@@ -1141,10 +1250,13 @@
           if (hint) hint.textContent = typeof t === "function" ? t("prefsTransferEmpty") : "";
           return;
         }
+        const tail = code.slice(-4);
         const ok = () => {
           if (hint && typeof t === "function") {
-            hint.textContent = t("transferQrHint", { len: code.length, cs: code.length % 997 });
+            hint.textContent = t("prefsTransferCopied", { tail });
           }
+          /* mark the tail so the Import paste can auto-verify */
+          try { sessionStorage.setItem("enlab-transfer-tail", tail); } catch { /* ignore */ }
         };
         if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).then(ok).catch(ok);
         else ok();
@@ -1215,14 +1327,28 @@
     }
   }
 
+  function travelYouAreHint() {
+    if (!travelOn()) return "";
+    const map = travelMapToday();
+    if (!map?.steps?.length) return "";
+    const key = travelThemeToday();
+    let done = [];
+    try { done = (JSON.parse(localStorage.getItem("enlab-travel-done") || "{}")[key]) || []; } catch { /* ignore */ }
+    if (!done.length) return "";
+    if (done.length >= map.steps.length) return "";
+    return t("travelYouAre", { done: done.length, total: map.steps.length, title: map.title });
+  }
+
   window.NR = {
     bootstrap,
     startCertExam,
+    loadCertNow,
     persistCertNow,
     renderCertToday,
     renderDuoToday,
     renderDuoResumeHablar,
     duoYouAreChipHtml,
+    travelYouAreHint,
     makeCertExamItems,
     travelOn,
     travelMapToday,

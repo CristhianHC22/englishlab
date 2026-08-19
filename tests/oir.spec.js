@@ -200,6 +200,19 @@ test("Oír: podcast banner hides while player is open", async ({ page }) => {
   await expect(page.locator(".podcast-resume-banner")).toBeHidden();
 });
 
+test("Oír: podcast mid shows in you-are text", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const p = (window.ENLAB.podcasts || [])[0];
+    localStorage.setItem("enlab-podcast-now", JSON.stringify({
+      id: p.id, seg: 2, day: todayKey(), at: Date.now(),
+    }));
+    if (typeof fillYouAre === "function") fillYouAre();
+  });
+  await expect(page.locator("#you-are-text")).toContainText(/Podcast|podcast/i);
+  await expect(page.locator("#you-are-chips [data-podcast]")).toBeVisible();
+});
+
 test("Oír: podcasts hand-written (en/es, no templates)", async ({ page }) => {
   await boot(page);
   const report = await page.evaluate(() => {

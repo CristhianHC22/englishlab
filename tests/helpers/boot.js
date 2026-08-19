@@ -71,7 +71,7 @@ const QUIZ_ROOMS = {
   ear: "quiz-ear", exam: "quiz-ear", dict: "quiz-ear", listen: "quiz-ear",
   uso: "quiz-uso", art: "quiz-uso", prep: "quiz-uso", phrasal: "quiz-uso",
   cond: "quiz-uso", emailtone: "quiz-uso", story: "quiz-uso",
-  place: "quiz-exams", weekly: "quiz-exams", cert: "quiz-exams",
+  quickmix: "quiz-exams", place: "quiz-exams", weekly: "quiz-exams", cert: "quiz-exams",
 };
 
 async function openQuizMode(page, mode) {

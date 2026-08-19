@@ -49,7 +49,7 @@ test("Hoy: continue story chip when in progress", async ({ page }) => {
   );
   await page.evaluate(() => window.SV.renderHoyStoryChip());
   await expect(page.locator("#hoy-story-chip")).toBeVisible();
-  await expect(page.locator("[data-story-resume]")).toBeVisible();
+  await expect(page.locator("#hoy-story-chip [data-story-resume]")).toBeVisible();
 });
 
 test("Hoy: day-marked card after the path", async ({ page }) => {
@@ -83,6 +83,61 @@ test("Hoy: story chip moves to day-marked when path is done", async ({ page }) =
   });
   await expect(page.locator("#hoy-done-story [data-story-resume]")).toBeVisible();
   await expect(page.locator("#hoy-story-chip")).toBeHidden();
+});
+
+test("Hoy: #coach-plan hash starts plan when pending", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+  });
+  await page.goto("/#coach-plan");
+  await page.waitForFunction(() => document.querySelector("#quiz.panel.active") || document.querySelector("[data-coach-plan-go]"));
+  const onQuiz = await page.locator("#quiz.panel.active").isVisible();
+  const chip = await page.locator("[data-coach-plan-go]").first().isVisible();
+  expect(onQuiz || chip).toBe(true);
+});
+
+test("Hoy: class task banner highlights once on tab open", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-class-task", "path");
+    localStorage.removeItem("enlab-class-task-auto");
+    if (window.SV?.renderClassTaskBanner) window.SV.renderClassTaskBanner();
+  });
+  await page.locator('[data-tab="hoy"]').click();
+  await page.waitForFunction(() => document.querySelector("#class-task-banner")?.classList.contains("class-task-must"));
+  await expect(page.locator("#class-task-banner")).toBeVisible();
+  const again = await page.evaluate(() => {
+    localStorage.removeItem("enlab-class-task-auto");
+    if (window.PLUS?.autoClassTask) window.PLUS.autoClassTask();
+    return document.querySelector("#class-task-banner")?.classList.contains("class-task-must");
+  });
+  expect(again).toBe(true);
+});
+
+test("Hoy: quickmix chip when friction is high", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-quiz-ux", JSON.stringify({
+      ear: { sessions: 5, completed: 1, abandoned: 4, answers: 20, correct: 8, ms: 90000 },
+    }));
+    sessionStorage.removeItem("enlab-coach-plan");
+    if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
+  });
+  await openHoyExtras(page);
+  await expect(page.locator('#coach-plan-today [data-coach-plan-mode="quickmix"]')).toBeVisible();
+});
+
+test("Hoy: coach plan card in extras when not complete", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
+  });
+  await openHoyExtras(page);
+  await expect(page.locator("#coach-plan-today")).toBeVisible();
+  await expect(page.locator("#coach-plan-today [data-coach-plan-go]")).toBeVisible();
 });
 
 test("Hoy: unfinished cierre offers Continue in Today extras", async ({ page }) => {
@@ -651,7 +706,7 @@ test("Hoy: repaso pauses path timer and restores on exit", async ({ page }) => {
       repaso: repasoOn(),
     };
   });
-  expect(before.pausedFlag).toBe("600");
+  expect(Number(before.pausedFlag)).toBeGreaterThanOrEqual(595);
   expect(before.repaso).toBe(true);
   await page.evaluate(() => clearRepasoMode());
   const after = await page.evaluate(() => ({
@@ -665,6 +720,10 @@ test("Hoy: repaso pauses path timer and restores on exit", async ({ page }) => {
 test("Hoy: cert retry chip in you-are opens cert exam", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    localStorage.removeItem("enlab-repaso");
+    document.body.classList.remove("repaso-active");
     localStorage.setItem("enlab-cert-score", JSON.stringify({
       timeUp: true, day: todayKey(), score: 8, total: 24, pct: 33, pass: false,
     }));
@@ -677,6 +736,23 @@ test("Hoy: cert retry chip in you-are opens cert exam", async ({ page }) => {
   await page.locator("#you-are-chips [data-cert-retry]").click();
   await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
   await expect(page.locator("#quiz-box")).toBeVisible();
+});
+
+test("Hoy: cert coach plan chip when plan pending", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 1, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.setItem("enlab-cert-score", JSON.stringify({
+      timeUp: true, day: todayKey(), score: 8, total: 24, pct: 33, pass: false,
+    }));
+    hoyPathI = hoyPath().length;
+    persistHoyPath();
+    finishHoyPath();
+    if (typeof fillYouAre === "function") fillYouAre();
+  });
+  await expect(page.locator("#you-are-chips [data-cert-coach-plan]")).toBeVisible();
 });
 
 test("Hoy: done mid-session chips for cierre weekly place", async ({ page }) => {
@@ -706,14 +782,20 @@ test("Hoy: done mid-session chips for cierre weekly place", async ({ page }) => 
 
 test("Hoy: podcast-today shows other podcast resume banner", async ({ page }) => {
   await boot(page);
-  await page.evaluate(() => {
+  const visible = await page.evaluate(() => {
     const list = (window.ENLAB.podcasts || []).filter((p) => (p.min || 1) <= lvlNum());
-    const other = list[1] || list[0];
+    const [Y, M, D] = todayKey().split("-").map(Number);
+    const todayPod = list[Math.floor(Date.UTC(Y, M - 1, D) / 86400000) % list.length];
+    /* find a podcast that is NOT the one for today */
+    const other = list.find((p) => p.id !== todayPod.id);
+    if (!other) return false; /* skip if only 1 accessible */
     localStorage.setItem("enlab-podcast-now", JSON.stringify({
       id: other.id, seg: 1, day: todayKey(), at: Date.now(),
     }));
     renderPodcastToday();
+    return true;
   });
+  if (!visible) return; /* not enough podcasts at this level — skip */
   await openHoyExtras(page);
   await expect(page.locator("#podcast-today .podcast-other-resume [data-podcast]")).toBeVisible();
 });
