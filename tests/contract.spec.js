@@ -88,12 +88,12 @@ test("i18n ES and EN expose the same keys", async ({ page }) => {
   expect(missingInEs, `ES falta: ${missingInEs.join(", ")}`).toEqual([]);
 });
 
-test("index has no remote fonts; SW v41 + offline fallback", async ({ request }) => {
+test("index has no remote fonts; SW v44 + offline fallback", async ({ request }) => {
   const html = await (await request.get("/index.html")).text();
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v41/);
+  expect(sw).toMatch(/enlab-v44/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -115,4 +115,28 @@ test("PIN blocks export and does not unlock the session", async ({ page }) => {
   const unlocked = await page.evaluate(() => sessionStorage.getItem("enlab-class-ok"));
   expect(unlocked).toBeNull();
   await expect(page.locator("#class-pin-status")).toContainText(/PIN/i);
+});
+
+test("lab standard: 6 tabs, lab frame, a guide per room", async ({ page, request }) => {
+  const html = await (await request.get("/index.html")).text();
+  expect(html).not.toMatch(/oido-card|oido-in/);
+  expect(html).toMatch(/lab-hub/);
+  expect(html).toMatch(/guide-lab/);
+  await boot(page);
+  await expect(page.locator("nav.tabs [data-tab]")).toHaveCount(6);
+  const miss = await page.evaluate(() => {
+    const rooms = [...document.querySelectorAll(".lab-topic[data-lab]")].map((el) => el.dataset.lab);
+    const es = window.ENLAB.ui.es.guide || {};
+    const en = window.ENLAB.ui.en.guide || {};
+    return {
+      rooms: rooms.filter((id) => !es[id]),
+      en: rooms.filter((id) => !en[id]),
+      hubs: document.querySelectorAll(".lab-hub").length,
+      oidoCards: document.querySelectorAll(".oido-card").length,
+    };
+  });
+  expect(miss.rooms, `ES guide missing: ${miss.rooms.join(", ")}`).toEqual([]);
+  expect(miss.en, `EN guide missing: ${miss.en.join(", ")}`).toEqual([]);
+  expect(miss.hubs).toBeGreaterThanOrEqual(4);
+  expect(miss.oidoCards).toBe(0);
 });

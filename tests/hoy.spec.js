@@ -9,6 +9,8 @@ test("Hoy: path, situations, class task, offline badge", async ({ page }) => {
   await expect(page.locator("#offline-badge")).toBeVisible();
   await page.locator(".hoy-next").first().click();
   await expect(page.locator("#daily-pairs .card").first()).toBeVisible();
+  await expect(page.locator("body")).toHaveClass(/session-focus/);
+  await expect(page.locator("#level-bar")).toBeHidden();
 });
 
 test("Hoy: 25+ situation keys", async ({ page }) => {

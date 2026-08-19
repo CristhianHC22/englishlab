@@ -1,6 +1,26 @@
 const { test, expect } = require("@playwright/test");
 const { boot, openQuizMode, openOidoRoom } = require("./helpers/boot");
 
+test("Quiz: after a round, stay in the same group", async ({ page }) => {
+  await boot(page);
+  await openQuizMode(page, "dict");
+  await page.locator("#quiz-start").click();
+  await expect(page.locator("#quiz-box .quiz-q")).toBeVisible();
+  await page.evaluate(() => {
+    const s = document.createElement("script");
+    s.textContent = "quiz.i = quiz.items.length; renderQuiz();";
+    document.documentElement.appendChild(s);
+    s.remove();
+  });
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+  await expect(page.locator("#quiz-again")).toBeVisible();
+  await expect(page.locator('[data-quiz-start="listen"]')).toBeVisible();
+  await expect(page.locator('[data-quiz-start="ear"]')).toBeVisible();
+  await page.locator('[data-quiz-start="ear"]').click();
+  await expect(page.locator("#quiz-box .quiz-q, #quiz-box .choices button").first()).toBeVisible();
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+});
+
 test("Quiz: dictation and listen modes", async ({ page }) => {
   await boot(page);
   await openQuizMode(page, "dict");

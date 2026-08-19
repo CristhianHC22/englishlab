@@ -49,7 +49,7 @@ Atajos (Hoy, cert, chat, podcast) deben llamar `openLabRoom` / `openQuizRoom`, n
 
 1. `<article class="lab-topic" data-lab="mi-id">` con un `h3` (el título de la barra). Si el `h3` interno lo pinta JS, añade `<h3 class="lab-topic-name" data-i18n="…">`.
 2. Ítem en el hub: `{ jump: "mi-id", key: "…", blurb: "…" }` y cadenas **ES+EN** en `i18n.js`.
-3. Copia de Guía: `ENLAB.ui.es.guide["mi-id"]` y la misma clave en `en` — `{ t, w, s: ["…"] }`. Si no hay entrada, cae a la pestaña o a `oidoRoom`.
+3. Copia de Guía: `ENLAB.ui.es.guide["mi-id"]` y la misma clave en `en` — `{ t, w, s: ["…"], d: "…" }`. Si no hay entrada, cae a la pestaña o a `oidoRoom`. El test de contrato falla si falta la clave.
 4. Tests: `openLabRoom(page, "mi-id", "tabId")`. Playwright no pulsa nodos `hidden`.
 5. Kids: filtra el ítem en `*HubItems()` y/o CSS `body.kids-mode`.
 6. Cache: bump `enlab-vNN` en `sw.js` **y** `features-sv.js`.
@@ -74,9 +74,21 @@ Juego: `openQuizRoom(mode)` traduce el modo a la sala. `startQuiz` / cert / plac
 
 - Botón `#guide-toggle` → panel `#guide-panel` (no modal). Cierra Ajustes y viceversa.
 - Contenido según `guidePlace()`: `data-lab` de la sala `.on`, o el id de la pestaña.
+- Copia: `ENLAB.ui.*.guide[place] = { t, w, s[], d? }`. `d` es “ya está cuando…”. Si no hay entrada, cae a la pestaña o a `oidoRoom`.
+- `#guide-lab`: las 6 pestañas. Un chip navega y **deja Guía abierta** (mapa del lab, no un tour de 12 pasos).
+- `#you-are` (bajo las pestañas): una línea con **dónde estás**. Pulsarla abre Guía. Se oculta mientras Guía está abierta. Durante el camino de Hoy muestra el paso actual.
+- El mapa de tarjetas es **clicable** (`data-guide-jump`): entra a la sala y Guía pasa a explicar esa sala. Dentro de una sala lista las hermanas del grupo (“También en este grupo”).
 - Primera visita a cada pestaña: se abre solo. `enlab-guide-seen` (JSON de pestañas). Tests y visual: `enlab-guide-quiet=1`.
-- En un hub de 2–8 tarjetas lista “Qué es cada tarjeta”. Oír tiene más de 8: no lista, las tarjetas ya traen blurb.
+- En un hub de 2–8 tarjetas lista “Qué es cada tarjeta”. Si el hub tiene **grupos con kicker** (Oír, Ayuda), Guía lista los grupos, no cada tarjeta.
 - No es un tour de 12 pasos. No se auto-lanza si `#welcome` está visible.
+
+## Hoy durante el camino
+
+`body.session-focus` mientras `#hoy.path-on` y no `.path-done` **y** estás en la pestaña Hoy. Oculta nivel, extras, racha y repaso. El paso actual es lo único que ocupa. Al cambiar de pestaña, el chrome vuelve.
+
+## Juego al terminar un round
+
+No echa al hub. `#quiz-again` = otro round del mismo modo. `[data-quiz-start]` = otro modo del **mismo grupo**. `lab-back` sigue siendo “Todas las…”.
 
 ## Qué no construir
 

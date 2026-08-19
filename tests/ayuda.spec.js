@@ -60,14 +60,29 @@ test("Guía: opens a box for the current screen", async ({ page }) => {
   await boot(page);
   await expect(page.locator("#guide-toggle")).toBeVisible();
   await expect(page.locator("#guide-panel")).toBeHidden();
-  await page.locator("#guide-toggle").click();
+  await expect(page.locator("#you-are")).toBeVisible();
+  await expect(page.locator("#you-are")).toContainText(/Hoy|sesión|15/i);
+  await page.locator("#you-are").click();
   await expect(page.locator("#guide-panel")).toBeVisible();
+  await expect(page.locator("#you-are")).toBeHidden();
   await expect(page.locator("#guide-title")).toContainText(/Hoy|sesión|15/i);
   await expect(page.locator("#guide-steps li")).toHaveCount(3);
+  await expect(page.locator("#guide-done")).toBeVisible();
+  await expect(page.locator("#guide-lab [data-guide-tab]")).toHaveCount(6);
+  await page.locator('[data-guide-tab="vocales"]').click();
+  await expect(page.locator("#guide-panel")).toBeVisible();
+  await expect(page.locator("#guide-title")).toContainText(/Oír|tema/i);
+  await expect(page.locator("#guide-map")).toContainText(/Vocales/);
   await page.locator('[data-tab="quiz"]').click();
   await expect(page.locator("#guide-title")).toContainText(/Juego|grupo/i);
   await expect(page.locator("#guide-map")).toContainText(/Verbos/);
   await expect(page.locator("#guide-map")).toContainText(/Exámenes/);
+  await page.locator('#guide-map [data-guide-jump="quiz-verbs"]').click();
+  await expect(page.locator("#quiz")).toHaveClass(/lab-in/);
+  await expect(page.locator("#guide-panel")).toBeVisible();
+  await expect(page.locator("#guide-title")).toContainText(/verbos/i);
+  await expect(page.locator("#guide-map")).toContainText(/grupo|group/i);
+  await page.locator("#quiz .lab-back").click();
   await page.locator("#guide-gotit").click();
   await expect(page.locator("#guide-panel")).toBeHidden();
 });
@@ -78,6 +93,8 @@ test("Guía: room copy after opening a practice", async ({ page }) => {
   await openLabRoom(page, "roleplay-card", "hablar");
   await expect(page.locator("#guide-panel")).toBeVisible();
   await expect(page.locator("#guide-title")).toContainText(/Role-play/i);
+  await openLabRoom(page, "oido-reglas", "vocales");
+  await expect(page.locator("#guide-title")).toContainText(/reglas|Rules/i);
 });
 
 test("Guía: offers itself once on first visit", async ({ page }) => {

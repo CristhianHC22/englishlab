@@ -12,7 +12,7 @@ Lee esto **antes** de tocar código. El mapa largo está en [docs/ARQUITECTURA.m
 - i18n: toda cadena nueva en **ES y EN** (`i18n.js`). `t("clave")` o `t("quizModes.place.t")`.
 - Visual: snapshots **win32 y linux**. Tras CSS/layout: `npm run test:visual:update` y Docker linux (comando en `tests/visual.spec.js`). El job CI visual usa esa misma imagen jammy.
 - No commitear `vapid-private.json`, `push-sub.json`, `node_modules`, `test-results/`.
-- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v41`). También cachear `offline.html`.
+- Al cambiar assets cacheados, subir `CACHE` en `sw.js` **y** `SW_CACHE` en `features-sv.js` (hoy `enlab-v44`). También cachear `offline.html`.
 - **6 pestañas.** Catálogo → una sala (`.lab-hub` / `.lab-topic` / `openLabRoom`). Guía (`#guide-toggle`) explica la pantalla; Ayuda son herramientas. No hamburguesa ni 7.ª pestaña. Receta en `docs/ESTANDAR.md`.
 
 ## Arranque (orden)

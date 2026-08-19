@@ -408,6 +408,7 @@ function showTab(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
   syncGuide();
   maybeOfferGuide();
+  syncSessionFocus();
 }
 
 const tabPaintHooks = [];
@@ -1061,6 +1062,16 @@ function renderHoyPath() {
   }
   if (copy) copy.textContent = text;
   $$(".hoy-next").forEach((b) => { b.textContent = label; });
+  syncSessionFocus();
+  fillYouAre();
+}
+
+function syncSessionFocus() {
+  const hoy = $("#hoy");
+  const on = currentTab === "hoy"
+    && hoy?.classList.contains("path-on")
+    && !hoy.classList.contains("path-done");
+  document.body.classList.toggle("session-focus", !!on);
 }
 
 function goHoyStep(i) {
@@ -2209,6 +2220,7 @@ function renderQuiz() {
       ${cierre ? `<p class="muted">${t("quizTipCierre")}</p>` : ""}
       ${extraGame}
       <button class="btn" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
+      ${quizPeerHtml()}
     </div>`;
     if (cierre) markSession("quizDone");
     syncRemindToSw();
@@ -2954,6 +2966,23 @@ document.addEventListener("click", (e) => {
     showTab(id);
   }
 
+  const gTab = e.target.closest("[data-guide-tab]");
+  if (gTab) {
+    showTab(gTab.dataset.guideTab);
+    setGuideOpen(true);
+  }
+
+  const gJump = e.target.closest("[data-guide-jump]");
+  if (gJump) {
+    e.preventDefault();
+    if (typeof openLabRoom === "function") openLabRoom(gJump.dataset.guideJump);
+    setGuideOpen(true);
+  }
+
+  if (e.target.closest("#you-are")) {
+    setGuideOpen(true);
+  }
+
   const jump = e.target.closest("[data-lab-jump], [data-jump]");
   if (jump) {
     e.preventDefault();
@@ -3331,6 +3360,13 @@ document.addEventListener("click", (e) => {
     $("#quiz-mode").value = qMode.dataset.quizMode;
     syncQuizModePicks();
   }
+
+  const qStart = e.target.closest("[data-quiz-start]");
+  if (qStart && $("#quiz-mode")) {
+    $("#quiz-mode").value = qStart.dataset.quizStart;
+    syncQuizModePicks();
+    startQuiz();
+  }
 });
 
 function syncQuizModePicks() {
@@ -3441,7 +3477,7 @@ function oidoHubItems() {
 
 /* Marco único: catálogo → una sala. Ver docs/ESTANDAR.md.
    Hub: .lab-hub + renderLabHub. Sala: .lab-topic[data-lab] + openLabRoom.
-   Guía: ENLAB.ui.*.guide[place] = { t, w, s[] }. */
+   Guía: ENLAB.ui.*.guide[place] = { t, w, s[], d? }. */
 function renderOidoToc() {
   renderLabHub("oido-toc", oidoHubItems());
 }
@@ -3522,6 +3558,27 @@ function quizRoomFor(mode) {
 
 function openQuizRoom(mode) {
   return openLabRoom(quizRoomFor(mode));
+}
+
+function quizPeerModes(mode) {
+  const room = quizRoomFor(mode);
+  const groups = {
+    "quiz-verbs": ["choice", "type", "ed"],
+    "quiz-ear": ["ear", "exam", "dict", "listen"],
+    "quiz-uso": ["uso", "art", "prep", "phrasal", "cond", "emailtone", "story"],
+    "quiz-exams": ["place", "weekly", ...(typeof kidsOn === "function" && kidsOn() ? [] : ["cert"])],
+  };
+  return (groups[room] || []).filter((m) => m !== mode);
+}
+
+function quizPeerHtml() {
+  if (!quiz || quiz.mode === "cierre") return "";
+  const peers = quizPeerModes(quiz.mode);
+  if (!peers.length) return "";
+  return `<p class="muted quiz-peers-label">${esc(t("quizSameGroup"))}</p>
+    <div class="row quiz-peers">${peers.map((m) =>
+      `<button type="button" class="btn ghost sm" data-quiz-start="${esc(m)}">${esc(t(`quizModes.${m}.t`))}</button>`
+    ).join("")}</div>`;
 }
 
 function closeLabRoom(panel) {
@@ -3997,38 +4054,110 @@ function fillGuide() {
   const title = $("#guide-title");
   const why = $("#guide-why");
   const steps = $("#guide-steps");
+  const done = $("#guide-done");
   if (title) title.textContent = entry.t || "";
   if (why) why.textContent = entry.w || "";
   if (steps) {
     const list = Array.isArray(entry.s) ? entry.s : [];
     steps.innerHTML = list.map((line) => `<li>${esc(line)}</li>`).join("");
   }
+  if (done) {
+    done.hidden = !entry.d;
+    done.textContent = entry.d ? `${t("guideWhen")} ${entry.d}` : "";
+  }
   fillGuideMap();
+  fillGuideLab();
+  fillYouAre();
+}
+
+function fillYouAre() {
+  const btn = $("#you-are");
+  const text = $("#you-are-text");
+  if (!btn || !text) return;
+  const guideOpen = $("#guide-panel") && !$("#guide-panel").hidden;
+  btn.hidden = !!guideOpen;
+  const hoy = $("#hoy");
+  const pathOn = currentTab === "hoy"
+    && hoy?.classList.contains("path-on")
+    && !hoy.classList.contains("path-done");
+  const pathCopy = $("#hoy-path-copy")?.textContent?.trim();
+  if (pathOn && pathCopy) {
+    text.textContent = pathCopy;
+    return;
+  }
+  const entry = guideEntry(guidePlace());
+  text.textContent = entry?.t || "";
 }
 
 function fillGuideMap() {
   const box = $("#guide-map");
   if (!box) return;
   const panel = document.getElementById(currentTab);
+  const cards = [...(panel?.querySelectorAll(".lab-card") || [])];
   const inRoom = panel?.classList.contains("lab-in");
   if (inRoom) {
-    box.hidden = true;
-    box.innerHTML = "";
+    const here = guidePlace();
+    const hereCard = panel.querySelector(`[data-lab-jump="${CSS.escape(here)}"]`);
+    const group = hereCard?.closest(".lab-hub-group") || panel.querySelector(".lab-hub");
+    const sibs = [...(group?.querySelectorAll(".lab-card") || [])]
+      .filter((c) => (c.dataset.labJump || c.dataset.jump) !== here);
+    if (!sibs.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML = `<p class="kicker">${esc(t("guideAlso"))}</p><div class="guide-lab-row">`
+      + sibs.map((c) => guideCardChip(c)).join("")
+      + `</div>`;
     return;
   }
-  const cards = [...(panel?.querySelectorAll(".lab-card") || [])];
-  if (cards.length < 2 || cards.length > 8) {
+  const groups = [...(panel?.querySelectorAll(".lab-hub-group") || [])];
+  if (cards.length < 2) {
     box.hidden = true;
     box.innerHTML = "";
     return;
   }
   box.hidden = false;
+  const named = groups.filter((g) => g.querySelector(".kicker")?.textContent?.trim());
+  if (named.length >= 2) {
+    box.innerHTML = `<p class="kicker">${esc(t("guideCards"))}</p>`
+      + named.map((g) => {
+        const k = g.querySelector(".kicker")?.textContent || "";
+        const chips = [...g.querySelectorAll(".lab-card")].map((c) => guideCardChip(c)).join("");
+        return `<div class="guide-map-group"><p><strong>${esc(k)}</strong></p><div class="guide-lab-row">${chips}</div></div>`;
+      }).join("");
+    return;
+  }
   box.innerHTML = `<p class="kicker">${esc(t("guideCards"))}</p>`
     + cards.map((c) => {
+      const jump = c.dataset.labJump || c.dataset.jump || "";
       const name = c.querySelector("strong")?.textContent || "";
       const blurb = c.querySelector(".muted")?.textContent || "";
-      return `<p><strong>${esc(name)}</strong> — ${esc(blurb)}</p>`;
+      return `<button type="button" class="guide-jump" data-guide-jump="${esc(jump)}"><strong>${esc(name)}</strong><span class="muted">${esc(blurb)}</span></button>`;
     }).join("");
+}
+
+function guideCardChip(c) {
+  const jump = c.dataset.labJump || c.dataset.jump || "";
+  const name = c.querySelector("strong")?.textContent || "";
+  return `<button type="button" class="chip sm" data-guide-jump="${esc(jump)}">${esc(name)}</button>`;
+}
+
+function fillGuideLab() {
+  const box = $("#guide-lab");
+  if (!box) return;
+  const lang = uiLang();
+  const tabs = ENLAB.ui?.[lang]?.tabs || ENLAB.ui?.es?.tabs || {};
+  const order = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
+  box.hidden = false;
+  box.innerHTML = `<p class="kicker">${esc(t("guideLab"))}</p><p class="muted guide-lab-hint">${esc(t("guideLabHint"))}</p><div class="guide-lab-row">`
+    + order.map((id) => {
+      const on = id === currentTab ? " on" : "";
+      const cur = id === currentTab ? "page" : "false";
+      return `<button type="button" class="chip sm${on}" data-guide-tab="${id}" aria-current="${cur}">${esc(tabs[id] || id)}</button>`;
+    }).join("")
+    + `</div>`;
 }
 
 function setGuideOpen(on) {
@@ -4049,9 +4178,11 @@ function setGuideOpen(on) {
     fillGuide();
     markGuideSeen(currentTab);
   }
+  fillYouAre();
 }
 
 function syncGuide() {
+  fillYouAre();
   const panel = $("#guide-panel");
   if (panel && !panel.hidden) fillGuide();
 }
@@ -4185,6 +4316,7 @@ function applyUiLangBody() {
   setPressed($("#guide-toggle"), guideOpen);
   $("#guide-toggle")?.setAttribute("aria-expanded", guideOpen ? "true" : "false");
   if (guideOpen) fillGuide();
+  fillYouAre();
 }
 
 function dateKey(d) {

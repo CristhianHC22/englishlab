@@ -23,10 +23,10 @@
       <h2 data-i18n="welcomeTitle">Pulsa, oye, repite</h2>
       <ol>
         <li data-i18n="welcomeStep1">Elige un nivel: A1 es fácil, B1 es la meta.</li>
-        <li data-i18n="welcomeStep2">El triángulo es robot. <strong>gente real</strong> abre YouGlish (nativos).</li>
+        <li data-i18n="welcomeStep2">Seis pestañas abajo. Hoy es la sesión de 15 min. Oír, Verbos, Juego y Hablar son práctica. Ayuda son herramientas.</li>
         <li data-i18n="welcomeStep3">Pulsa <strong>Empezar el camino</strong>: pares → verbos → diálogo (Grabar B aquí) → 3 preguntas.</li>
       </ol>
-      <p class="muted" data-i18n="welcomeNote">Chrome o Edge. 15 minutos. Nada se sube a internet. Instala la app si quieres avisos más fiables.</p>
+      <p class="muted" data-i18n="welcomeNote">Guía (arriba a la derecha) explica la pantalla en la que estás. Chrome o Edge. Nada se sube a internet.</p>
       <p><button type="button" class="btn" id="welcome-go" data-i18n="onboardStart">Empezar</button></p>
     </div>
   </div>
@@ -38,7 +38,7 @@
           <h1>English Lab</h1>
         </div>
         <div class="hero-tools">
-          <button type="button" class="chip" id="guide-toggle" aria-expanded="false" aria-controls="guide-panel" data-i18n="guideBtn">Guía</button>
+          <button type="button" class="chip" id="guide-toggle" aria-expanded="false" aria-controls="guide-panel" data-i18n="guideBtn" data-i18n-aria="guideBtnAria" aria-label="Guía: cómo funciona esta pantalla">Guía</button>
           <button type="button" class="chip" id="prefs-toggle" aria-expanded="false" aria-controls="prefs-panel" data-i18n="prefs">Ajustes</button>
         </div>
       </div>
@@ -72,13 +72,17 @@
     </header>
 
     <nav class="tabs" aria-label="Secciones" data-i18n-aria="navAria">
-      <button data-tab="hoy" aria-current="page">Hoy</button>
-      <button data-tab="vocales">Oír</button>
-      <button data-tab="verbos">Verbos</button>
-      <button data-tab="quiz">Juego</button>
-      <button data-tab="hablar">Hablar</button>
-      <button data-tab="ia">Ayuda</button>
+      <button data-tab="hoy" aria-current="page" data-i18n-title="tabHintHoy" title="Sesión de 15 min. Un botón te lleva.">Hoy</button>
+      <button data-tab="vocales" data-i18n-title="tabHintVocales" title="Temas para oír. Cada tarjeta es una sala.">Oír</button>
+      <button data-tab="verbos" data-i18n-title="tabHintVerbos" title="Tu lista: busca, oye, marca débil o fuerte.">Verbos</button>
+      <button data-tab="quiz" data-i18n-title="tabHintQuiz" title="Rounds. Primero un grupo, luego el juego.">Juego</button>
+      <button data-tab="hablar" data-i18n-title="tabHintHablar" title="Oye el modelo y grábate. Prácticas extra abajo.">Hablar</button>
+      <button data-tab="ia" data-i18n-title="tabHintIa" title="Herramientas (prompts, aula). No explica el lab: eso es Guía.">Ayuda</button>
     </nav>
+
+    <button type="button" id="you-are" class="you-are" aria-controls="guide-panel" data-i18n-title="youAreHint" title="Pulsa para abrir Guía">
+      <span id="you-are-text"></span>
+    </button>
 
     <aside id="guide-panel" class="guide-panel" hidden>
       <div class="guide-panel-head">
@@ -88,7 +92,9 @@
       <h2 id="guide-title"></h2>
       <p class="muted" id="guide-why"></p>
       <ol id="guide-steps"></ol>
+      <p id="guide-done" class="guide-done" hidden></p>
       <div id="guide-map" class="guide-map" hidden></div>
+      <nav id="guide-lab" class="guide-lab" hidden></nav>
     </aside>
 
     <section id="hoy" class="panel active">
