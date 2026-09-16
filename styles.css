@@ -1442,6 +1442,8 @@ nav.tabs [data-tab="quiz"].quickmix-hot::after {
 .podcast-progress-label { position: relative; z-index: 1; font-size: 11px; line-height: 20px; padding-left: 8px; color: var(--fg); font-variant-numeric: tabular-nums; }
 .cert-progress-ring { flex-shrink: 0; }
 .journal-mode-chips { flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.class-coach-plan-alert { margin: 8px 0 0; }
+.remind-preview { margin: 4px 0 0; font-size: 13px; }
 .journal-controls-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
 .journal-search { flex: 1; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 14px; }
 .journal-sort { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 13px; flex-shrink: 0; }

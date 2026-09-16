@@ -563,3 +563,12 @@ Avance v111:
 - **UX**: Guía repaso+plan = un hint; sin tarjeta coach duplicada en Día marcado; end-card sin párrafo extra.
 - **Perf**: caches Guía/plan/quiz-now incluyen idioma; lang toggle invalida; timer solo cuando aplica.
 - Cache SW: `enlab-v90`.
+
+Avance v112:
+
+- **Aula pro**: chip alerta «N sin empezar» filtra roster/heatmap; task-pick refresca panel; heatmap sync con filtro.
+- **Diario**: chip filtro plan; `journalPlayMode` entiende `plan:`; coach mode por familia.
+- **Verbos**: atajo **O** → Plan hoy; Guía lo lista.
+- **Push**: preview del próximo aviso bajo `#remind-status`.
+- **Quiz end**: kids sin CTAs de plan; menos tips si ya hay barra coach.
+- Cache SW: `enlab-v91`.

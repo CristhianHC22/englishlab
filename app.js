@@ -4283,9 +4283,11 @@ function renderQuiz() {
     const backHoy = fromHoy
       ? `<button type="button" class="btn ghost sm" data-go-tab="hoy">${esc(t("quizBackHoy"))}</button>`
       : "";
-    const coachBtn = !cierre ? quizCoachEndHtml(quiz.mode) : "";
-    const warmPlanBtn = !cierre && !cert && !weekly && quiz.mode !== "place" ? certWarmupPlanHtml(quiz.mode) : "";
-    const placePlanBtn = quiz.mode === "place" ? placementCoachPlanHtml() : "";
+    const kidsEnd = typeof kidsOn === "function" && kidsOn();
+    const coachBtn = !cierre && !kidsEnd ? quizCoachEndHtml(quiz.mode) : "";
+    const warmPlanBtn = !cierre && !kidsEnd && !cert && !weekly && quiz.mode !== "place" ? certWarmupPlanHtml(quiz.mode) : "";
+    const placePlanBtn = !kidsEnd && quiz.mode === "place" ? placementCoachPlanHtml() : "";
+    const skipHints = !!(coachBtn || warmPlanBtn || placePlanBtn);
     box.innerHTML = `<div class="card">
       ${cierre ? `<p class="kicker cierre-kicker">${esc(t("cierreKicker"))}</p>` : ""}
       <h3>${cierre ? t("quizClosed") : weekly ? t("quizWeeklyDone") : cert ? t("quizCertDone") : t("quizDone")}</h3>
@@ -4298,19 +4300,19 @@ function renderQuiz() {
             ? t("quizFailsReview", { list: quiz.fails.join(" · ") })
             : t("quizFailsWeak", { list: quiz.fails.join(", ") }))
         : t("quizNoFails")}</p>
-      ${!cierre && quizUxHint(quiz.mode) ? `<p class="muted">${esc(quizUxHint(quiz.mode))}</p>` : ""}
-      ${!cierre && quizCoachHint(quiz.mode) ? `<p class="muted">${esc(quizCoachHint(quiz.mode))}</p>` : ""}
+      ${!cierre && !skipHints && quizUxHint(quiz.mode) ? `<p class="muted">${esc(quizUxHint(quiz.mode))}</p>` : ""}
+      ${!cierre && !skipHints && quizCoachHint(quiz.mode) ? `<p class="muted">${esc(quizCoachHint(quiz.mode))}</p>` : ""}
       ${!cierre && quizEasyRecoverHint(quiz.mode) ? `<p class="muted">${esc(quizEasyRecoverHint(quiz.mode))}</p>` : ""}
-      ${ear ? `<p class="muted">${t("quizTipEar")}</p>` : ""}
-      ${quiz.mode === "uso" ? `<p class="muted">${t("quizTipUso")}</p>` : ""}
-      ${quiz.mode === "art" ? `<p class="muted">${t("quizTipArt")}</p>` : ""}
-      ${quiz.mode === "prep" ? `<p class="muted">${t("quizTipPrep")}</p>` : ""}
-      ${quiz.mode === "phrasal" ? `<p class="muted">${t("quizTipPhrasal")}</p>` : ""}
-      ${quiz.mode === "cond" ? `<p class="muted">${t("quizTipCond")}</p>` : ""}
-      ${quiz.mode === "dict" ? `<p class="muted">${t("quizTipDict")}</p>` : ""}
-      ${quiz.mode === "listen" ? `<p class="muted">${t("quizTipListen")}</p>` : ""}
-      ${weekly ? `<p class="muted">${t("quizTipWeekly")}</p>` : ""}
-      ${quiz.mode === "story" ? `<p class="muted">${esc(t("storyQuizTip"))}</p>` : ""}
+      ${!skipHints && ear ? `<p class="muted">${t("quizTipEar")}</p>` : ""}
+      ${!skipHints && quiz.mode === "uso" ? `<p class="muted">${t("quizTipUso")}</p>` : ""}
+      ${!skipHints && quiz.mode === "art" ? `<p class="muted">${t("quizTipArt")}</p>` : ""}
+      ${!skipHints && quiz.mode === "prep" ? `<p class="muted">${t("quizTipPrep")}</p>` : ""}
+      ${!skipHints && quiz.mode === "phrasal" ? `<p class="muted">${t("quizTipPhrasal")}</p>` : ""}
+      ${!skipHints && quiz.mode === "cond" ? `<p class="muted">${t("quizTipCond")}</p>` : ""}
+      ${!skipHints && quiz.mode === "dict" ? `<p class="muted">${t("quizTipDict")}</p>` : ""}
+      ${!skipHints && quiz.mode === "listen" ? `<p class="muted">${t("quizTipListen")}</p>` : ""}
+      ${!skipHints && weekly ? `<p class="muted">${t("quizTipWeekly")}</p>` : ""}
+      ${!skipHints && quiz.mode === "story" ? `<p class="muted">${esc(t("storyQuizTip"))}</p>` : ""}
       ${cierre ? `<p class="muted">${t("quizTipCierre")}</p>` : ""}
       ${extraGame}
       <button class="btn${cierre ? " ghost" : ""}" id="quiz-again">${cierre ? t("quizAgainCierre") : weekly ? t("quizAgainWeekly") : t("quizAgain")}</button>
@@ -5887,7 +5889,17 @@ document.addEventListener("keydown", (e) => {
       e.preventDefault();
       return;
     }
-    if (["w", "f", "d"].includes(key)) {
+    if (["w", "f", "d", "o"].includes(key)) {
+      if (key === "o") {
+        if (!isCoachVerbStep()) return;
+        const coachBtn = document.querySelector('#verb-filters [data-only="coach"]');
+        if (!coachBtn) return;
+        e.preventDefault();
+        FILTERS.only = FILTERS.only === "coach" ? "level" : "coach";
+        if (typeof saveVerbFilterPrefs === "function") saveVerbFilterPrefs();
+        renderVerbs();
+        return;
+      }
       const cards = $("#verb-list")?.querySelectorAll("[data-verb-card]") || [];
       if (!cards.length) return;
       if (!_activeVerbInf) _activeVerbInf = cards[0].dataset.verbCard || "";
@@ -6761,16 +6773,36 @@ function renderRemind() {
     st.textContent = t("remindScheduled", { time: remindTime(), extra }) + push;
     const testBtn = $("#remind-push-test");
     if (testBtn) testBtn.hidden = false;
+    let preview = $("#remind-preview");
+    if (!preview && st.parentElement) {
+      preview = document.createElement("p");
+      preview.id = "remind-preview";
+      preview.className = "muted remind-preview";
+      st.insertAdjacentElement("afterend", preview);
+    }
+    if (preview) {
+      const p = syncRemindPayload();
+      const body = remindPushBody(
+        p.dueCount, p.coachPlanLeft, p.coachPlanStarted,
+        p.quickmixHot, p.placePlanNudge, p.certWarmupNudge
+      );
+      preview.hidden = false;
+      preview.textContent = t("remindPreview", { body });
+    }
     syncRemindToSw();
     return;
   }
   if (on && Notification.permission === "denied") {
     st.textContent = t("remindBlocked");
+    const preview = $("#remind-preview");
+    if (preview) preview.hidden = true;
     return;
   }
   const testBtn = $("#remind-push-test");
   if (testBtn) testBtn.hidden = true;
   st.textContent = t("remindDefault");
+  const preview = $("#remind-preview");
+  if (preview) preview.hidden = true;
   syncRemindToSw();
 }
 
@@ -7221,7 +7253,8 @@ function fillGuideKeyboardHints() {
   const lang = typeof uiLang === "function" ? uiLang() : "es";
   const tab = currentTab;
   const repasoPlan = repasoOn() && typeof coachPlanLeft === "function" && coachPlanLeft() > 0;
-  const keysKey = `${lang}|${tab}|${repasoPlan ? "p" : ""}`;
+  const verbCoach = tab === "verbos" && typeof isCoachVerbStep === "function" && isCoachVerbStep();
+  const keysKey = `${lang}|${tab}|${repasoPlan ? "p" : ""}|${verbCoach ? "o" : ""}`;
   if (keysKey === _lastGuideKeysKey && box.innerHTML) return;
   _lastGuideKeysKey = keysKey;
   const shortcuts = [
@@ -7231,6 +7264,7 @@ function fillGuideKeyboardHints() {
     { keys: "1–9", desc: t("guideKeyNumbersQuiz") },
     { keys: "↑ / ↓", desc: t("guideKeyArrows") },
     { keys: "W / D / F", desc: t("guideKeyWdf") },
+    ...(verbCoach ? [{ keys: "O", desc: t("guideKeyVerbPlan") }] : []),
     { keys: "R", desc: t("guideKeyR") },
     ...(repasoPlan ? [{ keys: "P", desc: t("guideKeyRepasoPlan") }] : []),
     { keys: "Esc", desc: t("guideKeyEscape") },

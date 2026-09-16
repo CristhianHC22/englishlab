@@ -717,6 +717,28 @@ test("Verbos filter shows Plan hoy when coach step is verbs", async ({ page }) =
   await expect(page.locator('#verb-filters [data-only="coach"]')).toBeVisible();
 });
 
+test("Verbos O shortcut toggles Plan hoy filter", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 2, steps: ["ear", "uso", "choice"],
+    }));
+    FILTERS.only = "level";
+    if (typeof renderVerbs === "function") renderVerbs();
+  });
+  await page.locator('[data-tab="verbos"]').click();
+  await page.evaluate(() => {
+    FILTERS.only = "level";
+    if (typeof renderVerbs === "function") renderVerbs();
+  });
+  await expect(page.locator('#verb-filters [data-only="coach"]')).toBeVisible();
+  await expect(page.locator('#verb-filters [data-only="coach"].on')).toHaveCount(0);
+  await page.keyboard.press("o");
+  await expect(page.locator('#verb-filters [data-only="coach"].on')).toBeVisible();
+  await page.keyboard.press("o");
+  await expect(page.locator('#verb-filters [data-only="coach"].on')).toHaveCount(0);
+});
+
 test("Alt+1 switches to Hoy tab", async ({ page }) => {
   await boot(page);
   await page.locator('[data-tab="hablar"]').click();

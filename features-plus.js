@@ -178,7 +178,8 @@
   }
 
   function journalPlayMode(mode) {
-    const m = String(mode || "").toLowerCase();
+    let m = String(mode || "").toLowerCase();
+    if (m.startsWith("plan:")) m = m.slice(5);
     if (m === "exam") return "ear";
     if (["ear", "dict", "listen"].includes(m)) return m;
     if (["choice", "type", "ed"].includes(m)) return m;
@@ -189,12 +190,18 @@
 
   function journalCoachPlanMode() {
     const errors = loadErrors().slice(0, 30);
-    const stepScores = { ear: 0, uso: 0, choice: 0 };
+    const famScores = { ear: 0, uso: 0, verbs: 0 };
+    const famOf = (mode) => {
+      if (typeof coachPlanFamily === "function") return coachPlanFamily(journalPlayMode(mode)) || "";
+      const m = journalPlayMode(mode);
+      if (["ear", "dict", "listen"].includes(m)) return "ear";
+      if (["choice", "type", "ed"].includes(m)) return "verbs";
+      if (m === "hablar") return "";
+      return "uso";
+    };
     errors.forEach((r) => {
-      const m = journalPlayMode(r.mode);
-      if (["ear", "dict", "listen"].includes(m)) stepScores.ear += 1;
-      else if (["choice", "type", "ed"].includes(m)) stepScores.choice += 1;
-      else if (m !== "hablar") stepScores.uso += 1;
+      const fam = famOf(r.mode);
+      if (fam && famScores[fam] != null) famScores[fam] += 1;
     });
     try {
       const wf = typeof loadWeeklyFailsForCoach === "function"
@@ -203,9 +210,8 @@
       const day = typeof todayKey === "function" ? todayKey() : "";
       if (wf?.day === day && Array.isArray(wf.modes)) {
         wf.modes.forEach((m) => {
-          if (["ear", "dict", "listen", "exam"].includes(m)) stepScores.ear += 2;
-          else if (["choice", "type", "ed"].includes(m)) stepScores.choice += 2;
-          else stepScores.uso += 2;
+          const fam = famOf(m);
+          if (fam && famScores[fam] != null) famScores[fam] += 2;
         });
       }
     } catch { /* ignore */ }
@@ -215,7 +221,8 @@
     let best = pending[0] || "ear";
     let max = -1;
     pending.forEach((step) => {
-      const n = stepScores[step] || 0;
+      const fam = typeof coachPlanFamily === "function" ? coachPlanFamily(step) : famOf(step);
+      const n = famScores[fam] || 0;
       if (n > max) { max = n; best = step; }
     });
     return best;
@@ -269,9 +276,16 @@
   function renderErrorJournal() {
     const host = document.querySelector("#error-journal");
     if (!host) return;
+    let sortedRows = loadErrors();
+    let focus = "";
+    try { focus = sessionStorage.getItem("enlab-journal-focus") || ""; } catch { focus = ""; }
+    const focusNorm = focus.toLowerCase().trim();
+    const planFocus = focusNorm === "plan" || focusNorm === "plan 8 min" || focusNorm === "8-min plan";
+    if (planFocus) {
+      sortedRows = sortedRows.filter((r) => r.planStep);
+    }
     let sortBy = "date";
     try { sortBy = sessionStorage.getItem("enlab-journal-sort") || "date"; } catch { /* ignore */ }
-    let sortedRows = loadErrors();
     if (sortBy === "mode") {
       sortedRows = [...sortedRows].sort((a, b) => journalPlayMode(a.mode).localeCompare(journalPlayMode(b.mode)));
     } else if (sortBy === "word") {
@@ -279,16 +293,13 @@
     }
     /* date = default order (most recent first, already stored that way) */
     const rows = sortedRows.slice(0, 12);
-    let focus = "";
-    try { focus = sessionStorage.getItem("enlab-journal-focus") || ""; } catch { focus = ""; }
-    const focusNorm = focus.toLowerCase().trim();
-    const hitI = focusNorm
+    const hitI = focusNorm && !planFocus
       ? rows.findIndex((r) => [r.expected, r.prompt, r.said].some((x) =>
         x && String(x).toLowerCase().includes(focusNorm.slice(0, 40))))
       : -1;
-    let nowI = hitI >= 0 ? hitI : (focusNorm && rows.length ? 0 : -1);
+    let nowI = hitI >= 0 ? hitI : ((focusNorm && !planFocus && rows.length) ? 0 : -1);
     let nowRow = nowI >= 0 ? rows[nowI] : null;
-    if (hitI < 0 && focusNorm) {
+    if (hitI < 0 && focusNorm && !planFocus) {
       const modeHit = rows.filter((r) => {
         const m = journalPlayMode(r.mode);
         const label = (tt(`quizModes.${m}.t`) || m).toLowerCase();
@@ -318,16 +329,20 @@
     /* collect distinct modes for filter chips */
     const allRows = loadErrors().slice(0, 80);
     const modeCounts = {};
+    let planN = 0;
     allRows.forEach((r) => {
       const m = journalPlayMode(r.mode);
       modeCounts[m] = (modeCounts[m] || 0) + 1;
+      if (r.planStep) planN += 1;
     });
     const modeKeys = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a]);
-    const activeModeFilter = focusNorm && !focusNorm.includes(" ")
-      ? modeKeys.find((m) => focusNorm.includes(m.slice(0, 4))) : "";
-    const modeChipsHtml = modeKeys.length > 1 ? `
+    const activeModeFilter = planFocus ? "plan"
+      : (focusNorm && !focusNorm.includes(" ")
+        ? modeKeys.find((m) => focusNorm.includes(m.slice(0, 4))) : "");
+    const modeChipsHtml = (modeKeys.length > 1 || planN > 0) ? `
       <div class="journal-mode-chips row" role="group" aria-label="${esc(tt("journalFilterAria"))}">
         <button type="button" class="chip${!activeModeFilter ? " on" : ""}" data-journal-mode="">${esc(tt("journalFilterAll"))}</button>
+        ${planN ? `<button type="button" class="chip${activeModeFilter === "plan" ? " on" : ""}" data-journal-mode="plan">${esc(tt("journalPlanTag"))} <span class="muted">${planN}</span></button>` : ""}
         ${modeKeys.map((m) => {
           const on = activeModeFilter === m;
           const label = (typeof t === "function" && t(`quizModes.${m}.t`)) || m;
@@ -942,6 +957,7 @@
     bootstrap,
     logError,
     logPlanStepEvent,
+    journalPlayMode,
     startPlacement,
     makePlacementItems,
     loadPlaceNow,

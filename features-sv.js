@@ -772,6 +772,7 @@
         </tbody>
       </table>
       ${classCoachPlanSummaryHtml()}
+      ${classCoachPlanAlertHtml()}
       ${classCoachPlanHeatHtml()}
       ${classFrictionHeatmapHtml()}`;
   }
@@ -787,6 +788,15 @@
     document.querySelectorAll(".class-plan-heat-filters .chip").forEach((btn) => {
       btn.classList.toggle("active", (btn.dataset.planHeatFilter || "") === _classPlanHeatFilter);
     });
+    document.querySelectorAll(".class-plan-heat-row").forEach((row) => {
+      const st = row.dataset.planHeatFilter || "";
+      row.hidden = !!(_classPlanHeatFilter && st !== _classPlanHeatFilter);
+    });
+    const alert = document.querySelector(".class-coach-plan-alert");
+    if (alert) {
+      const pending = roster.filter((s) => rosterCoachPlanStatus(s) === "pending").length;
+      alert.hidden = pending <= 0;
+    }
   }
 
   function printClassCoachPlanSheet() {
@@ -920,6 +930,23 @@
     return t("classCoachPlanCell", { done, total });
   }
 
+  function classCoachPlanAlertHtml() {
+    const pending = loadRoster().filter((s) => rosterCoachPlanStatus(s) === "pending").length;
+    if (!pending) return "";
+    return `<p class="class-coach-plan-alert row" role="status" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">
+      <button type="button" class="chip sm" data-plan-heat-filter="pending">${esc(t("classTaskCoachPending", { n: pending }))}</button>
+    </p>`;
+  }
+
+  function classCoachPlanSummaryHtml() {
+    const rows = loadRoster().map((s) => rosterCoachPlanStatus(s)).filter(Boolean);
+    if (!rows.length) return "";
+    const pending = rows.filter((x) => x === "pending").length;
+    const mid = rows.filter((x) => x === "mid").length;
+    const done = rows.filter((x) => x === "done").length;
+    return `<p class="muted class-coach-plan-summary">${esc(t("classCoachPlanSummary", { pending, mid, done }))}</p>`;
+  }
+
   function classCoachPlanHeatHtml() {
     const kids = typeof kidsOn === "function" && kidsOn();
     const items = loadRoster().map((s) => ({
@@ -930,28 +957,23 @@
         : rosterCoachPlanCell(s),
     })).filter((x) => x.status);
     if (!items.length) return "";
+    const hint = kids
+      ? ""
+      : `<p class="muted">${esc(t("classCoachPlanHeatHint"))}</p>`;
     return `
       <details class="fold class-coach-plan-heat" open>
         <summary class="muted">${esc(t("classCoachPlanHeatTitle"))}</summary>
-        <p class="muted">${esc(t("classCoachPlanHeatHint"))} ${esc(t("classCoachPlanHeatClick"))}</p>
-        ${classPlanHeatFilterHtml(localStorage.getItem("enlab-class-task") === "coach")}
+        ${hint}
+        ${classPlanHeatFilterHtml(true)}
         <table class="mini-table class-heat-table class-plan-heat-table">
           <thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColCoachPlan"))}</th></tr></thead>
           <tbody>${items.map((r) => {
             const lvl = r.status === "done" ? "lo" : r.status === "mid" ? "mid" : "hi";
-            return `<tr class="class-plan-heat-row" tabindex="0" role="button" data-plan-heat-filter="${esc(r.status)}" title="${esc(t("classCoachPlanHeatClick"))}"><td>${esc(r.name)}</td><td class="class-heat-cell ${lvl}">${esc(r.label)}</td></tr>`;
+            const hide = _classPlanHeatFilter && r.status !== _classPlanHeatFilter;
+            return `<tr class="class-plan-heat-row" tabindex="0" role="button" data-plan-heat-filter="${esc(r.status)}" title="${esc(t("classCoachPlanHeatClick"))}"${hide ? " hidden" : ""}><td>${esc(r.name)}</td><td class="class-heat-cell ${lvl}">${esc(r.label)}</td></tr>`;
           }).join("")}</tbody>
         </table>
       </details>`;
-  }
-
-  function classCoachPlanSummaryHtml() {
-    const rows = loadRoster().map((s) => rosterCoachPlanStatus(s)).filter(Boolean);
-    if (!rows.length) return "";
-    const pending = rows.filter((x) => x === "pending").length;
-    const mid = rows.filter((x) => x === "mid").length;
-    const done = rows.filter((x) => x === "done").length;
-    return `<p class="muted class-coach-plan-summary">${esc(t("classCoachPlanSummary", { pending, mid, done }))}</p>`;
   }
 
   function exportClassCoachPlanCsv() {
@@ -1274,7 +1296,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v90";
+  const SW_CACHE = "enlab-v91";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1532,6 +1554,7 @@
       if (e.target.matches("#class-task-pick")) {
         localStorage.setItem("enlab-class-task", e.target.value);
         renderClassTaskBanner();
+        renderClassPro();
       }
     });
 

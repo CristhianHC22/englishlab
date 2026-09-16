@@ -13,6 +13,28 @@ test("Plus: journal shows plan step tag", async ({ page }) => {
   await expect(page.locator("#error-journal")).toContainText(/plan 8 min|8-min plan/i);
 });
 
+test("Plus: journal plan filter chip", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "uso", expected: "are", prompt: "x", said: "is", why: "y" },
+      { at: Date.now() - 1, mode: "plan:ear", expected: "Plan", prompt: "paso", said: "out", why: "z", planStep: "abandon" },
+    ]));
+    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
+  });
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator('#error-journal [data-journal-mode="plan"]')).toBeVisible();
+  await page.locator('#error-journal [data-journal-mode="plan"]').click();
+  await expect(page.locator("#error-journal .journal-card-plan")).toBeVisible();
+  await expect(page.locator("#error-journal")).not.toContainText(/\bare\b/);
+});
+
+test("Plus: journalPlayMode strips plan prefix", async ({ page }) => {
+  await boot(page);
+  const mode = await page.evaluate(() => window.PLUS.journalPlayMode("plan:listen"));
+  expect(mode).toBe("listen");
+});
+
 test("Plus: placement bank and CEFR bands", async ({ page }) => {
   await boot(page);
   const info = await page.evaluate(() => ({

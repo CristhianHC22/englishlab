@@ -93,7 +93,7 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v90/);
+  expect(sw).toMatch(/enlab-v91/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -171,6 +171,18 @@ test("SW remindCopy four priority tiers", async ({ request }) => {
     .toMatch(/fricci/i);
   expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, quickmixHot: false }).body)
     .toMatch(/plan 8 min|3 pasos/i);
+});
+
+test("Remind push body preview helper matches priority", async ({ page }) => {
+  await boot(page);
+  const bodies = await page.evaluate(() => ({
+    place: remindPushBody(0, 3, false, false, true, false),
+    plan: remindPushBody(0, 3, false, false, false, false),
+    due: remindPushBody(5, 0, false, false, false, false),
+  }));
+  expect(bodies.place).toMatch(/test|nivel|level/i);
+  expect(bodies.plan).toMatch(/plan 8 min|8-min plan/i);
+  expect(bodies.due).toMatch(/repaso|due|SRS|tarjeta/i);
 });
 
 test("Remind push priority: place beats cert warmup beats quickmix", async ({ page }) => {
