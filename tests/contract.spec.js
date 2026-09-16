@@ -93,7 +93,7 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v92/);
+  expect(sw).toMatch(/enlab-v93/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -295,6 +295,21 @@ test("remindPushBody matches SW remindCopy for priority bodies", async ({ page, 
   expect(run({
     lang: app.lang, dueCount: 0, coachPlanLeft: 2, coachPlanStarted: true,
   }).body).toBe(app.mid);
+});
+
+test("remindPushBody mid-plan uses singular when one step left", async ({ page, request }) => {
+  await boot(page);
+  const sw = await (await request.get("/sw.js")).text();
+  const fn = sw.match(/function remindCopy\(data\)\s*\{[\s\S]*?\n\}/);
+  const run = new Function(`${fn[0]}; return remindCopy;`)();
+  const app = await page.evaluate(() => ({
+    mid1: remindPushBody(0, 1, true, false, false, false),
+    lang: uiLang(),
+  }));
+  expect(app.mid1).toMatch(/1 paso(?!s)|1 step(?!s)/i);
+  expect(run({
+    lang: app.lang, dueCount: 0, coachPlanLeft: 1, coachPlanStarted: true,
+  }).body).toBe(app.mid1);
 });
 
 test("remindPushBody cert warmup requires plan not started", async ({ page }) => {

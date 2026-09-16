@@ -5523,6 +5523,20 @@ document.addEventListener("click", (e) => {
       startQuiz();
       return;
     }
+    if (srsDay.dataset.planDay === "1") {
+      try { sessionStorage.setItem("enlab-journal-focus", "plan"); } catch { /* ignore */ }
+      showTab("ia");
+      if (typeof openLabRoom === "function") openLabRoom("error-journal");
+      else {
+        const panel = document.querySelector("#error-journal");
+        if (panel) {
+          panel.hidden = false;
+          panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+      if (typeof window.PLUS?.renderErrorJournal === "function") window.PLUS.renderErrorJournal();
+      return;
+    }
     if (srsDay.dataset.srsDue === "1") {
       showTab("quiz");
       if ($("#quiz-mode")) $("#quiz-mode").value = "srs";
@@ -5530,6 +5544,14 @@ document.addEventListener("click", (e) => {
       startQuiz();
       return;
     }
+  }
+
+  if (e.target.closest("[data-chart90-plan]")) {
+    try { sessionStorage.setItem("enlab-journal-focus", "plan"); } catch { /* ignore */ }
+    showTab("ia");
+    if (typeof openLabRoom === "function") openLabRoom("error-journal");
+    if (typeof window.PLUS?.renderErrorJournal === "function") window.PLUS.renderErrorJournal();
+    return;
   }
 
   if (e.target.closest("[data-nudge-later]")) {
@@ -6917,7 +6939,9 @@ function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, cer
   if (certWarmupNudge && !planStarted && planLeft >= 3) return t("pushCertWarmupPlanBody");
   if (quickmixHot && !planStarted && planLeft >= 3) return t("pushQuickmixHotBody");
   if (!planStarted && planLeft >= 3) return t("pushCoachPlanStartBody");
-  if (planStarted && planLeft > 0 && planLeft < 3) return t("pushCoachPlanBody", { left: planLeft });
+  if (planStarted && planLeft > 0 && planLeft < 3) {
+    return t("pushCoachPlanBody", { left: planLeft, s: planLeft === 1 ? "" : "s" });
+  }
   return due >= 3 ? t("pushDueBody", { due }) : t("pushDailyBody");
 }
 
@@ -8185,7 +8209,7 @@ function renderStreakChart() {
   const max = Math.max(1, ...days.map((d) => d.score));
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90${srsDays ? ` · ${srsDays} ${esc(t("chart90SrsDays"))}` : ""}${frictionDays ? ` · ${frictionDays} ${esc(t("chart90FrictionDays"))}` : ""}${planDays ? ` · ${planDays} ${esc(t("chart90PlanDays"))}` : ""}</p>
+    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90${srsDays ? ` · ${srsDays} ${esc(t("chart90SrsDays"))}` : ""}${frictionDays ? ` · ${frictionDays} ${esc(t("chart90FrictionDays"))}` : ""}${planDays ? ` · <button type="button" class="chip sm chart90-plan-chip" data-chart90-plan>${planDays} ${esc(t("chart90PlanDays"))}</button>` : ""}</p>
     <div class="streak-bars streak-90" role="img" aria-label="${hotN} ${esc(t("streak90Aria"))}">
       ${days.map((d) => {
         const h = Math.max(d.score ? 20 : 8, Math.round((d.score / max) * 100));

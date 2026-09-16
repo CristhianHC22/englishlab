@@ -432,7 +432,22 @@
     const srs = typeof srsDueList === "function" ? srsDueList(40) : [];
     const friction = typeof topQuizFriction === "function" ? topQuizFriction(3) : [];
     const pending = typeof coachPlanPendingModes === "function" ? coachPlanPendingModes() : [];
+    const planRows = errs.filter((r) => r.planStep);
     const lines = ["#separator:tab", "#html:true"];
+    if (planRows.length) {
+      lines.push("#deck: English Lab::Plan 8 min");
+      const byMode = {};
+      planRows.forEach((r) => {
+        const m = journalPlayMode(r.mode);
+        if (!byMode[m]) byMode[m] = { abandon: 0, fail: 0 };
+        if (r.planStep === "abandon") byMode[m].abandon += 1;
+        else byMode[m].fail += 1;
+      });
+      const chart = Object.entries(byMode)
+        .map(([m, v]) => `${m} ${v.abandon}a/${v.fail}f`)
+        .join(", ");
+      if (chart) lines.push(`# plan-chart: ${chart}`);
+    }
     if (friction.length) {
       lines.push(`# friction-top: ${friction.map((r) => `${r.mode} ${r.drop}%`).join(", ")}`);
     }
@@ -453,11 +468,12 @@
       const mode = journalPlayMode(r.mode);
       const drop = typeof quizModeDropPct === "function" ? quizModeDropPct(mode) : 0;
       const coachTag = typeof coachPlanStepForMode === "function" && pending.includes(coachPlanStepForMode(mode)) ? " #coach-pending" : "";
+      const planTag = r.planStep ? ` #plan-step #plan-${r.planStep}` : "";
       const placeTag = placePct != null && placePct < 0.65 && typeof placementCoachStep === "function"
         && placementCoachStep(placePct) === coachPlanStepForMode(mode) ? " #placement-low" : "";
       const frTag = drop ? `<br><small>friction ${mode}: ${drop}%</small>` : "";
       const back = `${r.expected}<br><small>${r.why || ""}</small>${frTag}`;
-      lines.push(`${front.replace(/\t/g, " ")}${coachTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
+      lines.push(`${front.replace(/\t/g, " ")}${coachTag}${planTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
     });
     if (!focus?.length) {
       weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));
@@ -526,12 +542,18 @@
     if (!rows?.length) return;
     const area = document.querySelector("#weak-print-area") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "weak-print-area" }));
     area.hidden = false;
+    const chart = journalPlanStepChartHtml(rows);
     area.innerHTML = `
       <h1>English Lab — ${esc(tt("journalPrintNowTitle"))}</h1>
       <p>${typeof todayKey === "function" ? todayKey() : ""} · ${rows.length} ${esc(tt("journalPrintNowItems"))}</p>
+      ${chart}
       <table>
-        <thead><tr><th>${esc(tt("journalPrintNowExpected"))}</th><th>${esc(tt("journalPrintNowNote"))}</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr><td>${esc(r.expected || r.prompt || "")}</td><td>${esc(r.why || "")}</td></tr>`).join("")}</tbody>
+        <thead><tr><th>${esc(tt("journalPrintNowExpected"))}</th><th>${esc(tt("journalPrintNowNote"))}</th><th>${esc(tt("journalPlanTag"))}</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr>
+          <td>${esc(r.expected || r.prompt || "")}</td>
+          <td>${esc(r.why || "")}</td>
+          <td>${r.planStep ? esc(String(r.planStep)) : "—"}</td>
+        </tr>`).join("")}</tbody>
       </table>`;
     window.print();
     requestAnimationFrame(() => { area.hidden = true; area.innerHTML = ""; });

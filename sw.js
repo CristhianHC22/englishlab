@@ -1,4 +1,4 @@
-const CACHE = "enlab-v92";
+const CACHE = "enlab-v93";
 const ASSETS = [
   "./",
   "./index.html",
@@ -86,9 +86,9 @@ function remindCopy(data) {
   }
   if (planStarted && planLeft > 0 && planLeft < 3) {
     if (lang === "en") {
-      return { title: "English Lab", body: `8-min plan: ${planLeft} steps left today.` };
+      return { title: "English Lab", body: `8-min plan: ${planLeft} step${planLeft === 1 ? "" : "s"} left today.` };
     }
-    return { title: "English Lab", body: `Plan 8 min: te faltan ${planLeft} pasos hoy.` };
+    return { title: "English Lab", body: `Plan 8 min: te faltan ${planLeft} paso${planLeft === 1 ? "" : "s"} hoy.` };
   }
   if (lang === "en") {
     if (due >= 3) return { title: "English Lab", body: `You have ${due} reviews due. Got 15 minutes?` };

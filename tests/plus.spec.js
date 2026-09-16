@@ -474,3 +474,51 @@ test("Kids first banner is one short line", async ({ page }) => {
   expect(text.length).toBeLessThan(80);
   expect(text).toMatch(/primera|first|oír|listen/i);
 });
+
+test("Plus: Anki tags plan-step and plan-chart header", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "plan:ear", expected: "Plan", prompt: "paso", said: "out", why: "z", planStep: "abandon" },
+      { at: Date.now() - 1, mode: "plan:uso", expected: "Plan", prompt: "paso", said: "miss", why: "z", planStep: "fail" },
+    ]));
+    const blobs = [];
+    const Orig = window.Blob;
+    window.Blob = function (parts, opts) {
+      blobs.push(String(parts?.[0] || ""));
+      return new Orig(parts, opts);
+    };
+    const aProto = HTMLAnchorElement.prototype;
+    const click = aProto.click;
+    aProto.click = function () {};
+    try {
+      window.PLUS.exportAnki();
+    } finally {
+      window.Blob = Orig;
+      aProto.click = click;
+    }
+    return blobs[0] || "";
+  });
+  expect(out).toMatch(/#deck: English Lab::Plan 8 min/);
+  expect(out).toMatch(/# plan-chart:/);
+  expect(out).toMatch(/#plan-step/);
+  expect(out).toMatch(/#plan-abandon|#plan-fail/);
+});
+
+test("90d plan day chip opens journal plan filter", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const st = stats();
+    const day = todayKey();
+    st.days[day] = { ...(st.days[day] || {}), quiz: 1, heard: 1, spoke: 1, plan: 1 };
+    localStorage.setItem("enlab-stats", JSON.stringify(st));
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "plan:ear", expected: "Plan", prompt: "p", said: "out", why: "z", planStep: "abandon" },
+    ]));
+    renderStreakChart();
+  });
+  await openHoyExtras(page);
+  await expect(page.locator("[data-chart90-plan]")).toBeVisible();
+  await page.locator("[data-chart90-plan]").click();
+  await expect(page.locator("#error-journal .journal-plan-chart")).toBeVisible();
+});

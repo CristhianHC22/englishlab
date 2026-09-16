@@ -1289,7 +1289,7 @@ footer {
 .streak-day.hot { height: 28px; background: var(--accent); }
 .streak-day.srs-due-day { box-shadow: inset 0 -3px 0 var(--ok, #2a9d60); }
 .streak-day.friction-day { box-shadow: inset 0 -3px 0 var(--accent); cursor: pointer; }
-.streak-day.plan-day { position: relative; }
+.streak-day.plan-day { position: relative; cursor: pointer; }
 .streak-day.plan-day::after {
   content: "";
   position: absolute;
@@ -1301,6 +1301,9 @@ footer {
   transform: translateX(-50%);
   background: var(--ok, #2a6fbf);
 }
+.chart90-plan-chip { font-size: 12px; vertical-align: baseline; }
+.class-friction-heat-filters { margin-bottom: 4px; }
+.chip.warn { border-color: var(--warn, #e07a2f); color: var(--warn, #e07a2f); }
 .streak-90 .streak-day { border: 0; cursor: pointer; }
 .voice-history { margin-top: 14px; }
 .voice-row { margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }

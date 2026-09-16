@@ -186,6 +186,7 @@
   }
 
   let _classPlanHeatFilter = "";
+  let _classFrictionHeatFilter = "";
 
   function classPlanHeatFilterHtml(taskCoach) {
     if (!taskCoach) return "";
@@ -199,6 +200,33 @@
     return `<div class="row class-plan-heat-filters" style="gap:6px;flex-wrap:wrap;margin-top:8px">
       ${opts.map((o) => `<button type="button" class="chip sm${f === o.id ? " active" : ""}" data-plan-heat-filter="${esc(o.id)}">${esc(o.label)}</button>`).join("")}
     </div>`;
+  }
+
+  function classFrictionHeatFilterHtml() {
+    const f = _classFrictionHeatFilter;
+    const opts = [
+      { id: "", label: t("classFrictionFilterAll") },
+      { id: "hi", label: t("classFrictionFilterHi") },
+      { id: "mid", label: t("classFrictionFilterMid") },
+      { id: "lo", label: t("classFrictionFilterLo") },
+    ];
+    return `<div class="row class-friction-heat-filters" style="gap:6px;flex-wrap:wrap;margin:6px 0">
+      ${opts.map((o) => `<button type="button" class="chip sm${f === o.id ? " active" : ""}" data-friction-heat-filter="${esc(o.id)}">${esc(o.label)}</button>`).join("")}
+    </div>`;
+  }
+
+  function frictionDropLevel(drop) {
+    if (drop == null) return "";
+    if (drop >= 50) return "hi";
+    if (drop >= 35) return "mid";
+    return "lo";
+  }
+
+  function rosterCoachPlanStale(s) {
+    if (rosterCoachPlanStatus(s) !== "pending") return false;
+    const since = s.coachPendingSince || s.synced;
+    if (!since) return false;
+    return (Date.now() - Number(since)) >= 3 * 86400000;
   }
 
   function rosterRowsHtml(roster, taskCoach) {
@@ -614,12 +642,13 @@
         if (top) { liveMode = top.mode; liveDrop = top.drop; }
       }
       if (liveMode && liveDrop != null) student[liveMode] = liveDrop;
-      return { name: s.name, modes: student, prev: prevStudent };
+      const maxDrop = Math.max(0, ...Object.values(student).map((n) => Number(n) || 0));
+      return { name: s.name, modes: student, prev: prevStudent, maxDrop, lvl: frictionDropLevel(maxDrop) };
     }).filter((r) => Object.keys(r.modes).length);
     if (!rows.length) return "";
     const cell = (drop, prev) => {
       if (drop == null) return `<td class="class-heat-cell empty">—</td>`;
-      const lvl = drop >= 50 ? "hi" : drop >= 35 ? "mid" : "lo";
+      const lvl = frictionDropLevel(drop);
       let delta = "";
       if (prev != null && prev !== drop) {
         const d = drop - prev;
@@ -638,12 +667,16 @@
         <p class="muted">${esc(t("classFrictionHeatHint"))}</p>
         ${alerts}
         ${weekCmp}
-        <table class="mini-table class-heat-table">
+        ${classFrictionHeatFilterHtml()}
+        <table class="mini-table class-heat-table class-friction-heat-table">
           <thead><tr><th>${esc(t("classColName"))}</th>${modes.map((m) => `<th>${esc(t(`quizModes.${m}.t`) || m)}</th>`).join("")}</tr></thead>
-          <tbody>${rows.map((r) => `<tr>
+          <tbody>${rows.map((r) => {
+            const hide = _classFrictionHeatFilter && r.lvl !== _classFrictionHeatFilter;
+            return `<tr class="class-friction-heat-row" data-friction-lvl="${esc(r.lvl)}"${hide ? " hidden" : ""}>
             <td>${esc(r.name)}</td>
             ${modes.map((m) => cell(r.modes[m], r.prev[m])).join("")}
-          </tr>`).join("")}</tbody>
+          </tr>`;
+          }).join("")}</tbody>
         </table>
         <p class="row"><button type="button" class="btn ghost sm" id="class-friction-csv">${esc(t("classFrictionCsv"))}</button></p>
       </details>`;
@@ -806,10 +839,18 @@
       const st = row.dataset.planHeatFilter || "";
       row.hidden = !!(_classPlanHeatFilter && st !== _classPlanHeatFilter);
     });
+    document.querySelectorAll(".class-friction-heat-filters .chip").forEach((btn) => {
+      btn.classList.toggle("active", (btn.dataset.frictionHeatFilter || "") === _classFrictionHeatFilter);
+    });
+    document.querySelectorAll(".class-friction-heat-row").forEach((row) => {
+      const lvl = row.dataset.frictionLvl || "";
+      row.hidden = !!(_classFrictionHeatFilter && lvl !== _classFrictionHeatFilter);
+    });
     const alert = document.querySelector(".class-coach-plan-alert");
     if (alert) {
       const pending = roster.filter((s) => rosterCoachPlanStatus(s) === "pending").length;
-      alert.hidden = pending <= 0;
+      const stale = roster.filter((s) => rosterCoachPlanStale(s)).length;
+      alert.hidden = pending <= 0 && stale <= 0;
     }
   }
 
@@ -949,10 +990,13 @@
   }
 
   function classCoachPlanAlertHtml() {
-    const pending = loadRoster().filter((s) => rosterCoachPlanStatus(s) === "pending").length;
-    if (!pending) return "";
+    const roster = loadRoster();
+    const pending = roster.filter((s) => rosterCoachPlanStatus(s) === "pending").length;
+    const stale = roster.filter((s) => rosterCoachPlanStale(s)).length;
+    if (!pending && !stale) return "";
     return `<p class="class-coach-plan-alert row" role="status" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">
-      <button type="button" class="chip sm" data-plan-heat-filter="pending">${esc(t("classTaskCoachPending", { n: pending }))}</button>
+      ${pending ? `<button type="button" class="chip sm" data-plan-heat-filter="pending">${esc(t("classTaskCoachPending", { n: pending }))}</button>` : ""}
+      ${stale ? `<button type="button" class="chip sm warn" data-plan-heat-filter="pending" data-plan-stale="1">${esc(t("classCoachPlanStale", { n: stale }))}</button>` : ""}
     </p>`;
   }
 
@@ -996,24 +1040,34 @@
 
   function exportClassCoachPlanCsv() {
     if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
-    const rows = [["student", "plan_done", "plan_total", "status"]];
+    const rows = [["student", "plan_done", "plan_total", "status", "next_family", "stale_3d"]];
     loadRoster().forEach((s) => {
       const status = rosterCoachPlanStatus(s);
+      const stale = rosterCoachPlanStale(s) ? "yes" : "no";
+      let nextFam = "";
+      if (status === "pending" || status === "mid") {
+        const steps = Array.isArray(s.coachSteps) && s.coachSteps.length
+          ? s.coachSteps
+          : (typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear", "uso", "choice"]);
+        const done = s.coachDone != null ? s.coachDone : (typeof coachPlanProgress === "function" ? coachPlanProgress() : 0);
+        const next = steps[Math.min(done, steps.length - 1)];
+        nextFam = typeof coachPlanFamily === "function" ? (coachPlanFamily(next) || next) : (next || "");
+      }
       if (!status) {
-        rows.push([s.name, "", "", ""]);
+        rows.push([s.name, "", "", "", "", stale]);
         return;
       }
       if (status === "done") {
-        rows.push([s.name, "3", "3", "done"]);
+        rows.push([s.name, String(s.coachTotal || 3), String(s.coachTotal || 3), "done", "", stale]);
         return;
       }
       if (status === "pending") {
-        rows.push([s.name, "0", "3", "pending"]);
+        rows.push([s.name, "0", String(s.coachTotal || 3), "pending", nextFam, stale]);
         return;
       }
       const done = s.coachDone != null ? s.coachDone : (typeof coachPlanProgress === "function" ? coachPlanProgress() : 1);
       const total = s.coachTotal || (typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3);
-      rows.push([s.name, String(done), String(total), "in_progress"]);
+      rows.push([s.name, String(done), String(total), "in_progress", nextFam, stale]);
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1028,9 +1082,21 @@
       const raw = JSON.parse(payload["enlab-coach-plan-mirror"] || "null");
       if (!raw?.day) return null;
       const today = typeof todayKey === "function" ? todayKey() : "";
-      if (raw.day !== today) return null;
       const steps = Array.isArray(raw.steps) ? raw.steps : ["ear", "uso", "choice"];
-      return { coachDone: Number(raw.done) || 0, coachTotal: steps.length };
+      const done = Number(raw.done) || 0;
+      const out = {
+        coachDone: done,
+        coachTotal: steps.length,
+        coachDay: raw.day,
+        coachSteps: steps,
+      };
+      if (raw.day === today && done === 0) out.coachPendingSince = Date.now();
+      else if (raw.day === today && done > 0) out.coachPendingSince = null;
+      else if (raw.day !== today && done < steps.length) {
+        out.coachDone = 0;
+        out.coachPendingSince = Date.now() - 3 * 86400000;
+      }
+      return out;
     } catch { return null; }
   }
 
@@ -1075,10 +1141,19 @@
       }
       const place = parsePlaceFromPayload(payload);
       if (place) Object.assign(extras, place);
-      const coach = parseCoachPlanFromPayload(payload);
-      if (coach) Object.assign(extras, coach);
       const roster = loadRoster();
       const hit = roster.find((s) => s.name === name);
+      const coach = parseCoachPlanFromPayload(payload);
+      if (coach) {
+        if (coach.coachPendingSince == null && hit?.coachPendingSince && coach.coachDone === 0) {
+          coach.coachPendingSince = hit.coachPendingSince;
+        }
+        if (coach.coachPendingSince === null) {
+          delete coach.coachPendingSince;
+          if (hit) delete hit.coachPendingSince;
+        }
+        Object.assign(extras, coach);
+      }
       if (hit) {
         hit.weeklyDone = weekly || hit.weeklyDone;
         hit.certDone = certDone || hit.certDone;
@@ -1317,7 +1392,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v92";
+  const SW_CACHE = "enlab-v93";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1536,6 +1611,12 @@
         _classPlanHeatFilter = e.target.closest("[data-plan-heat-filter]").dataset.planHeatFilter || "";
         updateClassRosterBody();
         document.querySelector(".class-roster-table")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
+      if (e.target.closest("[data-friction-heat-filter]")) {
+        _classFrictionHeatFilter = e.target.closest("[data-friction-heat-filter]").dataset.frictionHeatFilter || "";
+        updateClassRosterBody();
+        document.querySelector(".class-friction-heat")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         return;
       }
       if (e.target.closest("#class-coach-plan-print")) printClassCoachPlanSheet();

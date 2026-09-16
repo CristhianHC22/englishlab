@@ -8,17 +8,15 @@ on:
 
 jobs:
   test:
+    # Misma imagen jammy que visual/local Docker → menos drift de Chromium/Node.
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-jammy
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
       - run: npm ci
       - run: npm run check
       - run: npm run audit:i18n
-      - run: npx playwright install chromium --with-deps
       - run: npm test
 
   visual:

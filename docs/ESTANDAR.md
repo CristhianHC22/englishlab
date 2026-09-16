@@ -583,3 +583,12 @@ Avance v113:
 - **Kids**: banner 1 línea + primera sesión en onboarding; hint kids en bienvenida.
 - **Push**: contrato SW↔`remindPushBody` (cert warm-up con mismas puertas).
 - Cache SW: `enlab-v92`.
+
+Avance v114:
+
+- **Anki/print**: `#deck: Plan 8 min`, `#plan-chart`, tags `#plan-step`; print con gráfica.
+- **Aula**: filtro fricción hi/mid/lo; alerta «sin plan ≥3 días»; CSV con `next_family` + `stale_3d`.
+- **90d**: chip/clic en días plan → diario filtrado plan.
+- **Push**: plural `paso{s}` / `step{s}` alineado SW↔app.
+- **CI**: job funcional en Playwright jammy (mismo container que visual).
+- Cache SW: `enlab-v93`.

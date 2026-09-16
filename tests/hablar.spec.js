@@ -383,3 +383,42 @@ test("Hablar: class coach plan print includes heatmap markup", async ({ page }) 
   expect(html).toMatch(/plan 8 min|8-min plan/i);
   expect(html).toMatch(/class-plan-heat|class-heat-cell|Ana|Luis/i);
 });
+
+test("Hablar: friction heatmap filter chips hide rows", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await page.evaluate(() => {
+    const week = typeof weekStartKey === "function" ? weekStartKey() : todayKey().slice(0, 7);
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      { name: "Hi", frictionMode: "uso", frictionDrop: 60, synced: Date.now() },
+      { name: "Lo", frictionMode: "ear", frictionDrop: 20, synced: Date.now() },
+    ]));
+    localStorage.setItem("enlab-class-friction-week", JSON.stringify({
+      [week]: { Hi: { uso: 60 }, Lo: { ear: 20 } },
+    }));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+  });
+  await expect(page.locator(".class-friction-heat-filters")).toBeVisible({ timeout: 3000 });
+  await page.locator('.class-friction-heat-filters [data-friction-heat-filter="hi"]').click();
+  await expect(page.locator('.class-friction-heat-row[data-friction-lvl="hi"]')).toBeVisible();
+  await expect(page.locator('.class-friction-heat-row[data-friction-lvl="lo"]')).toBeHidden();
+});
+
+test("Hablar: stale coach plan alert after 3 days pending", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      {
+        name: "Stale",
+        coachDone: 0,
+        coachTotal: 3,
+        coachPendingSince: Date.now() - 4 * 86400000,
+        synced: Date.now() - 4 * 86400000,
+      },
+    ]));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+  });
+  await expect(page.locator(".class-coach-plan-alert [data-plan-stale]")).toBeVisible();
+  await expect(page.locator(".class-coach-plan-alert")).toContainText(/3|sin plan|no plan/i);
+});
