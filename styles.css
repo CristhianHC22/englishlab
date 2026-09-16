@@ -712,7 +712,13 @@ button.btn.ghost.on {
   background: var(--accent);
   color: #fff;
 }
-button.btn.warn { background: var(--accent-2); box-shadow: 0 4px 0 #b8441b; }
+button.btn.warn.plan-stale-deep,
+.chip.warn.plan-stale-deep,
+button.btn.plan-stale-deep {
+  border-color: #c0392b;
+  color: #c0392b;
+  box-shadow: none;
+}
 button.say {
   border: 2px solid transparent;
   background: var(--accent-soft);

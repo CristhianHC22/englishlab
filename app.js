@@ -1152,12 +1152,16 @@ function coachPlanChipHtml(cls = "btn sm") {
   const steps = quizCoachPlan8();
   if (done >= steps.length) return "";
   const mode = steps[done];
+  const deep = done === 0 && coachPlanIsStale(7);
   const stale = done === 0 && coachPlanIsStale();
-  const label = stale
-    ? t("quizCoachPlanStale")
-    : (done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume"));
-  const warn = stale ? " warn" : "";
-  return `<button type="button" class="${cls}${warn}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}"${stale ? ' data-plan-stale="1"' : ""}>${esc(label)}</button>`;
+  const label = deep
+    ? t("quizCoachPlanStale7")
+    : (stale
+      ? t("quizCoachPlanStale")
+      : (done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume")));
+  const warn = deep ? " warn plan-stale-deep" : (stale ? " warn" : "");
+  const staleAttr = deep ? "7" : (stale ? "3" : "");
+  return `<button type="button" class="${cls}${warn}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}"${staleAttr ? ` data-plan-stale="${staleAttr}"` : ""}>${esc(label)}</button>`;
 }
 
 function podcastPlanEarChipHtml(cls = "chip") {
@@ -2219,15 +2223,18 @@ function renderHoyPath() {
     if (left > 0 && !repasoOn()) {
       const done = coachPlanProgress();
       const total = quizCoachPlan8().length;
+      const deep = done === 0 && coachPlanIsStale(7);
       const stale = done === 0 && coachPlanIsStale();
       const pulse = !coachPlanStarted() && !stale && localStorage.getItem("enlab-plan-pulse-day") !== todayKey();
       const pulseCls = pulse ? " next-act" : "";
-      const warnCls = stale ? " warn" : "";
-      const label = stale
-        ? t("hoyPathPlanStale", { done, total })
-        : t("hoyPathPlanChip", { done, total });
+      const warnCls = deep ? " warn plan-stale-deep" : (stale ? " warn" : "");
+      const label = deep
+        ? t("hoyPathPlanStale7", { done, total })
+        : (stale
+          ? t("hoyPathPlanStale", { done, total })
+          : t("hoyPathPlanChip", { done, total }));
       planEl.hidden = false;
-      planEl.innerHTML = `<button type="button" class="btn ghost sm${pulseCls}${warnCls}" data-coach-plan-go data-coach-plan-mode="${esc(coachPlanNextMode() || quizCoachPlan8()[0])}"${stale ? ' data-plan-stale="1"' : ""}>${esc(label)}</button>`;
+      planEl.innerHTML = `<button type="button" class="btn ghost sm${pulseCls}${warnCls}" data-coach-plan-go data-coach-plan-mode="${esc(coachPlanNextMode() || quizCoachPlan8()[0])}"${deep ? ' data-plan-stale="7"' : (stale ? ' data-plan-stale="3"' : "")}>${esc(label)}</button>`;
       if (pulse) localStorage.setItem("enlab-plan-pulse-day", todayKey());
     } else {
       planEl.hidden = true;
@@ -4339,6 +4346,10 @@ function renderQuiz() {
   if (quiz.mode === "cierre" && quiz.i > 0 && quiz.i < quiz.items.length) persistCierreNow();
   if (quiz.mode === "weekly" && quiz.i > 0 && quiz.i < quiz.items.length) persistWeeklyNow();
   if (quiz.mode === "place" && quiz.i > 0 && quiz.i < quiz.items.length) window.PLUS?.persistPlaceNow?.();
+  if (quiz.fromPodcast && String(quiz.fromPodcast).startsWith("series-")) {
+    if (quiz.i < quiz.items.length) window.NR?.persistSeriesQuizNow?.();
+    else window.NR?.clearSeriesQuizNow?.();
+  }
   if (quiz.i >= quiz.items.length) {
     const cierre = quiz.mode === "cierre";
     const ear = quiz.mode === "ear" || quiz.mode === "exam";
@@ -6501,7 +6512,8 @@ function renderCoachPlanToday() {
   const steps = quizCoachPlan8();
   const lang = typeof uiLang === "function" ? uiLang() : "es";
   const stale = done === 0 && coachPlanIsStale();
-  const key = `${done}|${steps.join(",")}|${quickmixFrictionHigh()}|${kids ? 1 : 0}|${pathDone ? 1 : 0}|${lang}|${stale ? 1 : 0}`;
+  const deep = done === 0 && coachPlanIsStale(7);
+  const key = `${done}|${steps.join(",")}|${quickmixFrictionHigh()}|${kids ? 1 : 0}|${pathDone ? 1 : 0}|${lang}|${deep ? 7 : (stale ? 1 : 0)}`;
   if (key === _coachPlanTodayKey) return;
   _coachPlanTodayKey = key;
   /* Día marcado ya lleva el chip en #hoy-done-mid; kids: menos ruido */
@@ -6515,7 +6527,7 @@ function renderCoachPlanToday() {
     : "";
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(stale ? t("quizCoachPlanStaleKicker") : t("quizCoachPlan8"))} · ${done}/${steps.length}</p>
+    <p class="kicker">${esc(deep ? t("quizCoachPlanStale7") : (stale ? t("quizCoachPlanStaleKicker") : t("quizCoachPlan8")))} · ${done}/${steps.length}</p>
     <div class="row">${coachPlanChipHtml("btn sm")}${qm}</div>`;
 }
 
@@ -6940,7 +6952,7 @@ function renderRemind() {
       const p = syncRemindPayload();
       const body = remindPushBody(
         p.dueCount, p.coachPlanLeft, p.coachPlanStarted,
-        p.quickmixHot, p.placePlanNudge, p.certWarmupNudge, p.coachPlanStale
+        p.quickmixHot, p.placePlanNudge, p.certWarmupNudge, p.coachPlanStale, p.coachPlanStaleDeep
       );
       preview.hidden = false;
       preview.textContent = t("remindPreview", { body });
@@ -7013,6 +7025,7 @@ function syncRemindPayload() {
       && certWarmupStreak() >= 1 && !planStarted
       && planLeft >= 3,
     coachPlanStale: typeof coachPlanIsStale === "function" && coachPlanIsStale() && !planStarted && planLeft >= 3,
+    coachPlanStaleDeep: typeof coachPlanIsStale === "function" && coachPlanIsStale(7) && !planStarted && planLeft >= 3,
     quickmixHot: typeof quickmixFrictionStreak === "function" ? quickmixFrictionStreak(3) : false,
     placePlanNudge: typeof placePlanNudgeOn === "function" ? placePlanNudgeOn() : false,
     lang: typeof uiLang === "function" ? uiLang() : "es",
@@ -7052,7 +7065,8 @@ function fireRemind() {
   const certWarm = typeof certWarmupStreak === "function" && certWarmupStreak() >= 1
     && !planStarted && planLeft >= 3;
   const planStale = typeof coachPlanIsStale === "function" && coachPlanIsStale() && !planStarted && planLeft >= 3;
-  const body = remindPushBody(due, planLeft, planStarted, hot, placeNudge, certWarm, planStale);
+  const planStaleDeep = typeof coachPlanIsStale === "function" && coachPlanIsStale(7) && !planStarted && planLeft >= 3;
+  const body = remindPushBody(due, planLeft, planStarted, hot, placeNudge, certWarm, planStale, planStaleDeep);
   try {
     new Notification(t("pushTitle"), {
       body,
@@ -7062,9 +7076,10 @@ function fireRemind() {
   } catch { /* ignore */ }
 }
 
-function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge, planStale) {
+function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge, planStale, planStaleDeep) {
   if (placeNudge && !planStarted && planLeft >= 3) return t("pushPlacePlanBody");
   if (certWarmupNudge && !planStarted && planLeft >= 3) return t("pushCertWarmupPlanBody");
+  if (planStaleDeep && !planStarted && planLeft >= 3) return t("pushCoachPlanStale7Body");
   if (planStale && !planStarted && planLeft >= 3) return t("pushCoachPlanStaleBody");
   if (quickmixHot && !planStarted && planLeft >= 3) return t("pushQuickmixHotBody");
   if (!planStarted && planLeft >= 3) return t("pushCoachPlanStartBody");
@@ -7268,10 +7283,22 @@ function guideFillEntry() {
       s: [rep, ...(entry.s || [])].slice(0, 3),
     };
   }
+  try {
+    if (!kids && sessionStorage.getItem("enlab-repaso-auto-plan") === "1") {
+      const hint = t("guideRepasoAutoPlan");
+      entry = {
+        ...entry,
+        w: entry.w ? `${hint} ${entry.w}` : hint,
+        s: [hint, ...(entry.s || [])].slice(0, 4),
+      };
+    }
+  } catch { /* ignore */ }
   const hoyPanel = $("#hoy");
   const pathDone = currentTab === "hoy" && hoyPanel?.classList.contains("path-done");
   if (!kids && pathDone && !coachPlanStarted() && coachPlanLeft() >= 3 && !placePlanNudgeOn()) {
-    const hint = coachPlanIsStale() ? t("guideCoachPlanStale") : t("guideCoachPlanPending");
+    const hint = coachPlanIsStale(7)
+      ? t("guideCoachPlanStale7")
+      : (coachPlanIsStale() ? t("guideCoachPlanStale") : t("guideCoachPlanPending"));
     entry = {
       ...entry,
       w: entry.w ? `${hint} ${entry.w}` : hint,
@@ -7552,12 +7579,13 @@ function guideFillEntryCached() {
     coachPlanLeft(),
     coachPlanStarted(),
     certWarmupStreak(),
-    typeof coachPlanIsStale === "function" && coachPlanIsStale() ? "1" : "0",
+    typeof coachPlanIsStale === "function" && coachPlanIsStale(7) ? "7" : (typeof coachPlanIsStale === "function" && coachPlanIsStale() ? "1" : "0"),
     document.querySelector("#class-task-banner")?.classList.contains("class-task-must") ? "1" : "0",
     (() => {
       try { return sessionStorage.getItem("enlab-journal-focus") || ""; } catch { return ""; }
     })(),
     sessionStorage.getItem("enlab-journal-from-90d") === "1" ? "1" : "0",
+    sessionStorage.getItem("enlab-repaso-auto-plan") === "1" ? "1" : "0",
   ].join("|");
   if (key === _guideFillEntryKey && _guideFillEntryCache) return _guideFillEntryCache;
   _guideFillEntryKey = key;
@@ -7644,6 +7672,12 @@ function fillYouAreChips() {
     } catch { /* ignore */ }
   }
 
+  /* serie quiz / eps a medias */
+  if (!kids && window.NR?.seriesYouAreChipsHtml) {
+    const seriesChips = window.NR.seriesYouAreChipsHtml();
+    if (seriesChips) parts.push(seriesChips);
+  }
+
   /* duo — solo en Hablar */
   if (currentTab === "hablar" && window.NR?.duoYouAreChipHtml) {
     const duo = window.NR.duoYouAreChipHtml();
@@ -7704,7 +7738,7 @@ function fillYouAre() {
       if (coachHint) line = coachHint;
     }
     if (!line && !kids && coachPlanIsStale() && coachPlanLeft() > 0) {
-      line = t("youAreCoachPlanStale");
+      line = coachPlanIsStale(7) ? t("youAreCoachPlanStale7") : t("youAreCoachPlanStale");
     }
     if (!line) {
       const oidoTitle = oidoLastTitle();
@@ -7757,7 +7791,7 @@ function fillYouAre() {
   {
     const kidsAny = typeof kidsOn === "function" && kidsOn();
     if (!kidsAny && !pathOn && coachPlanIsStale() && coachPlanLeft() > 0) {
-      paintYouAreLine(text, t("youAreCoachPlanStale"), entry);
+      paintYouAreLine(text, coachPlanIsStale(7) ? t("youAreCoachPlanStale7") : t("youAreCoachPlanStale"), entry);
       return;
     }
   }
@@ -8197,10 +8231,13 @@ function startRepasoMode() {
   let staleAuto = false;
   try {
     sessionStorage.removeItem("enlab-repaso-stale");
+    sessionStorage.removeItem("enlab-repaso-auto-plan");
     const kids = typeof kidsOn === "function" && kidsOn();
+    const pathDone = $("#hoy")?.classList.contains("path-done");
     if (!kids && coachPlanIsStale() && coachPlanProgress() === 0 && coachPlanLeft() >= 3) {
       sessionStorage.setItem("enlab-repaso-stale", coachPlanIsStale(5) ? "5" : "3");
-      staleAuto = true;
+      /* Auto-arranque solo con día marcado — no secuestra el camino */
+      if (pathDone) staleAuto = true;
     }
   } catch { /* ignore */ }
   try {
@@ -8227,12 +8264,13 @@ function startRepasoMode() {
   if (exitBtn) exitBtn.hidden = false;
   syncPrefsBadge();
   buzz(true);
-  /* Plan stale: timer corto + arranca oído→uso→verbos sin un clic más */
   if (staleAuto && typeof startCoachPlanQuiz === "function") {
     setTimeout(() => {
       try {
         if (localStorage.getItem("enlab-repaso") !== "1") return;
         if (coachPlanProgress() > 0) return;
+        sessionStorage.setItem("enlab-repaso-auto-plan", "1");
+        if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
         startCoachPlanQuiz();
       } catch { /* ignore */ }
     }, 220);
@@ -8242,7 +8280,10 @@ function startRepasoMode() {
 function clearRepasoMode() {
   if (localStorage.getItem("enlab-repaso") !== "1") return;
   localStorage.removeItem("enlab-repaso");
-  try { sessionStorage.removeItem("enlab-repaso-stale"); } catch { /* ignore */ }
+  try {
+    sessionStorage.removeItem("enlab-repaso-stale");
+    sessionStorage.removeItem("enlab-repaso-auto-plan");
+  } catch { /* ignore */ }
   document.body.classList.remove("repaso-active");
   setPressed($("#repaso-btn"), false);
   const prev = sessionStorage.getItem("enlab-repaso-speak-only");

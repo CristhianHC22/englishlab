@@ -222,11 +222,11 @@
     return "lo";
   }
 
-  function rosterCoachPlanStale(s) {
+  function rosterCoachPlanStale(s, minDays = 3) {
     if (rosterCoachPlanStatus(s) !== "pending") return false;
     const since = s.coachPendingSince || s.synced;
     if (!since) return false;
-    return (Date.now() - Number(since)) >= 3 * 86400000;
+    return (Date.now() - Number(since)) >= minDays * 86400000;
   }
 
   function rosterRowsHtml(roster, taskCoach) {
@@ -950,7 +950,12 @@
     const planLink = `${location.href.split("#")[0]}#coach-plan`;
     box.hidden = false;
     box.innerHTML = `
-      <p class="muted">${esc(t("classStudentQrHint", { name }))}${typeof transferPlanHintSuffix === "function" ? esc(transferPlanHintSuffix()) : ""}</p>
+      <p class="muted">${esc(t("classStudentQrHint", { name }))}${typeof transferPlanHintSuffix === "function" ? esc(transferPlanHintSuffix()) : ""}${(() => {
+        try {
+          const n = parsePodcastEarFromPayload(buildTransferPayload());
+          return n ? ` · ${esc(t("classStudentQrPodcastEar", { n }))}` : "";
+        } catch { return ""; }
+      })()}</p>
       <p class="muted"><a href="${esc(planLink)}">${esc(t("classStudentQrPlanLink"))}</a></p>
       <textarea class="transfer-code" rows="2" readonly>${esc(code)}</textarea>
       <canvas id="student-qr-canvas" width="160" height="160" aria-hidden="true"></canvas>`;
@@ -1154,10 +1159,13 @@
     const roster = loadRoster();
     const pending = roster.filter((s) => rosterCoachPlanStatus(s) === "pending").length;
     const stale = roster.filter((s) => rosterCoachPlanStale(s)).length;
+    const stale7 = roster.filter((s) => rosterCoachPlanStale(s, 7)).length;
     if (!pending && !stale) return "";
     return `<p class="class-coach-plan-alert row" role="status" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">
       ${pending ? `<button type="button" class="chip sm" data-plan-heat-filter="pending">${esc(t("classTaskCoachPending", { n: pending }))}</button>` : ""}
-      ${stale ? `<button type="button" class="chip sm warn" data-plan-heat-filter="pending" data-plan-stale="1">${esc(t("classCoachPlanStale", { n: stale }))}</button>` : ""}
+      ${stale7 ? `<button type="button" class="chip sm warn plan-stale-deep" data-plan-heat-filter="pending" data-plan-stale="7">${esc(t("classCoachPlanStale7", { n: stale7 }))}</button>` : ""}
+      ${stale && !stale7 ? `<button type="button" class="chip sm warn" data-plan-heat-filter="pending" data-plan-stale="3">${esc(t("classCoachPlanStale", { n: stale }))}</button>` : ""}
+      ${stale && stale7 && stale > stale7 ? `<button type="button" class="chip sm warn" data-plan-heat-filter="pending" data-plan-stale="3">${esc(t("classCoachPlanStale", { n: stale }))}</button>` : ""}
     </p>`;
   }
 
@@ -1201,10 +1209,11 @@
 
   function exportClassCoachPlanCsv() {
     if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
-    const rows = [["student", "plan_done", "plan_total", "status", "next_family", "stale_3d"]];
+    const rows = [["student", "plan_done", "plan_total", "status", "next_family", "stale_3d", "podcast_ear"]];
     loadRoster().forEach((s) => {
       const status = rosterCoachPlanStatus(s);
       const stale = rosterCoachPlanStale(s) ? "yes" : "no";
+      const podEar = s.podcastEar != null ? String(s.podcastEar) : "";
       let nextFam = "";
       if (status === "pending" || status === "mid") {
         const steps = Array.isArray(s.coachSteps) && s.coachSteps.length
@@ -1215,20 +1224,20 @@
         nextFam = typeof coachPlanFamily === "function" ? (coachPlanFamily(next) || next) : (next || "");
       }
       if (!status) {
-        rows.push([s.name, "", "", "", "", stale]);
+        rows.push([s.name, "", "", "", "", stale, podEar]);
         return;
       }
       if (status === "done") {
-        rows.push([s.name, String(s.coachTotal || 3), String(s.coachTotal || 3), "done", "", stale]);
+        rows.push([s.name, String(s.coachTotal || 3), String(s.coachTotal || 3), "done", "", stale, podEar]);
         return;
       }
       if (status === "pending") {
-        rows.push([s.name, "0", String(s.coachTotal || 3), "pending", nextFam, stale]);
+        rows.push([s.name, "0", String(s.coachTotal || 3), "pending", nextFam, stale, podEar]);
         return;
       }
       const done = s.coachDone != null ? s.coachDone : (typeof coachPlanProgress === "function" ? coachPlanProgress() : 1);
       const total = s.coachTotal || (typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3);
-      rows.push([s.name, String(done), String(total), "in_progress", nextFam, stale]);
+      rows.push([s.name, String(done), String(total), "in_progress", nextFam, stale, podEar]);
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1276,6 +1285,14 @@
     } catch { return null; }
   }
 
+  function parsePodcastEarFromPayload(payload) {
+    try {
+      const errs = JSON.parse(payload["enlab-error-log"] || "[]");
+      if (!Array.isArray(errs)) return 0;
+      return errs.filter((r) => r && r.podcastEar).length;
+    } catch { return 0; }
+  }
+
   function importStudentFromCode(code) {
     if (!code) return false;
     try {
@@ -1294,6 +1311,7 @@
         hot90: countHotDays(payload["enlab-stats"], 90),
         weak: parseWeakList(payload["enlab-weak"]),
         errors: parseErrorCount(payload["enlab-error-log"]),
+        podcastEar: parsePodcastEarFromPayload(payload),
       };
       const fr = typeof frictionFromUxRaw === "function"
         ? frictionFromUxRaw(payload["enlab-quiz-ux"])
@@ -1561,7 +1579,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v97";
+  const SW_CACHE = "enlab-v98";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1937,6 +1955,7 @@
     renderClassPro,
     renderClassTaskBanner,
     importStudentFromCode,
+    maybeNotifyClassAttention,
   };
 
   if (!window.ENLAB_LOADER) bootstrap();

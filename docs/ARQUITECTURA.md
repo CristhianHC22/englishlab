@@ -78,7 +78,7 @@ Flujo diario opcional tras el camino de Hoy: **familia oído → familia uso →
 | Día marcado | Chip en `#hoy-done-mid` (sin tarjeta duplicada en extras) |
 | Repaso + plan | Filtro por familia pendiente, timer corto, un hint en Guía |
 
-**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix, plan stale ≥3d (`pendingSince` + sticky + hydrate IDB). Espejo: `enlab-coach-plan-mirror`. Aula: atención print/CSV/QR + push local 1×/día si roster stale. Podcast/serie quiz fail → oído del plan + Anki `#podcast-ear`. Repaso con stale: timer corto + auto-arranque plan. You-are stale en cualquier pestaña. Guía map/lab memo. Deep-link: `#coach-plan`.
+**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix, plan stale ≥3d / ≥7d (push/chip rojo). Espejo + sticky + hydrate IDB. Aula: atención + push al abrir Ayuda. Serie mid (`enlab-series-now`) + Anki `::Podcast ear`. Repaso auto solo con día marcado + hint Guía. Transfer cuenta `podcastEar`. `npm run perf:lh` → panel Rendimiento. Deep-link: `#coach-plan`.
 
 ## Extensión a propósito (y su coste)
 

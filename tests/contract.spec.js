@@ -93,9 +93,9 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v97/);
+  expect(sw).toMatch(/enlab-v98/);
   const sv = await (await request.get("/features-sv.js")).text();
-  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v97["']/);
+  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v98["']/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -169,6 +169,8 @@ test("SW remindCopy four priority tiers", async ({ request }) => {
     .toMatch(/test de nivel|nivel bajo/i);
   expect(run({ ...base, placePlanNudge: false, certWarmupNudge: true, coachPlanStale: true, quickmixHot: true }).body)
     .toMatch(/calentamiento cert/i);
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStaleDeep: true, coachPlanStale: true, quickmixHot: true }).body)
+    .toMatch(/≥7 días|7\+ days/i);
   expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStale: true, quickmixHot: true }).body)
     .toMatch(/≥3 días|3\+ days|sin empezar/i);
   expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStale: false, quickmixHot: true }).body)
@@ -265,6 +267,8 @@ test("syncRemindPayload shape is complete", async ({ page }) => {
   expect(payload.certWarmupNudge).toBe(true);
   expect(typeof payload.placePlanNudge).toBe("boolean");
   expect(typeof payload.quickmixHot).toBe("boolean");
+  expect(typeof payload.coachPlanStale).toBe("boolean");
+  expect(typeof payload.coachPlanStaleDeep).toBe("boolean");
   expect(["es", "en"]).toContain(payload.lang);
 });
 
@@ -290,17 +294,19 @@ test("remindPushBody matches SW remindCopy for priority bodies", async ({ page, 
   expect(fn).toBeTruthy();
   const run = new Function(`${fn[0]}; return remindCopy;`)();
   const app = await page.evaluate(() => ({
-    place: remindPushBody(0, 3, false, false, true, false, false),
-    cert: remindPushBody(0, 3, false, false, false, true, false),
-    stale: remindPushBody(0, 3, false, false, false, false, true),
-    hot: remindPushBody(0, 3, false, true, false, false, false),
-    start: remindPushBody(0, 3, false, false, false, false, false),
-    mid: remindPushBody(0, 2, true, false, false, false, false),
+    place: remindPushBody(0, 3, false, false, true, false, false, false),
+    cert: remindPushBody(0, 3, false, false, false, true, false, false),
+    stale7: remindPushBody(0, 3, false, false, false, false, true, true),
+    stale: remindPushBody(0, 3, false, false, false, false, true, false),
+    hot: remindPushBody(0, 3, false, true, false, false, false, false),
+    start: remindPushBody(0, 3, false, false, false, false, false, false),
+    mid: remindPushBody(0, 2, true, false, false, false, false, false),
     lang: uiLang(),
   }));
   const base = { lang: app.lang, dueCount: 0, coachPlanLeft: 3, coachPlanStarted: false };
   expect(run({ ...base, placePlanNudge: true }).body).toBe(app.place);
   expect(run({ ...base, certWarmupNudge: true }).body).toBe(app.cert);
+  expect(run({ ...base, coachPlanStaleDeep: true, coachPlanStale: true }).body).toBe(app.stale7);
   expect(run({ ...base, coachPlanStale: true }).body).toBe(app.stale);
   expect(run({ ...base, quickmixHot: true }).body).toBe(app.hot);
   expect(run({ ...base }).body).toBe(app.start);

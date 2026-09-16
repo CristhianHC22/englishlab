@@ -438,7 +438,9 @@
     const srs = typeof srsDueList === "function" ? srsDueList(40) : [];
     const friction = typeof topQuizFriction === "function" ? topQuizFriction(3) : [];
     const pending = typeof coachPlanPendingModes === "function" ? coachPlanPendingModes() : [];
-    const planRows = errs.filter((r) => r.planStep);
+    const planRows = errs.filter((r) => r.planStep && !r.podcastEar);
+    const podRows = errs.filter((r) => r.podcastEar);
+    const otherRows = errs.filter((r) => !r.planStep && !r.podcastEar);
     const lines = ["#separator:tab", "#html:true"];
     if (planRows.length) {
       lines.push("#deck: English Lab::Plan 8 min");
@@ -464,14 +466,13 @@
       && typeof coachPlanStarted === "function" && !coachPlanStarted()) {
       lines.push("# plan-pending: 0/3");
     }
-    const podEarN = errs.filter((r) => r.podcastEar).length;
-    if (podEarN) lines.push(`# podcast-ear: ${podEarN}`);
+    if (podRows.length) lines.push(`# podcast-ear: ${podRows.length}`);
     const pr = typeof loadPlaceResult === "function" ? loadPlaceResult() : null;
     const placePct = pr?.n ? pr.score / pr.n : null;
     if (placePct != null && placePct < 0.65) {
       lines.push(`# placement-low: ${Math.round(placePct * 100)}%`);
     }
-    errs.forEach((r) => {
+    const pushRow = (r) => {
       const front = r.prompt || r.said || "Fix this";
       const mode = journalPlayMode(r.mode);
       const drop = typeof quizModeDropPct === "function" ? quizModeDropPct(mode) : 0;
@@ -483,7 +484,16 @@
       const frTag = drop ? `<br><small>friction ${mode}: ${drop}%</small>` : "";
       const back = `${r.expected}<br><small>${r.why || ""}</small>${frTag}`;
       lines.push(`${front.replace(/\t/g, " ")}${coachTag}${planTag}${podTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
-    });
+    };
+    planRows.forEach(pushRow);
+    if (podRows.length) {
+      lines.push("#deck: English Lab::Podcast ear");
+      podRows.forEach(pushRow);
+    }
+    if (otherRows.length || (!focus?.length && (weak.length || srs.length))) {
+      lines.push("#deck: English Lab");
+      otherRows.forEach(pushRow);
+    }
     if (!focus?.length) {
       weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));
       srs.forEach((x) => lines.push(`${(x.label || x.key || "").replace(/\t/g, " ")}\tSRS due`));
@@ -920,8 +930,33 @@
       if (week) lines.push(week);
     }
     lines.push(`<p><button type="button" class="btn ghost sm" id="perf-friction-csv">${esc(tt("perfFrictionCsv"))}</button></p>`);
+    let lh = null;
+    try { lh = JSON.parse(localStorage.getItem("enlab-lh-last") || "null"); } catch { lh = null; }
+    if (lh?.score != null) {
+      const ok = Number(lh.score) >= 0.7;
+      const lcp = lh.lcp != null ? Math.round(Number(lh.lcp)) : null;
+      lines.push(`<p class="muted perf-lh-row">${esc(tt("perfLhLast", {
+        score: Math.round(Number(lh.score) * 100),
+        lcp: lcp != null ? lcp : "—",
+        floor: 70,
+      }))}${ok ? "" : ` · ${esc(tt("perfLhSoftWarn"))}`}</p>`);
+    } else {
+      lines.push(`<p class="muted perf-lh-row">${esc(tt("perfLhHint"))}</p>`);
+    }
     host.innerHTML = lines.join("");
     schedulePerfHeatLazy();
+    fetch("./enlab-lh-last.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((data) => {
+      if (!data || data.score == null) return;
+      try {
+        localStorage.setItem("enlab-lh-last", JSON.stringify({
+          score: data.score, lcp: data.lcp, at: data.at || Date.now(),
+        }));
+      } catch { /* ignore */ }
+      if (host.isConnected) {
+        window._perfHintKey = "";
+        renderPerfHint();
+      }
+    }).catch(() => {});
   }
 
   function schedulePerfHeatLazy() {
@@ -1024,7 +1059,11 @@
     window.addEventListener("enlab-packs-ready", () => renderPerfHint());
     if (typeof onTabPaint === "function") {
       onTabPaint((id) => {
-        if (id === "ia") { renderErrorJournal(); renderPerfHint(); }
+        if (id === "ia") {
+          renderErrorJournal();
+          renderPerfHint();
+          window.SV?.maybeNotifyClassAttention?.();
+        }
         if (id === "quiz") {
           renderPlaceQuizResume();
           if (typeof renderWeeklyQuizResume === "function") renderWeeklyQuizResume();

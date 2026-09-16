@@ -56,7 +56,10 @@ async function main() {
     const raw = JSON.parse(fs.readFileSync(OUT, "utf8"));
     const score = Number(raw?.categories?.performance?.score);
     const lcp = Number(raw?.audits?.["largest-contentful-paint"]?.numericValue);
+    const summary = { score, lcp, at: Date.now() };
+    fs.writeFileSync("enlab-lh-last.json", JSON.stringify(summary, null, 2));
     console.log(`[perf:lh] score=${score} LCP=${Math.round(lcp)}ms (floors ${SCORE_FLOOR} / ${LCP_MS}ms)`);
+    console.log("[perf:lh] wrote enlab-lh-last.json (panel Rendimiento lo lee en local)");
     if (!(score >= SCORE_FLOOR)) {
       console.warn(`[perf:lh] score below soft floor ${SCORE_FLOOR} — not failing`);
     }

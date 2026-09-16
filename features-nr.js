@@ -425,6 +425,16 @@
     const pods = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= n);
     const series = (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n);
     const resumeBanner = renderPodcastResumeBanner();
+    const seriesMid = loadSeriesQuizNow();
+    const seriesResumeBanner = seriesMid ? (() => {
+      const s = (ENLAB.podcastSeries || []).find((x) => x.id === seriesMid.id);
+      if (!s) return "";
+      const total = (s.seriesQs || []).length;
+      return `<div class="card podcast-resume-banner series-quiz-resume">
+        <p class="kicker">${esc(t("seriesQuizResumeKicker"))}</p>
+        <button type="button" class="btn sm" data-series-resume="${esc(s.id)}">${esc(t("seriesQuizResume", { n: seriesMid.i + 1, total }))} · ${esc(s.title)}</button>
+      </div>`;
+    })() : "";
     /* track which podcasts have been listened to completion */
     let podDone = {};
     try { podDone = JSON.parse(localStorage.getItem("enlab-podcast-done") || "{}"); } catch { /* ignore */ }
@@ -459,7 +469,7 @@
         <button type="button" class="btn sm" data-series-quiz="${esc(s.id)}">${esc(typeof t === "function" ? t("seriesQuizGo") : "Quiz de la serie (9 preg.)")}</button>
       </div>`;
     }).join("");
-    el.innerHTML = resumeBanner + seriesHtml + pods.map((p) => {
+    el.innerHTML = resumeBanner + seriesResumeBanner + seriesHtml + pods.map((p) => {
       const done = !!podDone[p.id];
       const inProgress = podNowId === p.id && !done;
       const badge = done ? ` <span class="podcast-done-badge" aria-label="completado">✓</span>` : (inProgress ? ` <span class="podcast-progress-badge">▶</span>` : "");
@@ -486,10 +496,101 @@
       i: 0, score: 0, items, fails: [], mode: "listen", host: "#quiz-box",
       fromPodcast: seriesId,
     };
+    persistSeriesQuizNow();
     if (typeof showTab === "function") showTab("quiz");
     if (typeof openQuizRoom === "function") openQuizRoom("listen");
     if (typeof renderQuiz === "function") renderQuiz();
     document.querySelector("#quiz-box")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function clearSeriesQuizNow() {
+    try { localStorage.removeItem("enlab-series-now"); } catch { /* ignore */ }
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+  }
+
+  function persistSeriesQuizNow() {
+    if (!quiz?.fromPodcast || !String(quiz.fromPodcast).startsWith("series-")) return;
+    if (!quiz.items?.length || quiz.i >= quiz.items.length) {
+      clearSeriesQuizNow();
+      return;
+    }
+    try {
+      localStorage.setItem("enlab-series-now", JSON.stringify({
+        id: quiz.fromPodcast,
+        i: quiz.i,
+        score: quiz.score || 0,
+        fails: quiz.fails || [],
+        day: typeof todayKey === "function" ? todayKey() : "",
+        at: Date.now(),
+      }));
+    } catch { /* ignore */ }
+  }
+
+  function loadSeriesQuizNow() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("enlab-series-now") || "null");
+      if (!raw?.id || !String(raw.id).startsWith("series-")) return null;
+      const s = (ENLAB.podcastSeries || []).find((x) => x.id === raw.id);
+      if (!s?.seriesQs?.length) return null;
+      if (raw.i >= s.seriesQs.length) return null;
+      return raw;
+    } catch { return null; }
+  }
+
+  function resumeSeriesQuiz() {
+    const raw = loadSeriesQuizNow();
+    if (!raw) return;
+    const s = (ENLAB.podcastSeries || []).find((x) => x.id === raw.id);
+    if (!s) return;
+    const items = (s.seriesQs || []).map((q) => ({
+      type: "listen",
+      q: q.q,
+      a: q.a,
+      opts: q.opts,
+      say: q.a,
+      inf: `${s.id}:${q.a}`,
+    }));
+    quiz = {
+      i: Math.max(0, Number(raw.i) || 0),
+      score: Number(raw.score) || 0,
+      items,
+      fails: Array.isArray(raw.fails) ? raw.fails : [],
+      mode: "listen",
+      host: "#quiz-box",
+      fromPodcast: s.id,
+    };
+    if (typeof showTab === "function") showTab("quiz");
+    if (typeof openQuizRoom === "function") openQuizRoom("listen");
+    if (typeof renderQuiz === "function") renderQuiz();
+    document.querySelector("#quiz-box")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function seriesYouAreChipsHtml() {
+    const parts = [];
+    const mid = loadSeriesQuizNow();
+    if (mid) {
+      const s = (ENLAB.podcastSeries || []).find((x) => x.id === mid.id);
+      const total = s?.seriesQs?.length || 0;
+      if (s && total) {
+        parts.push(`<button type="button" class="chip" data-series-resume="${esc(s.id)}">${esc(t("seriesQuizResume", { n: mid.i + 1, total }))} · ${esc(s.title)}</button>`);
+      }
+    }
+    try {
+      const podDone = JSON.parse(localStorage.getItem("enlab-podcast-done") || "{}");
+      const n = typeof lvlNum === "function" ? lvlNum() : 2;
+      (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n).forEach((s) => {
+        if (mid?.id === s.id) return;
+        const done = (s.episodes || []).filter((id) => !!podDone[id]).length;
+        const total = (s.episodes || []).length;
+        if (done > 0 && done < total) {
+          const nextId = (s.episodes || []).find((id) => !podDone[id]);
+          if (nextId) {
+            parts.push(`<button type="button" class="chip" data-podcast="${esc(nextId)}">${esc(t("seriesEpsResume", { n: done + 1, total }))} · ${esc(s.title)}</button>`);
+          }
+        }
+      });
+    } catch { /* ignore */ }
+    return parts.join("");
   }
 
   /* ── Chat work (O) ── */
@@ -1227,6 +1328,9 @@
       if (e.target.closest("[data-series-quiz]")) {
         startSeriesQuiz(e.target.closest("[data-series-quiz]").dataset.seriesQuiz);
       }
+      if (e.target.closest("[data-series-resume]")) {
+        resumeSeriesQuiz();
+      }
       if (e.target.closest("[data-chat-hear]")) {
         const i = Number(e.target.closest("[data-chat-hear]").dataset.chatHear);
         const m = window._chatWorkSlice?.[i];
@@ -1364,6 +1468,11 @@
     playPodcast,
     startSeriesQuiz,
     startPodcastQuiz,
+    persistSeriesQuizNow,
+    clearSeriesQuizNow,
+    loadSeriesQuizNow,
+    resumeSeriesQuiz,
+    seriesYouAreChipsHtml,
   };
 
   if (!window.ENLAB_LOADER) NR.bootstrap();

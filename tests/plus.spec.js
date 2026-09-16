@@ -809,6 +809,8 @@ test("Repaso with stale plan sets short timer flag and arms quiz", async ({ page
     sessionStorage.removeItem("enlab-coach-plan");
     sessionStorage.removeItem("enlab-coach-plan-flow");
     localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 6 * 86400000));
+    document.querySelector("#hoy")?.classList.add("path-done");
+    document.querySelector("#hoy")?.classList.remove("path-on");
     startRepasoMode();
     const flag = sessionStorage.getItem("enlab-repaso-stale");
     const secs = repasoTimerSecs();
@@ -816,13 +818,38 @@ test("Repaso with stale plan sets short timer flag and arms quiz", async ({ page
     return {
       flag,
       secs,
+      auto: sessionStorage.getItem("enlab-repaso-auto-plan") === "1",
       flow: sessionStorage.getItem("enlab-coach-plan-flow") === "1"
         || document.querySelector("#quiz.panel.active"),
     };
   });
   expect(out.flag).toBe("5");
   expect(out.secs).toBe(360);
+  expect(out.auto).toBe(true);
   expect(!!out.flow).toBe(true);
+});
+
+test("Repaso stale during path does not auto-start plan", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(async () => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+    const hoy = document.querySelector("#hoy");
+    hoy?.classList.add("path-on");
+    hoy?.classList.remove("path-done");
+    startRepasoMode();
+    await new Promise((r) => setTimeout(r, 280));
+    return {
+      flag: sessionStorage.getItem("enlab-repaso-stale"),
+      auto: sessionStorage.getItem("enlab-repaso-auto-plan"),
+      quiz: !!document.querySelector("#quiz.panel.active"),
+    };
+  });
+  expect(out.flag).toBe("3");
+  expect(out.auto).toBeFalsy();
+  expect(out.quiz).toBe(false);
 });
 
 test("Anki export tags podcast-ear rows", async ({ page }) => {
@@ -852,4 +879,63 @@ test("Anki export tags podcast-ear rows", async ({ page }) => {
   });
   expect(text).toMatch(/#podcast-ear/);
   expect(text).toMatch(/# podcast-ear:/);
+  expect(text).toMatch(/English Lab::Podcast ear/);
+});
+
+test("Series quiz mid persists and you-are chip resumes", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    const s = (window.ENLAB.podcastSeries || [])[0];
+    if (!s) return { ok: false };
+    localStorage.removeItem("enlab-kids");
+    window.NR.startSeriesQuiz(s.id);
+    quiz.i = 1;
+    window.NR.persistSeriesQuizNow();
+    const raw = JSON.parse(localStorage.getItem("enlab-series-now") || "null");
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
+    fillYouAreChips();
+    const chip = document.querySelector("#you-are-chips [data-series-resume]");
+    return {
+      ok: true,
+      id: raw?.id === s.id,
+      i: raw?.i === 1,
+      chip: !!chip,
+    };
+  });
+  expect(out.ok).toBe(true);
+  expect(out.id).toBe(true);
+  expect(out.i).toBe(true);
+  expect(out.chip).toBe(true);
+});
+
+test("Stale 7d uses deep push body and chip class", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 8 * 86400000));
+    const body = remindPushBody(0, 3, false, false, false, false, true, true);
+    fillYouAre();
+    const chip = coachPlanChipHtml();
+    return {
+      body,
+      deep: coachPlanIsStale(7),
+      chip,
+      line: document.querySelector("#you-are-text")?.textContent || "",
+    };
+  });
+  expect(out.deep).toBe(true);
+  expect(out.body).toMatch(/≥7|7\+/);
+  expect(out.chip).toMatch(/plan-stale-deep|data-plan-stale="7"/);
+  expect(out.line).toMatch(/≥7|7\+/);
+});
+
+test("Perf panel shows stored Lighthouse score", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-lh-last", JSON.stringify({ score: 0.82, lcp: 1800, at: Date.now() }));
+    window._perfHintKey = "";
+    window.PLUS?.renderPerfHint?.();
+  });
+  await expect(page.locator("#perf-panel .perf-lh-row")).toContainText(/82|Lighthouse|LCP/i);
 });

@@ -137,6 +137,7 @@ No son progreso del alumno (no van en `PROG_KEYS` salvo que se indique):
 | `enlab-cierre-result` | (session) Score + `verbFail` / `earFail` / `useFail` del día |
 | `enlab-quiz-from-hoy` | (session) El round de Juego vino del miss de Hoy |
 | `enlab-podcast-now` | Podcast a medias (`id`, `seg`, `day`) |
+| `enlab-series-now` | Quiz de serie a medias (`id`, `i`, `score`, `fails`) |
 | `enlab-cert-now` | Cert a medias (`day`, `i`, `score`, `fails`, `items`, `left`) o `timeUp` |
 | `enlab-hoy-extra-timer` | (session) Otro 15 min tras Día marcado |
 
@@ -632,6 +633,16 @@ Avance v118:
 - **Aula**: kids sin atención print/CSV; push local 1×/día si roster stale ≥1.
 - **Contract**: sticky + `PROG_KEYS` IDB; `npm run perf:lh` (soft).
 - Cache SW: `enlab-v97`.
+
+Avance v119:
+
+- **Stale ≥7d**: chip rojo, you-are/Guía/push distinto (`coachPlanStaleDeep`).
+- **Repaso auto**: solo con día marcado; hint Guía `guideRepasoAutoPlan`.
+- **Serie mid**: `enlab-series-now` + chips you-are / banner Oír; eps a medias.
+- **Anki**: deck `English Lab::Podcast ear`.
+- **Aula**: push al abrir Ayuda; QR/CSV con `podcastEar`.
+- **Perf**: panel lee `enlab-lh-last.json` / localStorage tras `npm run perf:lh`.
+- Cache SW: `enlab-v98`.
 
 ### Perf baseline (Lighthouse)
 
