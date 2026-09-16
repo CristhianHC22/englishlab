@@ -732,10 +732,10 @@ test("hydrateCoachPlanStale copies pendingSince from mirror", async ({ page }) =
 
 test("Podcast quiz fail logs ear plan step once", async ({ page }) => {
   await boot(page);
-  const n = await page.evaluate(() => {
+  const out = await page.evaluate(() => {
     const pods = (window.ENLAB.podcasts || []).filter((p) => (p.qs || []).length >= 1);
     const pod = pods[0];
-    if (!pod) return -1;
+    if (!pod) return { n: -1 };
     localStorage.removeItem("enlab-kids");
     sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
       day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
@@ -754,7 +754,102 @@ test("Podcast quiz fail logs ear plan step once", async ({ page }) => {
     renderQuiz();
     renderQuiz();
     const log = JSON.parse(localStorage.getItem("enlab-error-log") || "[]");
-    return log.filter((r) => r.planStep === "fail" && String(r.mode || "").includes("ear")).length;
+    const hits = log.filter((r) => r.planStep === "fail" && String(r.mode || "").includes("ear"));
+    return { n: hits.length, podcastEar: !!hits[0]?.podcastEar };
   });
-  expect(n).toBe(1);
+  expect(out.n).toBe(1);
+  expect(out.podcastEar).toBe(true);
+});
+
+test("Series quiz fail sets fromPodcast and ear CTA", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    const s = (window.ENLAB.podcastSeries || [])[0];
+    if (!s) return { ok: false };
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.setItem("enlab-error-log", "[]");
+    sessionStorage.removeItem(`enlab-pod-fail-log:${todayKey()}:${s.id}`);
+    if (window.NR?.startSeriesQuiz) window.NR.startSeriesQuiz(s.id);
+    else return { ok: false, reason: "no startSeriesQuiz" };
+    quiz.fails = [(quiz.items[0] && quiz.items[0].inf) || "x"];
+    quiz.i = quiz.items.length;
+    renderQuiz();
+    const cta = !!document.querySelector("#quiz-box [data-coach-plan-go].warn, #quiz-box [data-coach-plan-go][data-coach-plan-mode]");
+    const log = JSON.parse(localStorage.getItem("enlab-error-log") || "[]");
+    const ear = log.some((r) => r.podcastEar && r.planStep === "fail");
+    return { ok: true, fromPodcast: quiz.fromPodcast === s.id, cta, ear };
+  });
+  expect(out.ok).toBe(true);
+  expect(out.fromPodcast).toBe(true);
+  expect(out.ear).toBe(true);
+  expect(out.cta).toBe(true);
+});
+
+test("You-are shows plan stale on quiz tab", async ({ page }) => {
+  await boot(page);
+  const line = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+    if (typeof showTab === "function") showTab("quiz");
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
+    fillYouAre();
+    return document.querySelector("#you-are-text")?.textContent || "";
+  });
+  expect(line).toMatch(/≥3|3\+|días|days|plan/i);
+});
+
+test("Repaso with stale plan sets short timer flag and arms quiz", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(async () => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 6 * 86400000));
+    startRepasoMode();
+    const flag = sessionStorage.getItem("enlab-repaso-stale");
+    const secs = repasoTimerSecs();
+    await new Promise((r) => setTimeout(r, 280));
+    return {
+      flag,
+      secs,
+      flow: sessionStorage.getItem("enlab-coach-plan-flow") === "1"
+        || document.querySelector("#quiz.panel.active"),
+    };
+  });
+  expect(out.flag).toBe("5");
+  expect(out.secs).toBe(360);
+  expect(!!out.flow).toBe(true);
+});
+
+test("Anki export tags podcast-ear rows", async ({ page }) => {
+  await boot(page);
+  const text = await page.evaluate(() => {
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      {
+        at: Date.now(), mode: "plan:ear", expected: "Plan", prompt: "paso",
+        said: "out", why: "z", planStep: "fail", podcastEar: 1,
+      },
+    ]));
+    const blobs = [];
+    const Orig = window.Blob;
+    window.Blob = function (parts, opts) {
+      blobs.push(String(parts?.[0] || ""));
+      return new Orig(parts, opts);
+    };
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {};
+    try {
+      window.PLUS?.exportAnki?.();
+    } finally {
+      window.Blob = Orig;
+      HTMLAnchorElement.prototype.click = click;
+    }
+    return blobs[0] || "";
+  });
+  expect(text).toMatch(/#podcast-ear/);
+  expect(text).toMatch(/# podcast-ear:/);
 });

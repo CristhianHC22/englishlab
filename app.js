@@ -1258,6 +1258,21 @@ function quizCoachPlanHtml() {
   </div>`;
 }
 
+function notePodcastQuizFailForPlan() {
+  if (!quiz?.fromPodcast || !(quiz.fails || []).length) return;
+  if (typeof kidsOn === "function" && kidsOn()) return;
+  if (typeof coachPlanLeft !== "function" || coachPlanLeft() <= 0) return;
+  if (!window.PLUS?.logPlanStepEvent) return;
+  try {
+    const day = todayKey();
+    const logKey = `enlab-pod-fail-log:${day}:${quiz.fromPodcast}`;
+    if (sessionStorage.getItem(logKey)) return;
+    sessionStorage.setItem(logKey, "1");
+    const ear = coachPlanPendingModes().find((m) => coachPlanFamily(m) === "ear") || "ear";
+    window.PLUS.logPlanStepEvent("fail", ear, { podcastEar: true });
+  } catch { /* ignore */ }
+}
+
 function quizCoachEndHtml(mode) {
   if (!mode || mode === "cierre") return "";
   if (mode === "weekly" || mode === "cert" || mode === "place") return quizCoachBtnsHtml(mode);
@@ -4372,18 +4387,7 @@ function renderQuiz() {
       if (coachPlanFlowOn() && quiz.fails.length && window.PLUS?.logPlanStepEvent) {
         window.PLUS.logPlanStepEvent("fail", quiz.mode);
       }
-      if (quiz.fromPodcast && quiz.fails.length && window.PLUS?.logPlanStepEvent
-        && !(typeof kidsOn === "function" && kidsOn()) && coachPlanLeft() > 0) {
-        try {
-          const day = todayKey();
-          const logKey = `enlab-pod-fail-log:${day}:${quiz.fromPodcast}`;
-          if (!sessionStorage.getItem(logKey)) {
-            sessionStorage.setItem(logKey, "1");
-            const ear = coachPlanPendingModes().find((m) => coachPlanFamily(m) === "ear") || "ear";
-            window.PLUS.logPlanStepEvent("fail", ear);
-          }
-        } catch { /* ignore */ }
-      }
+      notePodcastQuizFailForPlan();
       if (coachPlanStarted() || coachPlanFlowOn()) bumpCoachPlanProgress(quiz.mode);
     }
     const g = todayGame();
@@ -6467,6 +6471,11 @@ function saveWeeklyFailsForCoach() {
 }
 
 function repasoTimerSecs() {
+  try {
+    const staleFlag = sessionStorage.getItem("enlab-repaso-stale");
+    if (staleFlag === "5" && coachPlanLeft() > 0) return 360;
+    if (staleFlag === "3" && coachPlanLeft() > 0) return 480;
+  } catch { /* ignore */ }
   if (coachPlanStarted() && coachPlanLeft() > 0) {
     const left = coachPlanLeft();
     return Math.min(600, Math.max(360, left * 240));
@@ -7744,6 +7753,14 @@ function fillYouAre() {
     paintYouAreLine(text, jumpNote, entry);
     return;
   }
+  /* Plan stale: cualquier pestaña (Hoy día marcado ya lo cubre arriba) */
+  {
+    const kidsAny = typeof kidsOn === "function" && kidsOn();
+    if (!kidsAny && !pathOn && coachPlanIsStale() && coachPlanLeft() > 0) {
+      paintYouAreLine(text, t("youAreCoachPlanStale"), entry);
+      return;
+    }
+  }
   if (repasoOn()) {
     paintYouAreLine(text, t("youAreRepaso"), entry);
     return;
@@ -8177,6 +8194,15 @@ function startRepasoMode() {
   localStorage.setItem("enlab-repaso", "1");
   sessionStorage.setItem("enlab-repaso-speak-only", speakOnlyWeakOn() ? "1" : "0");
   localStorage.setItem("enlab-speak-only-weak", "1");
+  let staleAuto = false;
+  try {
+    sessionStorage.removeItem("enlab-repaso-stale");
+    const kids = typeof kidsOn === "function" && kidsOn();
+    if (!kids && coachPlanIsStale() && coachPlanProgress() === 0 && coachPlanLeft() >= 3) {
+      sessionStorage.setItem("enlab-repaso-stale", coachPlanIsStale(5) ? "5" : "3");
+      staleAuto = true;
+    }
+  } catch { /* ignore */ }
   try {
     const hoy = $("#hoy");
     const pathOn = hoy?.classList.contains("path-on") && !hoy.classList.contains("path-done");
@@ -8201,11 +8227,22 @@ function startRepasoMode() {
   if (exitBtn) exitBtn.hidden = false;
   syncPrefsBadge();
   buzz(true);
+  /* Plan stale: timer corto + arranca oído→uso→verbos sin un clic más */
+  if (staleAuto && typeof startCoachPlanQuiz === "function") {
+    setTimeout(() => {
+      try {
+        if (localStorage.getItem("enlab-repaso") !== "1") return;
+        if (coachPlanProgress() > 0) return;
+        startCoachPlanQuiz();
+      } catch { /* ignore */ }
+    }, 220);
+  }
 }
 
 function clearRepasoMode() {
   if (localStorage.getItem("enlab-repaso") !== "1") return;
   localStorage.removeItem("enlab-repaso");
+  try { sessionStorage.removeItem("enlab-repaso-stale"); } catch { /* ignore */ }
   document.body.classList.remove("repaso-active");
   setPressed($("#repaso-btn"), false);
   const prev = sessionStorage.getItem("enlab-repaso-speak-only");

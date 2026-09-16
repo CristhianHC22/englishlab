@@ -628,3 +628,53 @@ test("Hablar: attention CSV lists stale and hi friction", async ({ page }) => {
   expect(csv).toMatch(/stale_3d|friction_hi/);
   expect(csv).not.toMatch(/Ok/);
 });
+
+test("Hablar: kids hide attention print and CSV", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-kids", "1");
+    if (typeof applyKidsMode === "function") applyKidsMode();
+  });
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await expect(page.locator("#class-attention-print")).toHaveCount(0);
+  await expect(page.locator("#class-attention-csv")).toHaveCount(0);
+});
+
+test("Hablar: class attention push once per day when roster stale", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    const day = todayKey();
+    localStorage.removeItem(`enlab-class-attn-push:${day}`);
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      {
+        name: "Stale",
+        coachDone: 0,
+        coachTotal: 3,
+        coachPendingSince: Date.now() - 4 * 86400000,
+        synced: Date.now() - 4 * 86400000,
+      },
+    ]));
+    const notes = [];
+    const Orig = window.Notification;
+    window.Notification = function (title, opts) {
+      notes.push({ title, body: opts?.body });
+      return {};
+    };
+    window.Notification.permission = "granted";
+    try {
+      if (window.SV?.renderClassPro) window.SV.renderClassPro();
+      if (window.SV?.renderClassPro) window.SV.renderClassPro();
+    } finally {
+      window.Notification = Orig;
+    }
+    return {
+      n: notes.length,
+      body: notes[0]?.body || "",
+      flagged: localStorage.getItem(`enlab-class-attn-push:${day}`) === "1",
+    };
+  });
+  expect(out.n).toBe(1);
+  expect(out.flagged).toBe(true);
+  expect(out.body).toMatch(/1|alumno|student|plan/i);
+});

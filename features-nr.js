@@ -481,7 +481,11 @@
       say: q.a,
       inf: `${seriesId}:${q.a}`,
     }));
-    window.quiz = { i: 0, score: 0, items, fails: [], mode: "listen", host: "#quiz-box" };
+    /* fromPodcast = id de serie: mismo CTA oído + log plan:ear que podcast suelto */
+    quiz = {
+      i: 0, score: 0, items, fails: [], mode: "listen", host: "#quiz-box",
+      fromPodcast: seriesId,
+    };
     if (typeof showTab === "function") showTab("quiz");
     if (typeof openQuizRoom === "function") openQuizRoom("listen");
     if (typeof renderQuiz === "function") renderQuiz();
@@ -1358,6 +1362,8 @@
     travelMapToday,
     renderLabAudit,
     playPodcast,
+    startSeriesQuiz,
+    startPodcastQuiz,
   };
 
   if (!window.ENLAB_LOADER) NR.bootstrap();

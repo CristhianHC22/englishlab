@@ -19,7 +19,7 @@
     } catch { return []; }
   }
 
-  function logPlanStepEvent(kind, mode) {
+  function logPlanStepEvent(kind, mode, extra) {
     const steps = typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear", "uso", "choice"];
     const done = typeof coachPlanProgress === "function" ? coachPlanProgress() : 0;
     const stepMode = mode || steps[Math.min(done, steps.length - 1)] || "?";
@@ -31,6 +31,7 @@
       said: kind === "abandon" ? tt("journalPlanAbandonSaid") : tt("journalPlanFailSaid"),
       why: kind === "abandon" ? tt("journalPlanAbandonWhy") : tt("journalPlanFailWhy"),
       planStep: kind,
+      podcastEar: !!(extra && extra.podcastEar),
     });
   }
 
@@ -45,6 +46,7 @@
       why: String(entry.why || "").slice(0, 220),
     };
     if (entry.planStep) row.planStep = entry.planStep;
+    if (entry.podcastEar) row.podcastEar = 1;
     if (entry.f1) {
       row.f1 = entry.f1;
       row.f2 = entry.f2;
@@ -462,6 +464,8 @@
       && typeof coachPlanStarted === "function" && !coachPlanStarted()) {
       lines.push("# plan-pending: 0/3");
     }
+    const podEarN = errs.filter((r) => r.podcastEar).length;
+    if (podEarN) lines.push(`# podcast-ear: ${podEarN}`);
     const pr = typeof loadPlaceResult === "function" ? loadPlaceResult() : null;
     const placePct = pr?.n ? pr.score / pr.n : null;
     if (placePct != null && placePct < 0.65) {
@@ -473,11 +477,12 @@
       const drop = typeof quizModeDropPct === "function" ? quizModeDropPct(mode) : 0;
       const coachTag = typeof coachPlanStepForMode === "function" && pending.includes(coachPlanStepForMode(mode)) ? " #coach-pending" : "";
       const planTag = r.planStep ? ` #plan-step #plan-${r.planStep}` : "";
+      const podTag = r.podcastEar ? " #podcast-ear" : "";
       const placeTag = placePct != null && placePct < 0.65 && typeof placementCoachStep === "function"
         && placementCoachStep(placePct) === coachPlanStepForMode(mode) ? " #placement-low" : "";
       const frTag = drop ? `<br><small>friction ${mode}: ${drop}%</small>` : "";
       const back = `${r.expected}<br><small>${r.why || ""}</small>${frTag}`;
-      lines.push(`${front.replace(/\t/g, " ")}${coachTag}${planTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
+      lines.push(`${front.replace(/\t/g, " ")}${coachTag}${planTag}${podTag}${placeTag}\t${back.replace(/\t/g, " ")}`);
     });
     if (!focus?.length) {
       weak.forEach((v) => lines.push(`${v}\t${v} — irregular / weak in English Lab`));

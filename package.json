@@ -9,7 +9,8 @@
     "icons": "node scripts/gen-icons.js",
     "vapid": "node scripts/gen-vapid.js",
     "push": "node scripts/push-remind.js",
-    "audit:i18n": "node scripts/audit-i18n.js"
+    "audit:i18n": "node scripts/audit-i18n.js",
+    "perf:lh": "node scripts/lh-baseline.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

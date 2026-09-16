@@ -825,6 +825,7 @@
     const roster = loadRoster();
     const task = localStorage.getItem("enlab-class-task") || "path";
     const taskCoach = task === "coach";
+    const kids = typeof kidsOn === "function" && kidsOn();
     const weekKey = typeof todayKey === "function" ? todayKey().slice(0, 7) : "";
     const tasks = [
       { id: "path", label: t("classTaskPath") },
@@ -834,6 +835,9 @@
       { id: "pron", label: t("classTaskPron") },
       { id: "story", label: t("classTaskStory") },
     ];
+    const attnBtns = kids ? "" : `
+        <button type="button" class="btn ghost sm" id="class-attention-print">${esc(t("classAttentionPrint"))}</button>
+        <button type="button" class="btn ghost sm" id="class-attention-csv">${esc(t("classAttentionCsv"))}</button>`;
     host.innerHTML = `
       <p class="kicker">${esc(t("classPro"))}</p>
       <p class="muted">${esc(t("classProHint"))}</p>
@@ -850,8 +854,7 @@
         <button type="button" class="btn ghost sm" id="class-coach-plan-print">${esc(t("classCoachPlanPrint"))}</button>
         <button type="button" class="btn ghost sm" id="class-friction-print">${esc(t("classFrictionPrint"))}</button>
         <button type="button" class="btn ghost sm" id="class-student-qr">${esc(t("classStudentQr"))}</button>
-        <button type="button" class="btn ghost sm" id="class-attention-print">${esc(t("classAttentionPrint"))}</button>
-        <button type="button" class="btn ghost sm" id="class-attention-csv">${esc(t("classAttentionCsv"))}</button>
+        ${attnBtns}
         <button type="button" class="btn ghost sm" id="student-pdf">${esc(t("studentPdf"))}</button>
       </div>
       <div id="class-student-qr-box" class="student-qr-box" hidden></div>
@@ -864,6 +867,7 @@
       ${classCoachPlanAlertHtml()}
       <div id="class-heat-lazy" class="class-heat-lazy" aria-busy="true"><p class="muted">${esc(t("classHeatLazy"))}</p></div>`;
     scheduleClassHeatLazy();
+    maybeNotifyClassAttention();
   }
 
   function scheduleClassHeatLazy() {
@@ -968,7 +972,26 @@
     return roster.filter((s) => rosterCoachPlanStale(s) || frictionDropLevel(s.frictionDrop) === "hi");
   }
 
+  /** Aviso local 1×/día si ≥1 alumno con plan stale (profe en el aparato). */
+  function maybeNotifyClassAttention(minStale = 1) {
+    if (typeof kidsOn === "function" && kidsOn()) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (location.protocol === "file:") return;
+    const staleN = loadRoster().filter((s) => rosterCoachPlanStale(s)).length;
+    if (staleN < minStale) return;
+    try {
+      const day = typeof todayKey === "function" ? todayKey() : "";
+      const key = `enlab-class-attn-push:${day}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      const title = t("classAttentionPushTitle");
+      const body = t("classAttentionPushBody", { n: staleN, s: staleN === 1 ? "" : "s" });
+      new Notification(title, { body, tag: "enlab-class-attn", silent: true });
+    } catch { /* ignore */ }
+  }
+
   function printClassAttentionSheet() {
+    if (typeof kidsOn === "function" && kidsOn()) return;
     if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
     const area = document.querySelector("#weak-print-area");
     if (!area) return;
@@ -1008,6 +1031,7 @@
   }
 
   function exportClassAttentionCsv() {
+    if (typeof kidsOn === "function" && kidsOn()) return;
     if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
     const rows = [["student", "plan_status", "plan_cell", "friction_mode", "friction_drop", "why", "filter"]];
     const filt = _classFrictionHeatFilter || _classPlanHeatFilter || "attention";
@@ -1537,7 +1561,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v96";
+  const SW_CACHE = "enlab-v97";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;

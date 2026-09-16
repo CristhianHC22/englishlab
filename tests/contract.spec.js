@@ -93,9 +93,9 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v96/);
+  expect(sw).toMatch(/enlab-v97/);
   const sv = await (await request.get("/features-sv.js")).text();
-  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v96["']/);
+  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v97["']/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -332,4 +332,32 @@ test("remindPushBody cert warmup requires plan not started", async ({ page }) =>
   }));
   expect(bodies.open).toMatch(/calentamiento|warm-up/i);
   expect(bodies.gated).not.toMatch(/calentamiento|warm-up/i);
+});
+
+test("IDB PROG_KEYS include coach stale sticky and mirror", async ({ page }) => {
+  await boot(page);
+  const keys = await page.evaluate(() => window.ENLAB_PROG_KEYS || window.ENLAB_IDB?.PROG_KEYS || []);
+  expect(keys).toContain("enlab-coach-plan-mirror");
+  expect(keys).toContain("enlab-coach-stale-since");
+});
+
+test("hydrateCoachPlanStale after mirror restore keeps sticky", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-coach-stale-since");
+    localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+      pendingSince: Date.now() - 4 * 86400000,
+    }));
+    if (typeof restoreCoachPlanFromMirror === "function") restoreCoachPlanFromMirror();
+    hydrateCoachPlanStale();
+    return {
+      sticky: coachPlanStickySince() > 0,
+      stale: coachPlanIsStale(),
+      left: coachPlanLeft(),
+    };
+  });
+  expect(out.sticky).toBe(true);
+  expect(out.stale).toBe(true);
+  expect(out.left).toBeGreaterThan(0);
 });

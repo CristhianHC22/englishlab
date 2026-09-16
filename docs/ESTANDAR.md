@@ -624,13 +624,21 @@ Avance v117:
 - **Docs**: baseline Lighthouse local (ver abajo).
 - Cache SW: `enlab-v96`.
 
+Avance v118:
+
+- **You-are**: línea stale en cualquier pestaña (no solo Día marcado).
+- **Repaso**: si plan stale, timer corto + auto `startCoachPlanQuiz`.
+- **Serie podcast**: `fromPodcast` → mismo CTA oído + log; Anki `#podcast-ear`.
+- **Aula**: kids sin atención print/CSV; push local 1×/día si roster stale ≥1.
+- **Contract**: sticky + `PROG_KEYS` IDB; `npm run perf:lh` (soft).
+- Cache SW: `enlab-v97`.
+
 ### Perf baseline (Lighthouse)
 
-Servidor local estático + Chrome headless (no CI):
+Servidor local estático + Chrome headless (no CI — soft):
 
 ```bash
-npx serve -l 4173 . &
-npx lighthouse http://127.0.0.1:4173 --only-categories=performance --form-factor=mobile --chrome-flags="--headless" --quiet
+npm run perf:lh
 ```
 
-Meta orientativa post-packs: LCP &lt; 2.5s en laptop media; no bloquear el camino Hoy.
+Equivale a servir en `:4173` y correr Lighthouse mobile performance. Meta orientativa post-packs: score ≥ 0.7 / LCP &lt; 2.5s en laptop media; no bloquear el camino Hoy. El script escribe `test-results/lh.json` (gitignored) y no falla el CI si baja el umbral.
