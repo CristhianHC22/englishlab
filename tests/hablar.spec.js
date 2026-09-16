@@ -88,7 +88,7 @@ test("Hablar: class pro shows friction column", async ({ page }) => {
   await expect(page.locator(".class-roster-table tbody")).toContainText(/75%/);
 });
 
-test("Hoy done copy mentions pending plan", async ({ page }) => {
+test("Hoy done shows plan chip when pending", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
     sessionStorage.removeItem("enlab-coach-plan");
@@ -97,7 +97,8 @@ test("Hoy done copy mentions pending plan", async ({ page }) => {
     persistHoyPath();
     if (typeof renderHoyPath === "function") renderHoyPath();
   });
-  await expect(page.locator("#hoy-done-copy")).toContainText(/plan 8 min|8-min plan/i);
+  await expect(page.locator("#hoy-path-plan [data-coach-plan-go]")).toBeVisible();
+  await expect(page.locator("#hoy-done-copy")).toContainText(/listo por hoy|done for today/i);
 });
 
 test("Hablar: roster highlights pending plan when task is coach", async ({ page }) => {

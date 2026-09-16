@@ -824,7 +824,7 @@ test("Verbos: smart drill and family heatmap visible", async ({ page }) => {
   await expect(page.locator("#quiz-box .quiz-q, #quiz-box .choices button").first()).toBeVisible();
 });
 
-test("Hoy path inline plan step when plan started", async ({ page }) => {
+test("Hoy path plan chip shows progress when plan started", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
     sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
@@ -834,7 +834,7 @@ test("Hoy path inline plan step when plan started", async ({ page }) => {
     persistHoyPath();
     finishHoyPath();
   });
-  await expect(page.locator("#hoy-path-copy")).toContainText(/paso 1\/3|step 1\/3/i);
+  await expect(page.locator("#hoy-path-plan [data-coach-plan-go]")).toContainText(/1\/3/);
 });
 
 test("Quiz end without plan shows peer modes not coach plan bar", async ({ page }) => {
@@ -862,7 +862,7 @@ test("Repaso filters review to pending coach step", async ({ page }) => {
     if (typeof startRepasoMode === "function") startRepasoMode();
     if (typeof renderHoyReview === "function") renderHoyReview();
   });
-  await expect(page.locator("#hoy-review")).toContainText(/filtrado|filtered/i);
+  await expect(page.locator("#hoy-review")).toContainText(/Repaso · Plan 8 min|Review · 8-min plan/i);
   await expect(page.locator("#hoy-review .review-section").filter({ hasText: /Oído|Ear/i })).toHaveCount(0);
 });
 
@@ -953,7 +953,7 @@ test("Repaso plan-only banner when coach step pending", async ({ page }) => {
     if (typeof startRepasoMode === "function") startRepasoMode();
     if (typeof renderHoyReview === "function") renderHoyReview();
   });
-  await expect(page.locator("#hoy-review")).toContainText(/solo paso|plan step only/i);
+  await expect(page.locator("#hoy-review")).toContainText(/Repaso · Plan 8 min|Review · 8-min plan/i);
 });
 
 test("Cert warmup streak offers full 8-min plan", async ({ page }) => {

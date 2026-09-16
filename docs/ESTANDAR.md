@@ -550,3 +550,9 @@ Avance v109 (cont.):
 - **Quickmix hot**: caché diaria incluye firma de fricción (no queda stale tras seed en tests).
 - **Tests**: filtro heatmap vía chip; auto-quickmix al abrir sala exámenes.
 - Cache SW: `enlab-v88`.
+
+Avance v110:
+
+- **UX menos verbosa**: copy de Día marcado, plan, Guía y you-are acortados; plan solo en chip (no repetido en párrafo).
+- **Quiz Now / coach card**: sin párrafos duplicados bajo el CTA.
+- Cache SW: `enlab-v89`.

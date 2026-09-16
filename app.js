@@ -2071,11 +2071,6 @@ function renderHoyPath() {
     else label = t("pathReady");
   } else if (i > last) {
     text = g.game ? t("pathDoneGame") : t("pathDoneExplore");
-    if (coachPlanStarted() && coachPlanLeft() > 0) {
-      text += ` · ${t("hoyPathPlanInline", { done: coachPlanProgress(), total: quizCoachPlan8().length })}`;
-    } else if (!coachPlanStarted() && coachPlanLeft() >= 3) {
-      text += ` · ${t("hoyPathPlanPendingInline")}`;
-    }
     label = t("pathRepeat");
   }
   if (i >= 0 && i <= last && path[i].id === "cierre"
@@ -2123,11 +2118,7 @@ function renderHoyPath() {
     const done = hoy?.classList.contains("path-done");
     doneBox.hidden = !done;
     if (done && doneCopy) {
-      doneCopy.textContent = coachPlanLeft() > 0 && !coachPlanStarted()
-        ? `${t("hoyDoneCopy")} · ${t("hoyPathPlanPendingInline")}`
-        : coachPlanStarted() && coachPlanLeft() > 0
-          ? `${t("hoyDoneCopy")} · ${t("hoyPathPlanInline", { done: coachPlanProgress(), total: quizCoachPlan8().length })}`
-          : t("hoyDoneCopy");
+      doneCopy.textContent = t("hoyDoneCopy");
     }
     const r = loadCierreResult();
     const cierreLine = $("#hoy-done-cierre");
@@ -3214,7 +3205,6 @@ function renderHoyReview() {
         <div class="review-section-head"><span class="muted">${esc(t("quizCoachPlan8"))}</span></div>
         <div class="row">${coachPlanChipHtml("btn ghost sm")}</div>
         ${repasoStepBudgetHtml()}
-        <p class="muted">${esc(coachFilter ? t("repasoCoachFilterHint") : t("repasoCoachHint"))}</p>
       </div>`
     : "";
   if (!total && !preview.length && !coachRepaso) {
@@ -3233,7 +3223,7 @@ function renderHoyReview() {
   el.hidden = false;
   const repasoPlanStart = repasoOn() && !coachPlanStarted() && coachPlanLeft() >= 3;
   const repasoBanner = repasoOn()
-    ? `<p class="pill ok">${esc(coachFilter ? t("repasoPlanOnly") : repasoPlanStart ? t("repasoPlanStartHint") : t("repasoActive"))}${coachFilter ? ` · ${esc(t("repasoTimerCoach", { min: Math.round(repasoTimerSecs() / 60) }))}` : ""}</p>`
+    ? `<p class="pill ok">${esc(coachFilter ? t("repasoPlanOnly") : repasoPlanStart ? t("repasoPlanStartHint") : t("repasoActive"))}${coachFilter ? ` · ${Math.round(repasoTimerSecs() / 60)} min` : ""}</p>`
     : "";
   const totalWeak = ears.length + verbs.length + uso.length + ed.length + speak.length;
   const totalAll = weakSet().size + usoWeakSet().size + edWeakSet().size + speakWeakSet().size + worstEarPairs(99).length;
@@ -6331,8 +6321,7 @@ function renderCoachPlanToday() {
     : "";
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("quizCoachPlan8"))}</p>
-    <p class="muted">${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
+    <p class="kicker">${esc(t("quizCoachPlan8"))} · ${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
     <div class="row">${coachPlanChipHtml("btn sm")}${qm}</div>`;
 }
 
@@ -6348,11 +6337,9 @@ function renderQuizNow() {
   _quizNowKey = key;
   let planChip = "";
   if (planDone > 0 && planDone < planSteps.length) {
-    planChip = `<p class="muted quiz-plan-now">${esc(t("quizCoachPlanNow", { done: planDone, total: planSteps.length }))}</p>
-       <button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[planDone])}" data-quiz-coach="1" data-coach-plan-step="${planDone}">${esc(t("quizCoachPlanResume"))}</button>`;
+    planChip = `<button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[planDone])}" data-quiz-coach="1" data-coach-plan-step="${planDone}">${esc(t("quizCoachPlanResume"))} · ${planDone}/${planSteps.length}</button>`;
   } else if (planDone === 0) {
-    planChip = `<p class="muted quiz-plan-now">${esc(t("quizCoachPlanStartHint"))}</p>
-       <button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[0])}" data-quiz-coach="1" data-coach-plan-step="0">${esc(t("quizCoachPlanStart"))}</button>`;
+    planChip = `<button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[0])}" data-quiz-coach="1" data-coach-plan-step="0">${esc(t("quizCoachPlanStart"))}</button>`;
   }
   const missBtn = miss
     ? `<button type="button" class="btn ghost sm" data-quiz-miss="${esc(miss.game)}">${esc(miss.label)}</button>`

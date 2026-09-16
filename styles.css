@@ -196,14 +196,15 @@ header.hero {
 .net-warn[hidden] { display: none; }
 .hoy-done {
   margin: 12px 0 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 2px solid var(--accent);
   border-radius: 14px;
   background: var(--accent-soft);
 }
-.hoy-done .kicker { margin: 0 0 4px; }
-.hoy-done p { margin: 0 0 8px; }
-.hoy-done-streak { font-weight: 800; color: var(--accent); }
+.hoy-done .kicker { margin: 0 0 2px; }
+.hoy-done p { margin: 0 0 6px; }
+.hoy-done #hoy-done-copy { color: var(--muted); font-size: 14px; max-width: 28em; }
+.hoy-done-streak { font-weight: 800; color: var(--accent); font-size: 14px; }
 .hoy-done-next { gap: 8px; }
 body.kids-mode .hoy-done-next [data-go-tab="vocales"],
 body.kids-mode .hoy-done-next [data-go-tab="hablar"],
@@ -904,13 +905,18 @@ body:not(.reduced-motion):not(.a11y-contrast) .next-act {
 }
 .quiz-now {
   margin: 12px 0 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 2px solid var(--accent);
   border-radius: 14px;
   background: var(--accent-soft);
 }
-.quiz-now .kicker { margin: 0 0 4px; }
-.quiz-now p { margin: 0 0 8px; }
+.quiz-now .kicker { margin: 0 0 2px; }
+.quiz-now p { margin: 0 0 6px; }
+.quiz-now .muted { font-size: 13px; }
+#coach-plan-today.card {
+  padding: 10px 12px;
+}
+#coach-plan-today .kicker { margin: 0 0 8px; font-size: 13px; }
 .quiz-quickmix-plan { margin: 6px 0 0; font-size: 12px; opacity: 0.9; }
 .quiz-srs-why { margin: 6px 0 0; font-size: 12px; opacity: 0.9; }
 .perf-friction-list p { margin: 4px 0; }
