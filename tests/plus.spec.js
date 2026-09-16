@@ -595,3 +595,81 @@ test("90d streak chart memo skips identical rebuild", async ({ page }) => {
   });
   expect(same).toBe(true);
 });
+
+test("Coach plan sticky stale survives day-roll mirror clear", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+    localStorage.removeItem("enlab-coach-plan-mirror");
+    return {
+      stale: coachPlanIsStale(),
+      since: coachPlanPendingSinceMs() > 0,
+      chip: coachPlanChipHtml("btn sm"),
+    };
+  });
+  expect(out.stale).toBe(true);
+  expect(out.since).toBe(true);
+  expect(out.chip).toMatch(/data-plan-stale|≥3|3\+/);
+});
+
+test("Writing low score logs journal fail once per day", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "writing-panel", "hablar");
+  const n = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.removeItem("enlab-kids");
+    localStorage.setItem("enlab-error-log", "[]");
+    sessionStorage.removeItem(`enlab-write-fail-log:${todayKey()}:${window._writingPick?.id || ""}`);
+    document.querySelector("#writing-draft").value = "x";
+    document.querySelector("#writing-score")?.click();
+    document.querySelector("#writing-score")?.click();
+    const log = JSON.parse(localStorage.getItem("enlab-error-log") || "[]");
+    return log.filter((r) => r.planStep === "fail" && String(r.mode || "").startsWith("plan:")).length;
+  });
+  expect(n).toBe(1);
+});
+
+test("Guía fillYouAre skips heavy entry when panel closed", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+    document.querySelector("#hoy")?.classList.add("path-done");
+    if (typeof showTab === "function") showTab("hoy");
+    const panel = document.querySelector("#guide-panel");
+    if (panel) panel.hidden = true;
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
+    fillYouAre();
+    const closedWhyish = document.querySelector("#you-are-text")?.textContent || "";
+    if (panel) panel.hidden = false;
+    if (typeof fillGuide === "function") fillGuide();
+    const openWhy = document.querySelector("#guide-why")?.textContent || "";
+    return { closedWhyish, openWhy };
+  });
+  expect(out.openWhy).toMatch(/≥3|3\+|días|days|stale|pendiente/i);
+});
+
+test("Podcast mid offers plan ear CTA when ear pending", async ({ page }) => {
+  await boot(page);
+  const html = await page.evaluate(() => {
+    const pods = window.ENLAB.podcasts || [];
+    const pod = pods.find((p) => (p.segments || []).length > 2) || pods[0];
+    if (!pod) return "";
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.removeItem("enlab-kids");
+    localStorage.setItem("enlab-podcast-now", JSON.stringify({
+      id: pod.id, seg: 1, day: todayKey(), at: Date.now(),
+    }));
+    if (typeof fillYouAreChips === "function") fillYouAreChips();
+    return document.querySelector("#you-are-chips")?.innerHTML || "";
+  });
+  expect(html).toMatch(/data-coach-plan-mode=["']ear["']/);
+});

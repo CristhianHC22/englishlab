@@ -9,6 +9,7 @@
   --accent-2: #e15a28;
   --ok: #1b8a4a;
   --bad: #c5261e;
+  --warn: #e07a2f;
   --shadow: 0 12px 28px rgba(23, 50, 46, 0.08);
   --tap: 44px;
   --radius: 20px;
@@ -1304,6 +1305,7 @@ footer {
 .chart90-plan-chip { font-size: 12px; vertical-align: baseline; }
 .class-friction-heat-filters { margin-bottom: 4px; }
 .chip.warn { border-color: var(--warn, #e07a2f); color: var(--warn, #e07a2f); }
+button.btn.warn, a.btn.warn { border-color: var(--warn, #e07a2f); color: var(--warn, #e07a2f); background: transparent; }
 .streak-90 .streak-day { border: 0; cursor: pointer; }
 .voice-history { margin-top: 14px; }
 .voice-row { margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }

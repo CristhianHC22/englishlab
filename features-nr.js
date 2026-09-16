@@ -411,7 +411,10 @@
     const segAttr = mid ? ` data-pod-seg="${esc(String(now.seg))}"` : "";
     return `<div class="card podcast-resume-banner">
       <p class="kicker">${esc(t("podcastResumeKicker"))}</p>
-      <button type="button" class="btn sm" data-podcast="${esc(pod.id)}"${segAttr}>${esc(label)} · ${esc(pod.title)}</button>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <button type="button" class="btn sm" data-podcast="${esc(pod.id)}"${segAttr}>${esc(label)} · ${esc(pod.title)}</button>
+        ${typeof podcastPlanEarChipHtml === "function" && mid ? podcastPlanEarChipHtml("btn ghost sm") : ""}
+      </div>
     </div>`;
   }
 

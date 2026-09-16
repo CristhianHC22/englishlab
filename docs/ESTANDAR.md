@@ -603,3 +603,13 @@ Avance v115:
 - **Perf**: memo gráfica 90d por firma plan/fricción/SRS.
 - **Kids**: onboarding salta meta viaje/trabajo/examen.
 - Cache SW: `enlab-v94`.
+
+Avance v116:
+
+- **Hoy**: chip plan stale ≥3d (`pendingSince` + sticky `enlab-coach-stale-since` entre días).
+- **Push**: prioridad place → cert → stale → quickmix; contrato SW↔app.
+- **Guía**: hint stale; lazy `guideFillEntry` solo con panel abierto.
+- **Writing**: rúbrica &lt;60% loguea 1×/día/prompt al diario + CTA.
+- **Aula**: imprimir atención (filtro o hi/stale) + QR `#coach-plan`; `drawTransferQr` acepta canvas.
+- **Podcast**: a medias + plan oído pendiente → CTA Plan 8 min · oído.
+- Cache SW: `enlab-v95`.

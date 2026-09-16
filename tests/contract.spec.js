@@ -93,9 +93,9 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v94/);
+  expect(sw).toMatch(/enlab-v95/);
   const sv = await (await request.get("/features-sv.js")).text();
-  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v94["']/);
+  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v95["']/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -165,13 +165,15 @@ test("SW remindCopy four priority tiers", async ({ request }) => {
   expect(fn).toBeTruthy();
   const run = new Function(`${fn[0]}; return remindCopy;`)();
   const base = { lang: "es", dueCount: 0, coachPlanLeft: 3, coachPlanStarted: false };
-  expect(run({ ...base, placePlanNudge: true, certWarmupNudge: true, quickmixHot: true }).body)
+  expect(run({ ...base, placePlanNudge: true, certWarmupNudge: true, coachPlanStale: true, quickmixHot: true }).body)
     .toMatch(/test de nivel|nivel bajo/i);
-  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: true, quickmixHot: true }).body)
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: true, coachPlanStale: true, quickmixHot: true }).body)
     .toMatch(/calentamiento cert/i);
-  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, quickmixHot: true }).body)
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStale: true, quickmixHot: true }).body)
+    .toMatch(/≥3 días|3\+ days|sin empezar/i);
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStale: false, quickmixHot: true }).body)
     .toMatch(/fricci/i);
-  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, quickmixHot: false }).body)
+  expect(run({ ...base, placePlanNudge: false, certWarmupNudge: false, coachPlanStale: false, quickmixHot: false }).body)
     .toMatch(/plan 8 min|3 pasos/i);
 });
 
@@ -229,6 +231,12 @@ test("SW remindCopy includes placement nudge branch", async ({ request }) => {
   expect(sw).toMatch(/Test de nivel bajo|Level test was low/);
 });
 
+test("SW remindCopy includes coach plan stale branch", async ({ request }) => {
+  const sw = await (await request.get("/sw.js")).text();
+  expect(sw).toMatch(/coachPlanStale/);
+  expect(sw).toMatch(/sin empezar ≥3|waiting 3\+/);
+});
+
 test("Remind payload includes certWarmupNudge", async ({ page }) => {
   await boot(page);
   const payload = await page.evaluate(() => {
@@ -282,16 +290,18 @@ test("remindPushBody matches SW remindCopy for priority bodies", async ({ page, 
   expect(fn).toBeTruthy();
   const run = new Function(`${fn[0]}; return remindCopy;`)();
   const app = await page.evaluate(() => ({
-    place: remindPushBody(0, 3, false, false, true, false),
-    cert: remindPushBody(0, 3, false, false, false, true),
-    hot: remindPushBody(0, 3, false, true, false, false),
-    start: remindPushBody(0, 3, false, false, false, false),
-    mid: remindPushBody(0, 2, true, false, false, false),
+    place: remindPushBody(0, 3, false, false, true, false, false),
+    cert: remindPushBody(0, 3, false, false, false, true, false),
+    stale: remindPushBody(0, 3, false, false, false, false, true),
+    hot: remindPushBody(0, 3, false, true, false, false, false),
+    start: remindPushBody(0, 3, false, false, false, false, false),
+    mid: remindPushBody(0, 2, true, false, false, false, false),
     lang: uiLang(),
   }));
   const base = { lang: app.lang, dueCount: 0, coachPlanLeft: 3, coachPlanStarted: false };
   expect(run({ ...base, placePlanNudge: true }).body).toBe(app.place);
   expect(run({ ...base, certWarmupNudge: true }).body).toBe(app.cert);
+  expect(run({ ...base, coachPlanStale: true }).body).toBe(app.stale);
   expect(run({ ...base, quickmixHot: true }).body).toBe(app.hot);
   expect(run({ ...base }).body).toBe(app.start);
   expect(run({

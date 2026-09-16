@@ -1,4 +1,4 @@
-const CACHE = "enlab-v94";
+const CACHE = "enlab-v95";
 const ASSETS = [
   "./",
   "./index.html",
@@ -60,6 +60,7 @@ function remindCopy(data) {
   const quickmixHot = !!data.quickmixHot;
   const placePlanNudge = !!data.placePlanNudge;
   const certWarmupNudge = !!data.certWarmupNudge;
+  const coachPlanStale = !!data.coachPlanStale;
   if (placePlanNudge && !planStarted && planLeft >= 3) {
     if (lang === "en") {
       return { title: "English Lab", body: "Level test was low — start the 8-min plan (ear → usage → verbs)." };
@@ -71,6 +72,12 @@ function remindCopy(data) {
       return { title: "English Lab", body: "Cert warm-up done — start the 8-min plan (ear → usage → verbs)." };
     }
     return { title: "English Lab", body: "Calentamiento cert hecho — empieza el plan 8 min (oído → uso → verbos)." };
+  }
+  if (coachPlanStale && !planStarted && planLeft >= 3) {
+    if (lang === "en") {
+      return { title: "English Lab", body: "8-min plan waiting 3+ days — start with ear → usage → verbs." };
+    }
+    return { title: "English Lab", body: "Plan 8 min sin empezar ≥3 días — oído → uso → verbos." };
   }
   if (quickmixHot && !planStarted && planLeft >= 3) {
     if (lang === "en") {

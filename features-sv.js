@@ -580,6 +580,21 @@
       });
       const label = typeof t === "function" ? (t(`quizModes.${best}.t`) || best) : best;
       planCta = ` <button type="button" class="btn ghost sm" data-writing-coach-plan="${esc(best)}">${esc(typeof t === "function" ? t("writeCoachPlanCta", { mode: label }) : `Plan 8 min · ${label}`)}</button>`;
+      try {
+        const day = typeof todayKey === "function" ? todayKey() : "";
+        const logKey = `enlab-write-fail-log:${day}:${pick.id}`;
+        if (day && !sessionStorage.getItem(logKey) && window.PLUS?.logError) {
+          sessionStorage.setItem(logKey, "1");
+          window.PLUS.logError({
+            mode: `plan:${best}`,
+            expected: pick.title || "Writing",
+            prompt: String(pick.prompt || "").slice(0, 120),
+            said: draft.slice(0, 160),
+            why: typeof t === "function" ? t("writeJournalFailWhy", { pct }) : `Rubric ${pct}%`,
+            planStep: "fail",
+          });
+        }
+      } catch { /* ignore */ }
     }
     if (result) {
       const base = typeof t === "function"
@@ -835,6 +850,7 @@
         <button type="button" class="btn ghost sm" id="class-coach-plan-print">${esc(t("classCoachPlanPrint"))}</button>
         <button type="button" class="btn ghost sm" id="class-friction-print">${esc(t("classFrictionPrint"))}</button>
         <button type="button" class="btn ghost sm" id="class-student-qr">${esc(t("classStudentQr"))}</button>
+        <button type="button" class="btn ghost sm" id="class-attention-print">${esc(t("classAttentionPrint"))}</button>
         <button type="button" class="btn ghost sm" id="student-pdf">${esc(t("studentPdf"))}</button>
       </div>
       <div id="class-student-qr-box" class="student-qr-box" hidden></div>
@@ -934,6 +950,60 @@
       <textarea class="transfer-code" rows="2" readonly>${esc(code)}</textarea>
       <canvas id="student-qr-canvas" width="160" height="160" aria-hidden="true"></canvas>`;
     if (typeof drawTransferQr === "function") drawTransferQr(document.querySelector("#student-qr-canvas"), code);
+  }
+
+  function classAttentionStudents() {
+    const roster = loadRoster();
+    if (_classFrictionHeatFilter) {
+      return roster.filter((s) => frictionDropLevel(s.frictionDrop) === _classFrictionHeatFilter);
+    }
+    if (_classPlanHeatFilter) {
+      return roster.filter((s) => {
+        const st = rosterCoachPlanStatus(s);
+        if (_classPlanHeatFilter === "pending") return st === "pending" || rosterCoachPlanStale(s);
+        return st === _classPlanHeatFilter;
+      });
+    }
+    return roster.filter((s) => rosterCoachPlanStale(s) || frictionDropLevel(s.frictionDrop) === "hi");
+  }
+
+  function printClassAttentionSheet() {
+    if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
+    const area = document.querySelector("#weak-print-area");
+    if (!area) return;
+    const rows = classAttentionStudents();
+    const planLink = `${location.href.split("#")[0]}#coach-plan`;
+    const filtHint = _classFrictionHeatFilter
+      ? t(_classFrictionHeatFilter === "hi" ? "classFrictionFilterHi" : _classFrictionHeatFilter === "mid" ? "classFrictionFilterMid" : "classFrictionFilterLo")
+      : (_classPlanHeatFilter === "pending"
+        ? t("classAttentionFilterPending")
+        : (_classPlanHeatFilter === "mid"
+          ? t("classAttentionFilterMid")
+          : (_classPlanHeatFilter === "done" ? t("classAttentionFilterDone") : t("classAttentionDefault"))));
+    area.hidden = false;
+    area.innerHTML = `
+      <h1>${esc(t("classAttentionPrintTitle"))}</h1>
+      <p>${typeof todayKey === "function" ? todayKey() : ""} · ${esc(t("classAttentionPrintHint"))} · ${esc(filtHint)}</p>
+      <p class="muted"><a href="${esc(planLink)}">${esc(t("classStudentQrPlanLink"))}</a></p>
+      <canvas id="attention-qr-canvas" width="160" height="160" aria-hidden="true"></canvas>
+      ${rows.length ? `<table class="mini-table"><thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColCoachPlan"))}</th><th>${esc(t("classColFriction"))}</th><th>${esc(t("classAttentionWhy"))}</th></tr></thead>
+        <tbody>${rows.map((s) => {
+          const why = [
+            rosterCoachPlanStale(s) ? t("classAttentionWhyStale") : "",
+            frictionDropLevel(s.frictionDrop) === "hi" ? t("classAttentionWhyFriction") : "",
+          ].filter(Boolean).join(" · ") || "—";
+          return `<tr>
+            <td>${esc(s.name)}</td>
+            <td>${esc(rosterCoachPlanCell(s))}</td>
+            <td>${esc(rosterFrictionCell(s))}</td>
+            <td>${esc(why)}</td>
+          </tr>`;
+        }).join("")}</tbody></table>` : `<p>${esc(t("classAttentionEmpty"))}</p>`}`;
+    if (typeof drawTransferQr === "function") {
+      drawTransferQr(document.querySelector("#attention-qr-canvas"), planLink);
+    }
+    window.print();
+    area.hidden = true;
   }
 
   function countHotDays(statsRaw, windowDays) {
@@ -1439,7 +1509,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v94";
+  const SW_CACHE = "enlab-v95";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1649,6 +1719,7 @@
         renderStudentQrBox();
         document.querySelector("#class-student-qr-box")?.scrollIntoView({ behavior: "smooth" });
       }
+      if (e.target.closest("#class-attention-print")) printClassAttentionSheet();
       if (e.target.closest("#class-import-code")) {
         if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
         const code = window.prompt(typeof t === "function" ? t("classImportPrompt") : "Pega código transfer del alumno:");

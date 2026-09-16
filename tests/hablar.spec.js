@@ -537,3 +537,55 @@ test("Hablar: stale coach plan alert after 3 days pending", async ({ page }) => 
   await expect(page.locator(".class-coach-plan-alert [data-plan-stale]")).toBeVisible();
   await expect(page.locator(".class-coach-plan-alert")).toContainText(/3|sin plan|no plan/i);
 });
+
+test("Hablar: attention print lists stale and hi friction", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await expect(page.locator("#class-attention-print")).toBeVisible();
+  const html = await page.evaluate(() => {
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      {
+        name: "Stale",
+        coachDone: 0,
+        coachTotal: 3,
+        coachPendingSince: Date.now() - 4 * 86400000,
+        frictionMode: "uso",
+        frictionDrop: 20,
+        synced: Date.now() - 4 * 86400000,
+      },
+      {
+        name: "Hi",
+        coachDone: 1,
+        coachTotal: 3,
+        frictionMode: "ear",
+        frictionDrop: 60,
+        synced: Date.now(),
+      },
+      {
+        name: "Ok",
+        coachDone: 3,
+        coachTotal: 3,
+        frictionMode: "uso",
+        frictionDrop: 10,
+        synced: Date.now(),
+      },
+    ]));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+    const print = window.print;
+    window.print = () => {};
+    let out = "";
+    try {
+      document.querySelector("#class-attention-print")?.click();
+      out = document.querySelector("#weak-print-area")?.innerHTML || "";
+    } finally {
+      window.print = print;
+      const area = document.querySelector("#weak-print-area");
+      if (area) area.hidden = true;
+    }
+    return out;
+  });
+  expect(html).toMatch(/Stale/);
+  expect(html).toMatch(/Hi/);
+  expect(html).not.toMatch(/>Ok</);
+  expect(html).toMatch(/attention-qr-canvas|coach-plan|#coach-plan/i);
+});

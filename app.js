@@ -880,6 +880,12 @@ function persistCoachPlanMirror() {
     const today = todayKey();
     if (plan?.day !== today) plan = null;
     if (!plan && !flow) {
+      try {
+        const prev = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+        if (prev && (Number(prev.done) || 0) === 0) {
+          setCoachPlanStickySince(prev.pendingSince || coachPlanStickySince() || Date.now());
+        }
+      } catch { /* ignore */ }
       localStorage.removeItem("enlab-coach-plan-mirror");
       return;
     }
@@ -895,9 +901,42 @@ function persistCoachPlanMirror() {
       steps: plan?.steps || quizCoachPlan8(),
       flow: flow ? 1 : 0,
     };
-    if (done === 0) payload.pendingSince = pendingSince || Date.now();
+    if (done === 0) {
+      payload.pendingSince = pendingSince || coachPlanStickySince() || Date.now();
+      setCoachPlanStickySince(payload.pendingSince);
+    } else {
+      setCoachPlanStickySince(0);
+    }
     localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify(payload));
   } catch { /* ignore */ }
+}
+
+function coachPlanStickySince() {
+  try { return Number(localStorage.getItem("enlab-coach-stale-since") || 0) || 0; } catch { return 0; }
+}
+
+function setCoachPlanStickySince(ts) {
+  try {
+    if (ts) localStorage.setItem("enlab-coach-stale-since", String(ts));
+    else localStorage.removeItem("enlab-coach-stale-since");
+  } catch { /* ignore */ }
+}
+
+function coachPlanPendingSinceMs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    if (raw?.pendingSince) return Number(raw.pendingSince) || 0;
+  } catch { /* ignore */ }
+  return coachPlanStickySince();
+}
+
+function coachPlanIsStale(minDays = 3) {
+  if (typeof kidsOn === "function" && kidsOn()) return false;
+  if (coachPlanLeft() <= 0) return false;
+  if (coachPlanStarted()) return false;
+  const since = coachPlanPendingSinceMs();
+  if (!since) return false;
+  return (Date.now() - since) >= minDays * 86400000;
 }
 
 function restoreCoachPlanFromMirror() {
@@ -1103,8 +1142,27 @@ function coachPlanChipHtml(cls = "btn sm") {
   const steps = quizCoachPlan8();
   if (done >= steps.length) return "";
   const mode = steps[done];
-  const label = done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume");
-  return `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}">${esc(label)}</button>`;
+  const stale = done === 0 && coachPlanIsStale();
+  const label = stale
+    ? t("quizCoachPlanStale")
+    : (done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume"));
+  const warn = stale ? " warn" : "";
+  return `<button type="button" class="${cls}${warn}" data-coach-plan-go data-coach-plan-mode="${esc(mode)}"${stale ? ' data-plan-stale="1"' : ""}>${esc(label)}</button>`;
+}
+
+function podcastPlanEarChipHtml(cls = "chip") {
+  if (typeof kidsOn === "function" && kidsOn()) return "";
+  if (typeof coachPlanLeft !== "function" || coachPlanLeft() <= 0) return "";
+  const pending = typeof coachPlanPendingModes === "function"
+    ? coachPlanPendingModes()
+    : (typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear"]);
+  const earStep = pending.find((m) => (typeof coachPlanFamily === "function" ? coachPlanFamily(m) : m) === "ear");
+  if (!earStep) return "";
+  try {
+    const pod = JSON.parse(localStorage.getItem("enlab-podcast-now") || "null");
+    if (!(pod?.id && pod.seg > 0)) return "";
+  } catch { return ""; }
+  return `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(earStep)}">${esc(t("podcastPlanEarCta"))}</button>`;
 }
 
 function coachPlanCierreHint() {
@@ -2128,10 +2186,15 @@ function renderHoyPath() {
     if (left > 0 && !repasoOn()) {
       const done = coachPlanProgress();
       const total = quizCoachPlan8().length;
-      const pulse = !coachPlanStarted() && localStorage.getItem("enlab-plan-pulse-day") !== todayKey();
+      const stale = done === 0 && coachPlanIsStale();
+      const pulse = !coachPlanStarted() && !stale && localStorage.getItem("enlab-plan-pulse-day") !== todayKey();
       const pulseCls = pulse ? " next-act" : "";
+      const warnCls = stale ? " warn" : "";
+      const label = stale
+        ? t("hoyPathPlanStale", { done, total })
+        : t("hoyPathPlanChip", { done, total });
       planEl.hidden = false;
-      planEl.innerHTML = `<button type="button" class="btn ghost sm${pulseCls}" data-coach-plan-go data-coach-plan-mode="${esc(coachPlanNextMode() || quizCoachPlan8()[0])}">${esc(t("hoyPathPlanChip", { done, total }))}</button>`;
+      planEl.innerHTML = `<button type="button" class="btn ghost sm${pulseCls}${warnCls}" data-coach-plan-go data-coach-plan-mode="${esc(coachPlanNextMode() || quizCoachPlan8()[0])}"${stale ? ' data-plan-stale="1"' : ""}>${esc(label)}</button>`;
       if (pulse) localStorage.setItem("enlab-plan-pulse-day", todayKey());
     } else {
       planEl.hidden = true;
@@ -3617,6 +3680,8 @@ function hoyMidSessionChipsHtml() {
       const podObj = (ENLAB.podcasts || []).find((x) => x.id === pod.id);
       if (podObj && pod.seg < (podObj.segments || []).length) {
         parts.push(`<button type="button" class="chip" data-podcast="${esc(pod.id)}" data-pod-seg="${pod.seg}">${esc(t("podcastResume", { n: pod.seg + 1, total: (podObj.segments || []).length }))} · ${esc(podObj.title)}</button>`);
+        const earChip = podcastPlanEarChipHtml();
+        if (earChip) parts.push(earChip);
       }
     }
   } catch { /* ignore */ }
@@ -6394,7 +6459,8 @@ function renderCoachPlanToday() {
   const done = coachPlanProgress();
   const steps = quizCoachPlan8();
   const lang = typeof uiLang === "function" ? uiLang() : "es";
-  const key = `${done}|${steps.join(",")}|${quickmixFrictionHigh()}|${kids ? 1 : 0}|${pathDone ? 1 : 0}|${lang}`;
+  const stale = done === 0 && coachPlanIsStale();
+  const key = `${done}|${steps.join(",")}|${quickmixFrictionHigh()}|${kids ? 1 : 0}|${pathDone ? 1 : 0}|${lang}|${stale ? 1 : 0}`;
   if (key === _coachPlanTodayKey) return;
   _coachPlanTodayKey = key;
   /* Día marcado ya lleva el chip en #hoy-done-mid; kids: menos ruido */
@@ -6408,7 +6474,7 @@ function renderCoachPlanToday() {
     : "";
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("quizCoachPlan8"))} · ${done}/${steps.length}</p>
+    <p class="kicker">${esc(stale ? t("quizCoachPlanStaleKicker") : t("quizCoachPlan8"))} · ${done}/${steps.length}</p>
     <div class="row">${coachPlanChipHtml("btn sm")}${qm}</div>`;
 }
 
@@ -6833,7 +6899,7 @@ function renderRemind() {
       const p = syncRemindPayload();
       const body = remindPushBody(
         p.dueCount, p.coachPlanLeft, p.coachPlanStarted,
-        p.quickmixHot, p.placePlanNudge, p.certWarmupNudge
+        p.quickmixHot, p.placePlanNudge, p.certWarmupNudge, p.coachPlanStale
       );
       preview.hidden = false;
       preview.textContent = t("remindPreview", { body });
@@ -6893,6 +6959,7 @@ function isStandalone() {
 function syncRemindPayload() {
   const dueCount = typeof srsDueList === "function" ? srsDueList(99).length : 0;
   const planLeft = typeof coachPlanLeft === "function" ? coachPlanLeft() : 0;
+  const planStarted = typeof coachPlanStarted === "function" ? coachPlanStarted() : false;
   return {
     on: remindOn(),
     time: remindTime(),
@@ -6900,10 +6967,11 @@ function syncRemindPayload() {
     today: todayKey(),
     dueCount,
     coachPlanLeft: planLeft,
-    coachPlanStarted: typeof coachPlanStarted === "function" ? coachPlanStarted() : false,
+    coachPlanStarted: planStarted,
     certWarmupNudge: typeof certWarmupStreak === "function"
-      && certWarmupStreak() >= 1 && !(typeof coachPlanStarted === "function" && coachPlanStarted())
+      && certWarmupStreak() >= 1 && !planStarted
       && planLeft >= 3,
+    coachPlanStale: typeof coachPlanIsStale === "function" && coachPlanIsStale() && !planStarted && planLeft >= 3,
     quickmixHot: typeof quickmixFrictionStreak === "function" ? quickmixFrictionStreak(3) : false,
     placePlanNudge: typeof placePlanNudgeOn === "function" ? placePlanNudgeOn() : false,
     lang: typeof uiLang === "function" ? uiLang() : "es",
@@ -6942,7 +7010,8 @@ function fireRemind() {
   const placeNudge = typeof placePlanNudgeOn === "function" ? placePlanNudgeOn() : false;
   const certWarm = typeof certWarmupStreak === "function" && certWarmupStreak() >= 1
     && !planStarted && planLeft >= 3;
-  const body = remindPushBody(due, planLeft, planStarted, hot, placeNudge, certWarm);
+  const planStale = typeof coachPlanIsStale === "function" && coachPlanIsStale() && !planStarted && planLeft >= 3;
+  const body = remindPushBody(due, planLeft, planStarted, hot, placeNudge, certWarm, planStale);
   try {
     new Notification(t("pushTitle"), {
       body,
@@ -6952,9 +7021,10 @@ function fireRemind() {
   } catch { /* ignore */ }
 }
 
-function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge) {
+function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge, planStale) {
   if (placeNudge && !planStarted && planLeft >= 3) return t("pushPlacePlanBody");
   if (certWarmupNudge && !planStarted && planLeft >= 3) return t("pushCertWarmupPlanBody");
+  if (planStale && !planStarted && planLeft >= 3) return t("pushCoachPlanStaleBody");
   if (quickmixHot && !planStarted && planLeft >= 3) return t("pushQuickmixHotBody");
   if (!planStarted && planLeft >= 3) return t("pushCoachPlanStartBody");
   if (planStarted && planLeft > 0 && planLeft < 3) {
@@ -7160,7 +7230,7 @@ function guideFillEntry() {
   const hoyPanel = $("#hoy");
   const pathDone = currentTab === "hoy" && hoyPanel?.classList.contains("path-done");
   if (!kids && pathDone && !coachPlanStarted() && coachPlanLeft() >= 3 && !placePlanNudgeOn()) {
-    const hint = t("guideCoachPlanPending");
+    const hint = coachPlanIsStale() ? t("guideCoachPlanStale") : t("guideCoachPlanPending");
     entry = {
       ...entry,
       w: entry.w ? `${hint} ${entry.w}` : hint,
@@ -7441,6 +7511,7 @@ function guideFillEntryCached() {
     coachPlanLeft(),
     coachPlanStarted(),
     certWarmupStreak(),
+    typeof coachPlanIsStale === "function" && coachPlanIsStale() ? "1" : "0",
     document.querySelector("#class-task-banner")?.classList.contains("class-task-must") ? "1" : "0",
     (() => {
       try { return sessionStorage.getItem("enlab-journal-focus") || ""; } catch { return ""; }
@@ -7524,6 +7595,8 @@ function fillYouAreChips() {
           const segs = p.segments || [];
           if (pod.seg < segs.length) {
             parts.push(`<button type="button" class="chip" data-podcast="${esc(pod.id)}" data-pod-seg="${pod.seg}">${esc(t("podcastResume", { n: pod.seg + 1, total: segs.length }))} · ${esc(p.title)}</button>`);
+            const earChip = podcastPlanEarChipHtml();
+            if (earChip) parts.push(earChip);
           }
         }
       }
@@ -7568,7 +7641,10 @@ function fillYouAre() {
   btn.hidden = !!guideOpen;
   delete btn.dataset.streakBadge;
   if (jumpNote && currentTab !== "quiz") jumpNote = "";
-  const entry = guideFillEntryCached() || guideEntry(guidePlace());
+  /* Guía cerrada: copia base (CTAs viven en chips). Abierta: hints dinámicos. */
+  const entry = guideOpen
+    ? (guideFillEntryCached() || guideFillEntry())
+    : (guideEntry(guidePlace()) || { t: "", w: "", s: [] });
   const hoy = $("#hoy");
   const pathOn = currentTab === "hoy"
     && hoy?.classList.contains("path-on")
@@ -8307,7 +8383,8 @@ function transferDecodeLooksCut(err) {
   const name = err?.name || "";
   const msg = String(err?.message || err);
   if (name === "URIError" || name === "InvalidCharacterError") return true;
-  return /URI malformed|Invalid character|Unexpected end|Unterminated string/i.test(msg);
+  if (name === "SyntaxError") return true;
+  return /URI malformed|Invalid character|Unexpected end|Unterminated string|Unexpected token|JSON/i.test(msg);
 }
 
 function applyTransferPayload(data) {
@@ -8318,12 +8395,22 @@ function applyTransferPayload(data) {
   });
 }
 
-function drawTransferQr(text) {
-  document.querySelectorAll("#transfer-qr, #prefs-transfer-qr, #audit-transfer-qr").forEach((canvas) => {
+function drawTransferQr(textOrCanvas, maybeText) {
+  let text = "";
+  let canvases = [];
+  if (textOrCanvas && typeof textOrCanvas.getContext === "function") {
+    canvases = [textOrCanvas];
+    text = String(maybeText || "");
+  } else {
+    text = String(textOrCanvas || "");
+    canvases = [...document.querySelectorAll("#transfer-qr, #prefs-transfer-qr, #audit-transfer-qr, #student-qr-canvas, #attention-qr-canvas")];
+  }
+  if (!text) return;
+  canvases.forEach((canvas) => {
     if (!canvas?.getContext) return;
     const ctx = canvas.getContext("2d");
     const n = 21;
-    const cell = Math.floor(canvas.width / n);
+    const cell = Math.floor(canvas.width / n) || 1;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#0d3b36";
