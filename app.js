@@ -636,6 +636,21 @@ function invalidateCoachPlanCache() {
   window._coachPlanSteps = null;
 }
 
+function coachPlanFamily(mode) {
+  if (["ear", "listen", "dict", "exam"].includes(mode)) return "ear";
+  if (["uso", "ed", "art", "prep", "phrasal", "cond", "emailtone", "story"].includes(mode)) return "uso";
+  if (["choice", "type"].includes(mode)) return "verbs";
+  return "";
+}
+
+function coachPlanStored() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem("enlab-coach-plan") || "null");
+    if (raw?.day === todayKey() && Array.isArray(raw.steps) && raw.steps.length) return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
 function quizEasyOn(mode) {
   if (!mode || mode === "cierre" || mode === "weekly" || mode === "cert" || mode === "place") return false;
   const row = loadQuizUx()[mode] || {};
@@ -837,6 +852,12 @@ function quizCoachSteps(mode) {
 }
 
 function quizCoachPlan8() {
+  const stored = coachPlanStored();
+  if (stored?.steps?.length) {
+    window._coachPlanStepsDay = todayKey();
+    window._coachPlanSteps = stored.steps;
+    return stored.steps;
+  }
   const day = todayKey();
   if (window._coachPlanStepsDay === day && window._coachPlanSteps) return window._coachPlanSteps;
   const ux = loadQuizUx();
@@ -893,7 +914,8 @@ function coachPlanProgress() {
 
 function bumpCoachPlanProgress(mode) {
   const steps = quizCoachPlan8();
-  const idx = steps.indexOf(mode);
+  const mapped = typeof coachPlanStepForMode === "function" ? coachPlanStepForMode(mode) : mode;
+  const idx = steps.indexOf(mapped);
   if (idx < 0) return;
   const done = Math.max(coachPlanProgress(), idx + 1);
   try {
@@ -1145,8 +1167,7 @@ function quizCoachPlanHtml() {
   const btns = steps.map((m, i) =>
     `<button type="button" class="btn${i === done ? "" : " ghost"} sm" data-quiz-start="${esc(m)}" data-quiz-coach="1" data-coach-plan-step="${i}">${esc(labels[i] || t(`quizModes.${m}.t`))}</button>`).join("");
   return `<div class="quiz-coach-plan">
-    <p class="kicker">${esc(t("quizCoachPlan8"))}</p>
-    <p class="muted">${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
+    <p class="kicker">${esc(t("quizCoachPlan8"))} · ${done}/${steps.length}</p>
     <div class="coach-plan-bar" aria-hidden="true">${bar}</div>
     <div class="row quiz-coach-steps">${btns}</div>
   </div>`;
@@ -3185,14 +3206,14 @@ function renderHoyReview() {
   const el = $("#hoy-review");
   if (!el) return;
   /* bail early if nothing changed */
-  const reviewKey = [weakSet().size, usoWeakSet().size, edWeakSet().size, speakWeakSet().size, worstEarPairs(99).length, repasoOn(), coachPlanLeft(), coachPlanProgress()].join("|");
+  const reviewKey = [weakSet().size, usoWeakSet().size, edWeakSet().size, speakWeakSet().size, worstEarPairs(99).length, repasoOn(), coachPlanLeft(), coachPlanProgress(), coachPlanStarted() ? 1 : 0, coachPlanFlowOn() ? 1 : 0].join("|");
   if (reviewKey === _lastHoyReviewKey && !el.hidden) return;
   _lastHoyReviewKey = reviewKey;
   const coachFilter = repasoCoachFilterOn();
   const pending = coachFilter ? coachPlanPendingModes() : [];
-  const showEar = !coachFilter || pending.includes("ear");
-  const showUso = !coachFilter || pending.includes("uso");
-  const showVerbs = !coachFilter || pending.includes("choice");
+  const showEar = !coachFilter || pending.some((m) => coachPlanFamily(m) === "ear");
+  const showUso = !coachFilter || pending.some((m) => coachPlanFamily(m) === "uso");
+  const showVerbs = !coachFilter || pending.some((m) => coachPlanFamily(m) === "verbs");
   const ears = showEar ? worstEarPairs(4) : [];
   const verbs = showVerbs ? [...weakSet()].slice(0, 4) : [];
   const uso = showUso ? [...usoWeakSet()].slice(0, 3) : [];
@@ -3202,7 +3223,7 @@ function renderHoyReview() {
   const total = ears.length + verbs.length + uso.length + ed.length + speak.length;
   const coachRepaso = repasoOn() && coachPlanLeft() > 0
     ? `<div class="review-section review-coach-plan">
-        <div class="review-section-head"><span class="muted">${esc(t("quizCoachPlan8"))}</span></div>
+        ${coachFilter ? "" : `<div class="review-section-head"><span class="muted">${esc(t("quizCoachPlan8"))}</span></div>`}
         <div class="row">${coachPlanChipHtml("btn ghost sm")}</div>
         ${repasoStepBudgetHtml()}
       </div>`
@@ -3553,7 +3574,7 @@ function hoyMidSessionChipsHtml() {
   }
 
   /* coach plan 8 min */
-  const planChip = placementPlanChipHtml("btn sm") || weeklyFailPlanChipHtml("btn sm") || coachPlanChipHtml("btn sm");
+  const planChip = kids ? "" : (placementPlanChipHtml("btn sm") || weeklyFailPlanChipHtml("btn sm") || coachPlanChipHtml("btn sm"));
   if (planChip) parts.unshift(planChip);
 
   /* cierre / weekly / placement siempre primero */
@@ -4251,7 +4272,7 @@ function renderQuiz() {
       if (coachPlanFlowOn() && quiz.fails.length && window.PLUS?.logPlanStepEvent) {
         window.PLUS.logPlanStepEvent("fail", quiz.mode);
       }
-      bumpCoachPlanProgress(quiz.mode);
+      if (coachPlanStarted() || coachPlanFlowOn()) bumpCoachPlanProgress(quiz.mode);
     }
     const g = todayGame();
     const extraGame = cierre && g.game
@@ -6095,10 +6116,13 @@ function setCertWarmupMode(mode) {
 function coachPlanStepForMode(mode) {
   const steps = quizCoachPlan8();
   if (steps.includes(mode)) return mode;
-  if (["dict", "listen", "exam"].includes(mode)) return "ear";
-  if (["art", "prep", "phrasal", "cond", "emailtone", "story"].includes(mode)) return "uso";
-  if (["type", "ed"].includes(mode)) return "choice";
-  return coachPlanNextMode() || steps[0];
+  const fam = coachPlanFamily(mode);
+  if (!fam) return coachPlanNextMode() || steps[0];
+  const pending = coachPlanPendingModes();
+  const pendingHit = pending.find((m) => coachPlanFamily(m) === fam);
+  if (pendingHit) return pendingHit;
+  const any = steps.find((m) => coachPlanFamily(m) === fam);
+  return any || coachPlanNextMode() || steps[0];
 }
 
 function certWarmupStreak() {
@@ -6304,24 +6328,26 @@ function prevWeekStartKey() {
 function renderCoachPlanToday() {
   const el = $("#coach-plan-today");
   if (!el) return;
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const pathDone = $("#hoy")?.classList.contains("path-done");
   const done = coachPlanProgress();
   const steps = quizCoachPlan8();
-  const key = `${done}|${steps.length}|${quickmixFrictionHigh()}`;
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  const key = `${done}|${steps.join(",")}|${quickmixFrictionHigh()}|${kids ? 1 : 0}|${pathDone ? 1 : 0}|${lang}`;
   if (key === _coachPlanTodayKey) return;
   _coachPlanTodayKey = key;
-  if (done >= steps.length) {
+  /* Día marcado ya lleva el chip en #hoy-done-mid; kids: menos ruido */
+  if (kids || pathDone || done >= steps.length) {
     el.hidden = true;
     el.innerHTML = "";
     return;
   }
-  const mode = steps[done];
-  const label = done === 0 ? t("quizCoachPlanStart") : t("quizCoachPlanResume");
   const qm = quickmixFrictionHigh()
     ? `<button type="button" class="btn ghost sm" data-coach-plan-go data-coach-plan-mode="quickmix">${esc(t("quickmixToday"))}</button>`
     : "";
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("quizCoachPlan8"))} · ${esc(t("quizCoachPlan8Hint", { done, total: steps.length }))}</p>
+    <p class="kicker">${esc(t("quizCoachPlan8"))} · ${done}/${steps.length}</p>
     <div class="row">${coachPlanChipHtml("btn sm")}${qm}</div>`;
 }
 
@@ -6332,13 +6358,15 @@ function renderQuizNow() {
   const miss = cierreMissGame();
   const planDone = coachPlanProgress();
   const planSteps = quizCoachPlan8();
-  const key = `${g.game}|${miss?.game || ""}|${planDone}|${planSteps.length}`;
+  const kids = typeof kidsOn === "function" && kidsOn();
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  const key = `${g.game}|${miss?.game || ""}|${planDone}|${planSteps.join(",")}|${kids ? 1 : 0}|${lang}`;
   if (key === _quizNowKey && el.innerHTML) return;
   _quizNowKey = key;
   let planChip = "";
-  if (planDone > 0 && planDone < planSteps.length) {
+  if (!kids && planDone > 0 && planDone < planSteps.length) {
     planChip = `<button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[planDone])}" data-quiz-coach="1" data-coach-plan-step="${planDone}">${esc(t("quizCoachPlanResume"))} · ${planDone}/${planSteps.length}</button>`;
-  } else if (planDone === 0) {
+  } else if (!kids && planDone === 0) {
     planChip = `<button type="button" class="btn ghost sm" data-quiz-start="${esc(planSteps[0])}" data-quiz-coach="1" data-coach-plan-step="0">${esc(t("quizCoachPlanStart"))}</button>`;
   }
   const missBtn = miss
@@ -7021,34 +7049,19 @@ function guideFillEntry() {
       }
     }
   }
-  if (!kids && repasoOn()) {
-    const rep = t("youAreRepaso");
-    entry = {
-      ...entry,
-      w: entry.w ? `${rep} ${entry.w}` : rep,
-      s: [rep, ...(entry.s || [])].slice(0, 4),
-    };
-  }
   if (!kids && repasoCoachFilterOn()) {
-    const pending = coachPlanPendingModes();
-    if (pending.length) {
-      const totalMin = Math.round(repasoTimerSecs() / 60);
-      const each = Math.max(1, Math.round(totalMin / pending.length));
-      const labels = pending.map((m) => t(`quizModes.${m}.t`)).join(" · ");
-      const hint = t("repasoStepBudget", { min: each, modes: labels });
-      entry = {
-        ...entry,
-        w: entry.w ? `${hint} ${entry.w}` : hint,
-        s: [hint, ...(entry.s || [])].slice(0, 4),
-      };
-    }
-  }
-  if (!kids && currentTab === "hoy" && repasoOn() && coachPlanStarted() && coachPlanLeft() > 0) {
     const hint = t("guideRepasoPlanTimer", { min: Math.round(repasoTimerSecs() / 60) });
     entry = {
       ...entry,
       w: entry.w ? `${hint} ${entry.w}` : hint,
-      s: [hint, ...(entry.s || [])].slice(0, 4),
+      s: [hint, ...(entry.s || [])].slice(0, 3),
+    };
+  } else if (!kids && repasoOn()) {
+    const rep = t("youAreRepaso");
+    entry = {
+      ...entry,
+      w: entry.w ? `${rep} ${entry.w}` : rep,
+      s: [rep, ...(entry.s || [])].slice(0, 3),
     };
   }
   const hoyPanel = $("#hoy");
@@ -7299,15 +7312,15 @@ function guideFillEntryCached() {
   const hoy = $("#hoy");
   const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
   const kids = typeof kidsOn === "function" && kidsOn();
-  const extraTimer = sessionStorage.getItem("enlab-hoy-extra-timer") === "1";
+  const extraTimer = pathDone && sessionStorage.getItem("enlab-hoy-extra-timer") === "1";
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
   const key = [
     currentTab,
     guidePlace(),
     pathDone,
     kids ? "1" : "0",
-    extraTimer ? "1" : "0",
-    timerState().running ? "1" : "0",
-    Math.ceil(remainingNow()),
+    lang,
+    extraTimer ? `1:${Math.ceil(remainingNow())}` : "0",
     repasoOn(),
     coachPlanProgress(),
     coachPlanFlowOn(),
@@ -7698,7 +7711,7 @@ function syncPrefsBadge() {
       const done = coachPlanProgress();
       const total = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
       const on = !repasoPlan && done > 0 && done < total;
-      const pending = !repasoPlan && !coachPlanStarted() && done === 0 && coachPlanLeft() >= 3;
+      const pending = !repasoPlan && done === 0 && coachPlanLeft() >= 3;
       hoyTab.classList.toggle("coach-plan-on", on);
       hoyTab.classList.toggle("coach-plan-pending-on", pending);
       if (on) {
@@ -7719,7 +7732,7 @@ function syncPrefsBadge() {
     const done = coachPlanProgress();
     const total = typeof quizCoachPlan8 === "function" ? quizCoachPlan8().length : 3;
     const on = done > 0 && done < total;
-    const pending = !coachPlanStarted() && done === 0 && coachPlanLeft() >= 3;
+    const pending = done === 0 && coachPlanLeft() >= 3;
     quizTab.classList.toggle("coach-plan-on", on);
     quizTab.classList.toggle("coach-plan-pending-on", pending && !on);
     if (on) {
@@ -9047,6 +9060,7 @@ $("#kids-toggle")?.addEventListener("click", () => {
 
 $("#ui-lang-toggle")?.addEventListener("click", () => {
   localStorage.setItem("enlab-ui-lang", uiLang() === "en" ? "es" : "en");
+  invalidateYouAreChipsCache();
   applyUiLang();
   dirty.hoy = true;
   renderHome(true);

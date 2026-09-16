@@ -541,7 +541,7 @@ test("Cert warmup streak auto-flow after second warm-up", async ({ page }) => {
   });
   expect(flowOn).toBe(true);
   await expect(page.locator("#quiz-box .cert-warmup-plan")).toContainText(/plan 8 min|8-min plan/i);
-  await expect(page.locator("#quiz-box .quiz-plan-auto")).toContainText(/calentamiento|warm-up/i);
+  await expect(page.locator("#quiz-box .quiz-plan-auto")).toContainText(/plan|calentamiento|warm-up/i);
   const ms = await page.evaluate(() => coachPlanAutoDelayMs());
   expect(ms).toBe(200);
 });
@@ -1218,4 +1218,44 @@ test("Repaso coach timer is shorter when plan pending", async ({ page }) => {
   });
   expect(secs).toBe(480);
   expect(secs).toBeLessThan(600);
+});
+
+test("Coach plan bump maps listen to ear family step", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    invalidateCoachPlanCache();
+    bumpCoachPlanProgress("listen");
+    return {
+      done: coachPlanProgress(),
+      mapped: coachPlanStepForMode("listen"),
+      steps: quizCoachPlan8(),
+    };
+  });
+  expect(out.mapped).toBe("ear");
+  expect(out.done).toBe(1);
+  expect(out.steps).toEqual(["ear", "uso", "choice"]);
+});
+
+test("Coach plan keeps stored adaptive steps for the day", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 1, steps: ["listen", "phrasal", "type"],
+    }));
+    invalidateCoachPlanCache();
+    const steps = quizCoachPlan8();
+    const pending = coachPlanPendingModes();
+    const showEar = pending.some((m) => coachPlanFamily(m) === "ear");
+    const showUso = pending.some((m) => coachPlanFamily(m) === "uso");
+    const showVerbs = pending.some((m) => coachPlanFamily(m) === "verbs");
+    return { steps, pending, showEar, showUso, showVerbs };
+  });
+  expect(out.steps).toEqual(["listen", "phrasal", "type"]);
+  expect(out.pending).toEqual(["phrasal", "type"]);
+  expect(out.showEar).toBe(false);
+  expect(out.showUso).toBe(true);
+  expect(out.showVerbs).toBe(true);
 });

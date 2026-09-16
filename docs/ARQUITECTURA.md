@@ -65,15 +65,20 @@ No hay usuario en la nube. Aula pro = PIN local + roster + QR de transfer.
 
 ## Plan 8 min (coach)
 
-Flujo diario opcional tras el camino de Hoy: **oído → uso → verbos** (`quizCoachPlan8()` = `ear`, `uso`, `choice`).
+Flujo diario opcional tras el camino de Hoy: **familia oído → familia uso → familia verbos**.
+
+`quizCoachPlan8()` elige el modo concreto por fricción (`ear|listen|dict`, `uso|ed|art|…`, `choice|type`). Si ya hay plan del día en `sessionStorage` (`steps`), **se reutilizan** hasta completar o cambiar de día — no se remezclan mid-plan.
+
+`coachPlanStepForMode` / `bumpCoachPlanProgress` mapean por **familia**, no por id exacto (un warm-up `listen` cuenta como paso oído).
 
 | Estado | UI |
 |---|---|
-| Pendiente 0/3 | Badge punteado Hoy/Quiz, chip `#hoy-path-plan`, Guía, push genérico |
+| Pendiente 0/3 | Badge punteado Hoy/Quiz, chip `#hoy-path-plan`, Guía, push |
 | En curso 1–2/3 | Badge sólido, auto-continúa si `enlab-coach-plan-flow` |
-| Repaso + plan | Filtro solo paso pendiente, timer 6–10 min |
+| Día marcado | Chip en `#hoy-done-mid` (sin tarjeta duplicada en extras) |
+| Repaso + plan | Filtro por familia pendiente, timer corto, un hint en Guía |
 
-**Triggers:** placement &lt;50 %, cert warm-up ×2, fallos semanal (`enlab-weekly-fails`), fricción 3 días → quickmix. Espejo IDB: `enlab-coach-plan-mirror` (via transfer). Aula pro: columna Plan + mapa visual + CSV. Deep-link alumno: `#coach-plan`. Diario: entradas `planStep` (abandono/fallo).
+**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix. Espejo: `enlab-coach-plan-mirror` (transfer). Aula pro: columna Plan + mapa + CSV. Deep-link: `#coach-plan`. Diario: `planStep`.
 
 ## Extensión a propósito (y su coste)
 

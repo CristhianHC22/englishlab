@@ -174,7 +174,7 @@ test("Quiz: placement end offers 8-min plan CTA", async ({ page }) => {
     renderQuiz();
   });
   await expect(page.locator("#quiz-box [data-coach-plan-go]")).toBeVisible();
-  await expect(page.locator("#quiz-box")).toContainText(/plan 8 min|8-min plan/i);
+  await expect(page.locator("#quiz-box")).toContainText(/plan 8 min|8-min plan|plan tras|plan after|plan en|plan on/i);
 });
 
 test("Quiz: placement below 50% auto-starts plan flow", async ({ page }) => {

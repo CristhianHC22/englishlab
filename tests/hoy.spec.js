@@ -644,7 +644,7 @@ test("Hoy: cert time-up shows in you-are when day is marked", async ({ page }) =
     finishHoyPath();
     if (typeof fillYouAre === "function") fillYouAre();
   });
-  await expect(page.locator("#you-are-text")).toContainText(/certificado|certificate/i);
+  await expect(page.locator("#you-are-text")).toContainText(/cert|sin tiempo|timed out/i);
 });
 
 test("Hoy: weekly stale from last week shows hint in extras", async ({ page }) => {

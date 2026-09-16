@@ -556,3 +556,10 @@ Avance v110:
 - **UX menos verbosa**: copy de Día marcado, plan, Guía y you-are acortados; plan solo en chip (no repetido en párrafo).
 - **Quiz Now / coach card**: sin párrafos duplicados bajo el CTA.
 - Cache SW: `enlab-v89`.
+
+Avance v111:
+
+- **Lógica plan**: pasos del día persistidos; bump/filtro por familia (`listen`→oído, `phrasal`→uso…).
+- **UX**: Guía repaso+plan = un hint; sin tarjeta coach duplicada en Día marcado; end-card sin párrafo extra.
+- **Perf**: caches Guía/plan/quiz-now incluyen idioma; lang toggle invalida; timer solo cuando aplica.
+- Cache SW: `enlab-v90`.

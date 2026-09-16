@@ -1274,7 +1274,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v89";
+  const SW_CACHE = "enlab-v90";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
