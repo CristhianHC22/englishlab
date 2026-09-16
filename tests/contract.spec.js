@@ -93,7 +93,7 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v91/);
+  expect(sw).toMatch(/enlab-v92/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");
@@ -271,4 +271,38 @@ test("Remind SW payload includes placePlanNudge", async ({ page }) => {
   });
   expect(payload.nudge).toBe(true);
   expect(payload.left).toBe(3);
+});
+
+test("remindPushBody matches SW remindCopy for priority bodies", async ({ page, request }) => {
+  await boot(page);
+  const sw = await (await request.get("/sw.js")).text();
+  const fn = sw.match(/function remindCopy\(data\)\s*\{[\s\S]*?\n\}/);
+  expect(fn).toBeTruthy();
+  const run = new Function(`${fn[0]}; return remindCopy;`)();
+  const app = await page.evaluate(() => ({
+    place: remindPushBody(0, 3, false, false, true, false),
+    cert: remindPushBody(0, 3, false, false, false, true),
+    hot: remindPushBody(0, 3, false, true, false, false),
+    start: remindPushBody(0, 3, false, false, false, false),
+    mid: remindPushBody(0, 2, true, false, false, false),
+    lang: uiLang(),
+  }));
+  const base = { lang: app.lang, dueCount: 0, coachPlanLeft: 3, coachPlanStarted: false };
+  expect(run({ ...base, placePlanNudge: true }).body).toBe(app.place);
+  expect(run({ ...base, certWarmupNudge: true }).body).toBe(app.cert);
+  expect(run({ ...base, quickmixHot: true }).body).toBe(app.hot);
+  expect(run({ ...base }).body).toBe(app.start);
+  expect(run({
+    lang: app.lang, dueCount: 0, coachPlanLeft: 2, coachPlanStarted: true,
+  }).body).toBe(app.mid);
+});
+
+test("remindPushBody cert warmup requires plan not started", async ({ page }) => {
+  await boot(page);
+  const bodies = await page.evaluate(() => ({
+    gated: remindPushBody(0, 3, true, false, false, true),
+    open: remindPushBody(0, 3, false, false, false, true),
+  }));
+  expect(bodies.open).toMatch(/calentamiento|warm-up/i);
+  expect(bodies.gated).not.toMatch(/calentamiento|warm-up/i);
 });

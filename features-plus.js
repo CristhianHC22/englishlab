@@ -273,6 +273,38 @@
     }).join("");
   }
 
+  function journalPlanStepChartHtml(rows) {
+    const planRows = (rows || []).filter((r) => r.planStep);
+    if (!planRows.length) return "";
+    const byMode = {};
+    planRows.forEach((r) => {
+      const m = journalPlayMode(r.mode);
+      if (!byMode[m]) byMode[m] = { abandon: 0, fail: 0 };
+      if (r.planStep === "abandon") byMode[m].abandon += 1;
+      else byMode[m].fail += 1;
+    });
+    const entries = Object.entries(byMode).sort((a, b) => (b[1].abandon + b[1].fail) - (a[1].abandon + a[1].fail));
+    if (!entries.length) return "";
+    const max = Math.max(1, ...entries.map(([, v]) => v.abandon + v.fail));
+    return `<div class="journal-plan-chart" role="img" aria-label="${esc(tt("journalPlanChartAria"))}">
+      <p class="kicker">${esc(tt("journalPlanChartTitle"))}</p>
+      ${entries.map(([mode, v]) => {
+        const label = tt(`quizModes.${mode}.t`) || mode;
+        const total = v.abandon + v.fail;
+        const w = Math.max(8, Math.round((total / max) * 100));
+        const abW = total ? Math.round((v.abandon / total) * 100) : 0;
+        return `<div class="journal-plan-bar-row">
+          <span class="journal-plan-bar-label">${esc(label)}</span>
+          <span class="journal-plan-bar" style="width:${w}%" title="${esc(tt("journalPlanChartTip", { abandon: v.abandon, fail: v.fail }))}">
+            <span class="journal-plan-bar-abandon" style="width:${abW}%"></span>
+          </span>
+          <span class="muted journal-plan-bar-n">${total}</span>
+        </div>`;
+      }).join("")}
+      <p class="muted">${esc(tt("journalPlanChartLegend"))}</p>
+    </div>`;
+  }
+
   function renderErrorJournal() {
     const host = document.querySelector("#error-journal");
     if (!host) return;
@@ -352,14 +384,16 @@
     const searchVal = esc(focus);
     const coachMode = journalCoachPlanMode();
     const coachLabel = (typeof t === "function" && t(`quizModes.${coachMode}.t`)) || coachMode;
-    const coachPlanBtn = (typeof coachPlanLeft === "function" && coachPlanLeft() > 0)
+    const coachPlanBtn = (typeof coachPlanLeft === "function" && coachPlanLeft() > 0 && !(typeof kidsOn === "function" && kidsOn()))
       ? `<button type="button" class="btn ghost sm" id="journal-coach-plan" data-coach-plan-mode="${esc(coachMode)}" title="${esc(tt("journalCoachPlanHint", { mode: coachLabel }))}">${esc(tt("journalCoachPlan"))}</button>`
       : "";
+    const planChart = journalPlanStepChartHtml(allRows);
     host.innerHTML = `
       <p class="kicker">${esc(tt("journalTitle"))}</p>
       ${nowI >= 0 ? `<p class="kicker journal-now-kicker">${esc(tt("journalNow"))}</p>` : ""}
       <p class="muted">${esc(tt("journalHint"))}</p>
       ${modeChipsHtml}
+      ${planChart}
       <div class="row journal-controls-row">
         <input type="search" id="journal-search" class="journal-search" placeholder="${esc(tt("journalSearch"))}" value="${searchVal}" aria-label="${esc(tt("journalSearch"))}">
         <select id="journal-sort" class="journal-sort" aria-label="${esc(tt("journalSortAria"))}">
@@ -848,10 +882,7 @@
       lines.push(`<p class="muted">${esc(tt("perfFrictionNone"))}</p>`);
     }
     if (typeof perfFrictionHeatmapHtml === "function") {
-      const heat = perfFrictionHeatmapHtml(2);
-      if (heat) {
-        lines.push(`<p class="kicker">${esc(tt("perfHeatTitle"))}</p>${heat}`);
-      }
+      lines.push(`<div id="perf-heat-lazy" class="perf-heat-lazy" aria-busy="true"><p class="muted">${esc(tt("perfHeatLazy"))}</p></div>`);
     }
     if (typeof perfFrictionWeekHtml === "function") {
       const week = perfFrictionWeekHtml();
@@ -859,6 +890,23 @@
     }
     lines.push(`<p><button type="button" class="btn ghost sm" id="perf-friction-csv">${esc(tt("perfFrictionCsv"))}</button></p>`);
     host.innerHTML = lines.join("");
+    schedulePerfHeatLazy();
+  }
+
+  function schedulePerfHeatLazy() {
+    const slot = document.querySelector("#perf-heat-lazy");
+    if (!slot || slot.dataset.ready === "1" || typeof perfFrictionHeatmapHtml !== "function") return;
+    const fill = () => {
+      if (!slot.isConnected || slot.dataset.ready === "1") return;
+      const heat = perfFrictionHeatmapHtml(2);
+      slot.dataset.ready = "1";
+      slot.removeAttribute("aria-busy");
+      slot.innerHTML = heat
+        ? `<p class="kicker">${esc(tt("perfHeatTitle"))}</p>${heat}`
+        : "";
+    };
+    if (typeof requestIdleCallback === "function") requestIdleCallback(fill, { timeout: 200 });
+    else setTimeout(fill, 0);
   }
 
   function bindPlus() {

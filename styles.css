@@ -383,6 +383,7 @@ button.say:focus-visible, nav.tabs button:focus-visible, .mode-pick:focus-visibl
   font-size: 14px;
   color: var(--ink);
 }
+.kids-banner-first { font-weight: 700; }
 #level-blurb { margin: 2px 0 0; }
 
 .lab-hub {
@@ -1288,6 +1289,18 @@ footer {
 .streak-day.hot { height: 28px; background: var(--accent); }
 .streak-day.srs-due-day { box-shadow: inset 0 -3px 0 var(--ok, #2a9d60); }
 .streak-day.friction-day { box-shadow: inset 0 -3px 0 var(--accent); cursor: pointer; }
+.streak-day.plan-day { position: relative; }
+.streak-day.plan-day::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--ok, #2a6fbf);
+}
 .streak-90 .streak-day { border: 0; cursor: pointer; }
 .voice-history { margin-top: 14px; }
 .voice-row { margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
@@ -1442,6 +1455,25 @@ nav.tabs [data-tab="quiz"].quickmix-hot::after {
 .podcast-progress-label { position: relative; z-index: 1; font-size: 11px; line-height: 20px; padding-left: 8px; color: var(--fg); font-variant-numeric: tabular-nums; }
 .cert-progress-ring { flex-shrink: 0; }
 .journal-mode-chips { flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.journal-plan-chart { margin: 8px 0 10px; }
+.journal-plan-bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.journal-plan-bar-label { min-width: 4.5rem; font-size: 12px; }
+.journal-plan-bar {
+  flex: 1;
+  height: 10px;
+  max-width: 220px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warn, #e07a2f) 22%, var(--line));
+  overflow: hidden;
+}
+.journal-plan-bar-abandon {
+  display: block;
+  height: 100%;
+  background: var(--warn, #e07a2f);
+}
+.journal-plan-bar-n { font-size: 12px; font-variant-numeric: tabular-nums; }
+.class-heat-lazy { margin-top: 10px; min-height: 2rem; }
+.perf-heat-lazy { margin-top: 6px; }
 .class-coach-plan-alert { margin: 8px 0 0; }
 .remind-preview { margin: 4px 0 0; font-size: 13px; }
 .journal-controls-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }

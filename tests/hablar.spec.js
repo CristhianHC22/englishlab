@@ -345,3 +345,41 @@ test("Hablar: duo chip hidden in non-hablar tab", async ({ page }) => {
   /* we are on "hoy" by default */
   await expect(page.locator("#you-are-chips [data-duo-resume]")).toBeHidden();
 });
+
+test("Hablar: class heatmaps lazy-fill after roster", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      { name: "Luis", coachDone: 0, coachTotal: 3, frictionMode: "uso", frictionDrop: 40, synced: Date.now() },
+    ]));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+  });
+  await expect(page.locator("#class-heat-lazy")).toBeVisible();
+  await expect(page.locator(".class-coach-plan-heat")).toBeVisible({ timeout: 3000 });
+});
+
+test("Hablar: class coach plan print includes heatmap markup", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  const html = await page.evaluate(() => {
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      { name: "Ana", coachDone: 3, coachTotal: 3, synced: Date.now() },
+      { name: "Luis", coachDone: 1, coachTotal: 3, synced: Date.now() },
+    ]));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+    const area = document.querySelector("#weak-print-area");
+    if (!area) return "";
+    const realPrint = window.print;
+    window.print = () => {};
+    try {
+      document.querySelector("#class-coach-plan-print")?.click();
+      return area.innerHTML;
+    } finally {
+      window.print = realPrint;
+      area.hidden = true;
+    }
+  });
+  expect(html).toMatch(/plan 8 min|8-min plan/i);
+  expect(html).toMatch(/class-plan-heat|class-heat-cell|Ana|Luis/i);
+});

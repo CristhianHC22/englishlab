@@ -391,3 +391,86 @@ test("Plus: journal coach plan picks mode from recent errors", async ({ page }) 
   await expect(page.locator("#quiz.panel.active")).toBeVisible();
   await expect(page.locator("#quiz-mode")).toHaveValue("ear");
 });
+
+test("Plus: journal plan step chart from abandon/fail", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "plan:ear", expected: "Plan", prompt: "p", said: "out", why: "z", planStep: "abandon" },
+      { at: Date.now() - 1, mode: "plan:uso", expected: "Plan", prompt: "p", said: "miss", why: "z", planStep: "fail" },
+      { at: Date.now() - 2, mode: "plan:ear", expected: "Plan", prompt: "p", said: "out", why: "z", planStep: "abandon" },
+    ]));
+    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
+  });
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#error-journal .journal-plan-chart")).toBeVisible();
+  await expect(page.locator("#error-journal .journal-plan-bar-row")).toHaveCount(2);
+});
+
+test("Plus: kids hide journal coach plan CTA", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.setItem("enlab-kids", "1");
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "uso", expected: "are", prompt: "x", said: "is", why: "y" },
+    ]));
+    if (typeof applyKidsMode === "function") applyKidsMode();
+    if (window.PLUS?.renderErrorJournal) window.PLUS.renderErrorJournal();
+  });
+  await openLabRoom(page, "error-journal", "ia");
+  await expect(page.locator("#journal-coach-plan")).toHaveCount(0);
+});
+
+test("Transfer import restores mid-flow coach plan steps", async ({ page }) => {
+  await boot(page);
+  const restored = await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    sessionStorage.removeItem("enlab-coach-plan-flow");
+    const payload = buildTransferPayload();
+    payload["enlab-coach-plan-mirror"] = JSON.stringify({
+      day: todayKey(), done: 1, steps: ["listen", "phrasal", "type"], flow: true,
+    });
+    payload.cs = transferPayloadChecksum(payload);
+    const code = transferEncode(payload);
+    importTransferCode(code, true);
+    const plan = JSON.parse(sessionStorage.getItem("enlab-coach-plan") || "null");
+    return {
+      done: plan?.done,
+      steps: plan?.steps,
+      flow: sessionStorage.getItem("enlab-coach-plan-flow"),
+      quizSteps: typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : [],
+    };
+  });
+  expect(restored.done).toBe(1);
+  expect(restored.steps).toEqual(["listen", "phrasal", "type"]);
+  expect(restored.flow).toBe("1");
+  expect(restored.quizSteps).toEqual(["listen", "phrasal", "type"]);
+});
+
+test("Coach plan complete marks stats day.plan for 90d chart", async ({ page }) => {
+  await boot(page);
+  const marked = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 2, steps: ["ear", "uso", "choice"],
+    }));
+    sessionStorage.setItem("enlab-coach-plan-flow", "1");
+    bumpCoachPlanProgress("choice");
+    const st = stats();
+    return st.days?.[todayKey()]?.plan === 1;
+  });
+  expect(marked).toBe(true);
+});
+
+test("Kids first banner is one short line", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids-welcome");
+    localStorage.setItem("enlab-kids", "1");
+    applyKidsMode();
+  });
+  await expect(page.locator("#kids-banner")).toBeVisible();
+  await expect(page.locator("#kids-banner")).toHaveClass(/kids-banner-first/);
+  const text = await page.locator("#kids-banner").innerText();
+  expect(text.length).toBeLessThan(80);
+  expect(text).toMatch(/primera|first|oír|listen/i);
+});

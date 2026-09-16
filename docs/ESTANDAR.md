@@ -572,3 +572,14 @@ Avance v112:
 - **Push**: preview del próximo aviso bajo `#remind-status`.
 - **Quiz end**: kids sin CTAs de plan; menos tips si ya hay barra coach.
 - Cache SW: `enlab-v91`.
+
+Avance v113:
+
+- **CI**: Node 22 + `npm run audit:i18n` en el job de tests.
+- **Transfer**: import restaura `enlab-coach-plan` (steps/flow) desde el espejo mid-plan.
+- **Diario**: mini gráfica abandono/fallos por paso del plan; kids sin CTA coach.
+- **Aula**: print plan incluye heatmap; heatmaps lazy tras pintar el roster.
+- **90d**: marca días con plan 8 min completado (`days.plan`).
+- **Kids**: banner 1 línea + primera sesión en onboarding; hint kids en bienvenida.
+- **Push**: contrato SW↔`remindPushBody` (cert warm-up con mismas puertas).
+- Cache SW: `enlab-v92`.

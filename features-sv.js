@@ -773,8 +773,22 @@
       </table>
       ${classCoachPlanSummaryHtml()}
       ${classCoachPlanAlertHtml()}
-      ${classCoachPlanHeatHtml()}
-      ${classFrictionHeatmapHtml()}`;
+      <div id="class-heat-lazy" class="class-heat-lazy" aria-busy="true"><p class="muted">${esc(t("classHeatLazy"))}</p></div>`;
+    scheduleClassHeatLazy();
+  }
+
+  function scheduleClassHeatLazy() {
+    const slot = document.querySelector("#class-heat-lazy");
+    if (!slot || slot.dataset.ready === "1") return;
+    const fill = () => {
+      if (!slot.isConnected || slot.dataset.ready === "1") return;
+      slot.dataset.ready = "1";
+      slot.removeAttribute("aria-busy");
+      slot.innerHTML = `${classCoachPlanHeatHtml()}${classFrictionHeatmapHtml()}`;
+      updateClassRosterBody();
+    };
+    if (typeof requestIdleCallback === "function") requestIdleCallback(fill, { timeout: 180 });
+    else setTimeout(fill, 0);
   }
 
   function updateClassRosterBody() {
@@ -809,12 +823,16 @@
       const cell = rosterCoachPlanCell(s);
       return `<tr><td>${esc(s.name)}</td><td>${esc(status || "—")}</td><td>${esc(cell)}</td></tr>`;
     }).join("") || `<tr><td colspan="3" class="muted">${esc(t("classRosterEmpty"))}</td></tr>`;
+    const heat = classCoachPlanHeatHtml()
+      .replace(/<\/?details[^>]*>/gi, "")
+      .replace(/<summary[^>]*>[\s\S]*?<\/summary>/gi, "");
     area.hidden = false;
     area.innerHTML = `
       <h1>${esc(t("classCoachPlanPrintTitle"))}</h1>
       <p class="muted">${esc(t("classCoachPlanPrintHint"))} · ${typeof todayKey === "function" ? todayKey() : ""}</p>
       <table><thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColStatus"))}</th><th>${esc(t("classColCoachPlan"))}</th></tr></thead>
-      <tbody>${rows}</tbody></table>`;
+      <tbody>${rows}</tbody></table>
+      <div class="print-coach-plan-heat">${heat}</div>`;
     window.print();
     area.hidden = true;
   }
@@ -1245,7 +1263,10 @@
         </div>
         <div class="onboard-step" data-step="3" hidden>
           <h2 data-i18n="onboardSession">Primera sesión</h2>
-          <p class="muted" data-i18n="onboardSessionHint">15 min: oír → hablar → 3 preguntas. Todo local.</p>
+          <p class="muted" id="onboard-session-hint" data-i18n="onboardSessionHint">15 min: oír → hablar → 3 preguntas. Todo local.</p>
+          <div class="row" style="margin:8px 0">
+            <button type="button" class="chip" id="onboard-kids" aria-pressed="false" data-i18n="kids">Modo niño</button>
+          </div>
           <button type="button" class="btn" id="onboard-start-path" data-i18n="onboardStart">Empezar el camino</button>
           <button type="button" class="btn ghost" id="onboard-skip" data-i18n="onboardSkip">Saltar</button>
         </div>
@@ -1296,7 +1317,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v91";
+  const SW_CACHE = "enlab-v92";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1540,11 +1561,28 @@
         document.querySelector('[data-step="2"]')?.setAttribute("hidden", "");
         document.querySelector('[data-step="3"]')?.removeAttribute("hidden");
       }
+      if (e.target.closest("#onboard-kids")) {
+        const btn = e.target.closest("#onboard-kids");
+        const on = btn.getAttribute("aria-pressed") !== "true";
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+        btn.classList.toggle("on", on);
+        localStorage.setItem("enlab-kids", on ? "1" : "0");
+        const hint = document.querySelector("#onboard-session-hint");
+        if (hint) {
+          hint.removeAttribute("data-i18n");
+          hint.textContent = on ? t("onboardSessionHintKids") : t("onboardSessionHint");
+        }
+        return;
+      }
       if (e.target.closest("#onboard-start-path")) {
         finishOnboarding();
+        if (typeof applyKidsMode === "function") applyKidsMode();
         document.querySelector(".hoy-next")?.click();
       }
-      if (e.target.closest("#onboard-skip")) finishOnboarding();
+      if (e.target.closest("#onboard-skip")) {
+        finishOnboarding();
+        if (typeof applyKidsMode === "function") applyKidsMode();
+      }
     });
 
     document.addEventListener("change", (e) => {

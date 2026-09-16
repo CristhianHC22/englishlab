@@ -921,6 +921,15 @@ function bumpCoachPlanProgress(mode) {
   try {
     sessionStorage.setItem("enlab-coach-plan", JSON.stringify({ day: todayKey(), done, steps }));
   } catch { /* ignore */ }
+  if (done >= steps.length) {
+    try {
+      const st = stats();
+      const today = todayKey();
+      st.days[today] = st.days[today] || { quiz: 0, heard: 0, spoke: 0 };
+      st.days[today].plan = 1;
+      localStorage.setItem("enlab-stats", JSON.stringify(st));
+    } catch { /* ignore */ }
+  }
   persistCoachPlanMirror();
   clearCoachPlanAbandon();
   invalidateYouAreChipsCache();
@@ -6905,7 +6914,7 @@ function fireRemind() {
 
 function remindPushBody(due, planLeft, planStarted, quickmixHot, placeNudge, certWarmupNudge) {
   if (placeNudge && !planStarted && planLeft >= 3) return t("pushPlacePlanBody");
-  if (certWarmupNudge) return t("pushCertWarmupPlanBody");
+  if (certWarmupNudge && !planStarted && planLeft >= 3) return t("pushCertWarmupPlanBody");
   if (quickmixHot && !planStarted && planLeft >= 3) return t("pushQuickmixHotBody");
   if (!planStarted && planLeft >= 3) return t("pushCoachPlanStartBody");
   if (planStarted && planLeft > 0 && planLeft < 3) return t("pushCoachPlanBody", { left: planLeft });
@@ -6986,7 +6995,17 @@ function applyKidsMode() {
   document.body.classList.toggle("kids-mode", on);
   setPressed($("#kids-toggle"), on);
   const banner = $("#kids-banner");
-  if (banner) banner.hidden = !on;
+  if (banner) {
+    banner.hidden = !on;
+    if (on) {
+      const first = localStorage.getItem("enlab-kids-welcome") !== "1";
+      if (first) localStorage.setItem("enlab-kids-welcome", "1");
+      banner.textContent = first ? t("kidsBannerFirst") : t("kidsBanner");
+      banner.classList.toggle("kids-banner-first", first);
+    } else {
+      banner.classList.remove("kids-banner-first");
+    }
+  }
   if (on && localStorage.getItem("enlab-rate") !== "slow") {
     localStorage.setItem("enlab-rate", "slow");
   }
@@ -8151,25 +8170,33 @@ function renderStreakChart() {
     const quizN = day.quiz || 0;
     const spoke = day.spoke || 0;
     const score = heard + quizN + spoke;
-    days.push({ key, score, heard, quiz: quizN, spoke, hot: score > 0, srsDue: srsDueOnDay(key), frictionHigh: dayFrictionHigh(key) });
+    days.push({
+      key, score, heard, quiz: quizN, spoke,
+      hot: score > 0,
+      srsDue: srsDueOnDay(key),
+      frictionHigh: dayFrictionHigh(key),
+      planDone: !!day.plan,
+    });
   }
   const hotN = days.filter((d) => d.hot).length;
   const srsDays = days.filter((d) => d.srsDue).length;
   const frictionDays = days.filter((d) => d.frictionHigh).length;
+  const planDays = days.filter((d) => d.planDone).length;
   const max = Math.max(1, ...days.map((d) => d.score));
   el.hidden = false;
   el.innerHTML = `
-    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90${srsDays ? ` · ${srsDays} ${esc(t("chart90SrsDays"))}` : ""}${frictionDays ? ` · ${frictionDays} ${esc(t("chart90FrictionDays"))}` : ""}</p>
+    <p class="kicker">${esc(t("streak90"))} · ${hotN}/90${srsDays ? ` · ${srsDays} ${esc(t("chart90SrsDays"))}` : ""}${frictionDays ? ` · ${frictionDays} ${esc(t("chart90FrictionDays"))}` : ""}${planDays ? ` · ${planDays} ${esc(t("chart90PlanDays"))}` : ""}</p>
     <div class="streak-bars streak-90" role="img" aria-label="${hotN} ${esc(t("streak90Aria"))}">
       ${days.map((d) => {
         const h = Math.max(d.score ? 20 : 8, Math.round((d.score / max) * 100));
-        const cls = [d.hot ? "hot" : "", d.srsDue ? "srs-due-day" : "", d.frictionHigh ? "friction-day" : ""].filter(Boolean).join(" ");
+        const cls = [d.hot ? "hot" : "", d.srsDue ? "srs-due-day" : "", d.frictionHigh ? "friction-day" : "", d.planDone ? "plan-day" : ""].filter(Boolean).join(" ");
         const srsHint = d.srsDue ? ` · ${t("chart90SrsDue")}` : "";
         const frHint = d.frictionHigh ? ` · ${t("chart90FrictionDue")}` : "";
-        return `<button type="button" class="streak-day ${cls}" data-streak-day="${esc(d.key)}" data-srs-due="${d.srsDue ? "1" : "0"}" data-friction-day="${d.frictionHigh ? "1" : "0"}" style="height:${h}%" title="${esc(d.key)}: ${d.heard} ${t("logHeard")} · ${d.quiz} ${t("logQuiz")} · ${d.spoke} ${t("logVoice")}${srsHint}${frHint}" aria-label="${esc(d.key)}"></button>`;
+        const planHint = d.planDone ? ` · ${t("chart90PlanDue")}` : "";
+        return `<button type="button" class="streak-day ${cls}" data-streak-day="${esc(d.key)}" data-srs-due="${d.srsDue ? "1" : "0"}" data-friction-day="${d.frictionHigh ? "1" : "0"}" data-plan-day="${d.planDone ? "1" : "0"}" style="height:${h}%" title="${esc(d.key)}: ${d.heard} ${t("logHeard")} · ${d.quiz} ${t("logQuiz")} · ${d.spoke} ${t("logVoice")}${srsHint}${frHint}${planHint}" aria-label="${esc(d.key)}"></button>`;
       }).join("")}
     </div>
-    <p class="muted chart90-legend">${esc(t("chart90Legend"))}${srsDays ? ` · ${esc(t("chart90SrsLegend"))}` : ""}${frictionDays ? ` · ${esc(t("chart90FrictionLegend"))}` : ""}</p>`;
+    <p class="muted chart90-legend">${esc(t("chart90Legend"))}${srsDays ? ` · ${esc(t("chart90SrsLegend"))}` : ""}${frictionDays ? ` · ${esc(t("chart90FrictionLegend"))}` : ""}${planDays ? ` · ${esc(t("chart90PlanLegend"))}` : ""}</p>`;
 }
 
 function buildTransferPayload() {
@@ -8314,9 +8341,16 @@ function importTransferCode(raw, quiet) {
   }
   try {
     applyTransferPayload(payload);
+    if (typeof restoreCoachPlanFromMirror === "function") restoreCoachPlanFromMirror();
+    window._coachPlanSteps = null;
+    window._coachPlanStepsDay = "";
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
     applyLevel();
     renderRemind();
     renderTransferCode();
+    if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
+    if (typeof renderQuizNow === "function") renderQuizNow();
+    if (typeof syncRemindToSw === "function") syncRemindToSw();
     say(t("progressImported"));
     prefsTransferEcho = trimmed;
   } catch (err) {
