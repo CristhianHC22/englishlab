@@ -589,3 +589,42 @@ test("Hablar: attention print lists stale and hi friction", async ({ page }) => 
   expect(html).not.toMatch(/>Ok</);
   expect(html).toMatch(/attention-qr-canvas|coach-plan|#coach-plan/i);
 });
+
+test("Hablar: attention CSV lists stale and hi friction", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  const csv = await page.evaluate(() => {
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      {
+        name: "Stale",
+        coachDone: 0,
+        coachTotal: 3,
+        coachPendingSince: Date.now() - 4 * 86400000,
+        frictionDrop: 20,
+        synced: Date.now() - 4 * 86400000,
+      },
+      { name: "Hi", coachDone: 1, coachTotal: 3, frictionDrop: 60, synced: Date.now() },
+      { name: "Ok", coachDone: 3, coachTotal: 3, frictionDrop: 10, synced: Date.now() },
+    ]));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+    const blobs = [];
+    const Orig = window.Blob;
+    window.Blob = function (parts, opts) {
+      blobs.push(String(parts?.[0] || ""));
+      return new Orig(parts, opts);
+    };
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {};
+    try {
+      document.querySelector("#class-attention-csv")?.click();
+    } finally {
+      window.Blob = Orig;
+      HTMLAnchorElement.prototype.click = click;
+    }
+    return blobs[0] || "";
+  });
+  expect(csv).toMatch(/Stale/);
+  expect(csv).toMatch(/Hi/);
+  expect(csv).toMatch(/stale_3d|friction_hi/);
+  expect(csv).not.toMatch(/Ok/);
+});

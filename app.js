@@ -939,6 +939,16 @@ function coachPlanIsStale(minDays = 3) {
   return (Date.now() - since) >= minDays * 86400000;
 }
 
+function hydrateCoachPlanStale() {
+  try {
+    if (coachPlanStickySince()) return;
+    const raw = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    if (raw?.pendingSince && (Number(raw.done) || 0) === 0) {
+      setCoachPlanStickySince(raw.pendingSince);
+    }
+  } catch { /* ignore */ }
+}
+
 function restoreCoachPlanFromMirror() {
   try {
     const raw = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
@@ -1251,6 +1261,14 @@ function quizCoachPlanHtml() {
 function quizCoachEndHtml(mode) {
   if (!mode || mode === "cierre") return "";
   if (mode === "weekly" || mode === "cert" || mode === "place") return quizCoachBtnsHtml(mode);
+  if (quiz?.fromPodcast && (quiz.fails || []).length && coachPlanLeft() > 0
+    && !(typeof kidsOn === "function" && kidsOn())) {
+    const ear = coachPlanPendingModes().find((m) => coachPlanFamily(m) === "ear");
+    if (ear) {
+      const plan = coachPlanStarted() || coachPlanFlowOn() ? quizCoachPlanHtml(mode) : "";
+      return `<button type="button" class="btn sm warn" data-coach-plan-go data-coach-plan-mode="${esc(ear)}">${esc(t("podcastPlanEarCta"))}</button>${plan}`;
+    }
+  }
   if (coachPlanStarted() || coachPlanFlowOn()) return quizCoachPlanHtml(mode);
   return quizCoachBtnsHtml(mode);
 }
@@ -4354,6 +4372,18 @@ function renderQuiz() {
       if (coachPlanFlowOn() && quiz.fails.length && window.PLUS?.logPlanStepEvent) {
         window.PLUS.logPlanStepEvent("fail", quiz.mode);
       }
+      if (quiz.fromPodcast && quiz.fails.length && window.PLUS?.logPlanStepEvent
+        && !(typeof kidsOn === "function" && kidsOn()) && coachPlanLeft() > 0) {
+        try {
+          const day = todayKey();
+          const logKey = `enlab-pod-fail-log:${day}:${quiz.fromPodcast}`;
+          if (!sessionStorage.getItem(logKey)) {
+            sessionStorage.setItem(logKey, "1");
+            const ear = coachPlanPendingModes().find((m) => coachPlanFamily(m) === "ear") || "ear";
+            window.PLUS.logPlanStepEvent("fail", ear);
+          }
+        } catch { /* ignore */ }
+      }
       if (coachPlanStarted() || coachPlanFlowOn()) bumpCoachPlanProgress(quiz.mode);
     }
     const g = todayGame();
@@ -6441,6 +6471,8 @@ function repasoTimerSecs() {
     const left = coachPlanLeft();
     return Math.min(600, Math.max(360, left * 240));
   }
+  if (coachPlanLeft() > 0 && coachPlanIsStale(5)) return 360;
+  if (coachPlanLeft() > 0 && coachPlanIsStale(3)) return 480;
   return 600;
 }
 
@@ -7652,6 +7684,7 @@ function fillYouAre() {
   const pathDone = currentTab === "hoy" && hoy?.classList.contains("path-done");
   if (pathDone) {
     let line = "";
+    const kids = typeof kidsOn === "function" && kidsOn();
     try {
       if (sessionStorage.getItem("enlab-hoy-extra-timer") === "1" && timerState().running) {
         line = t("youAreExtraTimer");
@@ -7660,6 +7693,9 @@ function fillYouAre() {
     if (!line) {
       const coachHint = coachPlanCierreHint();
       if (coachHint) line = coachHint;
+    }
+    if (!line && !kids && coachPlanIsStale() && coachPlanLeft() > 0) {
+      line = t("youAreCoachPlanStale");
     }
     if (!line) {
       const oidoTitle = oidoLastTitle();
@@ -7760,7 +7796,10 @@ function fillGuideMap() {
   const box = $("#guide-map");
   if (!box) return;
   const pathDone = currentTab === "hoy" && $("#hoy")?.classList.contains("path-done");
-  const mapKey = `${currentTab}|${guidePlace()}|${pathDone}|${$("#quiz")?.classList.contains("lab-in")}`;
+  const place = guidePlace();
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  const labIn = $("#quiz")?.classList.contains("lab-in") || document.getElementById(currentTab)?.classList.contains("lab-in") ? "1" : "0";
+  const mapKey = `${lang}|${currentTab}|${place}|${pathDone ? 1 : 0}|${labIn}`;
   if (mapKey === _lastGuideMapKey && box.innerHTML) return;
   _lastGuideMapKey = mapKey;
   if (pathDone) {
@@ -7830,10 +7869,10 @@ function guideCardChip(c) {
 function fillGuideLab() {
   const box = $("#guide-lab");
   if (!box) return;
-  const labKey = uiLang();
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  const labKey = `${lang}|${currentTab}`;
   if (labKey === _lastGuideLabKey && box.innerHTML) return;
   _lastGuideLabKey = labKey;
-  const lang = uiLang();
   const tabs = ENLAB.ui?.[lang]?.tabs || ENLAB.ui?.es?.tabs || {};
   const order = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
   box.hidden = false;
@@ -9201,9 +9240,11 @@ function init() {
         if (typeof renderHome === "function") renderHome();
       }
       if (typeof restoreCoachPlanFromMirror === "function") restoreCoachPlanFromMirror();
+      if (typeof hydrateCoachPlanStale === "function") hydrateCoachPlanStale();
     });
   } else if (typeof restoreCoachPlanFromMirror === "function") {
     restoreCoachPlanFromMirror();
+    if (typeof hydrateCoachPlanStale === "function") hydrateCoachPlanStale();
   }
   setupPwaInstall();
   renderClassPin();

@@ -613,3 +613,24 @@ Avance v116:
 - **Aula**: imprimir atención (filtro o hi/stale) + QR `#coach-plan`; `drawTransferQr` acepta canvas.
 - **Podcast**: a medias + plan oído pendiente → CTA Plan 8 min · oído.
 - Cache SW: `enlab-v95`.
+
+Avance v117:
+
+- **Hoy/you-are**: línea stale cuando día marcado (además del chip).
+- **Repaso**: timer 8 min si stale ≥3d, 6 min si ≥5d.
+- **Aula**: CSV atención (mismo filtro que print).
+- **Podcast quiz**: fallos → log `plan:ear` 1× + CTA warn al cerrar.
+- **Perf**: `fillGuideMap`/`fillGuideLab` memo con lang+tab; `hydrateCoachPlanStale` tras IDB.
+- **Docs**: baseline Lighthouse local (ver abajo).
+- Cache SW: `enlab-v96`.
+
+### Perf baseline (Lighthouse)
+
+Servidor local estático + Chrome headless (no CI):
+
+```bash
+npx serve -l 4173 . &
+npx lighthouse http://127.0.0.1:4173 --only-categories=performance --form-factor=mobile --chrome-flags="--headless" --quiet
+```
+
+Meta orientativa post-packs: LCP &lt; 2.5s en laptop media; no bloquear el camino Hoy.

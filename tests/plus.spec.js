@@ -673,3 +673,88 @@ test("Podcast mid offers plan ear CTA when ear pending", async ({ page }) => {
   });
   expect(html).toMatch(/data-coach-plan-mode=["']ear["']/);
 });
+
+test("You-are day-marked shows stale plan line", async ({ page }) => {
+  await boot(page);
+  const line = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+    document.querySelector("#hoy")?.classList.add("path-done");
+    if (typeof showTab === "function") showTab("hoy");
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
+    fillYouAre();
+    return document.querySelector("#you-are-text")?.textContent || "";
+  });
+  expect(line).toMatch(/≥3|3\+|días|days|plan/i);
+});
+
+test("Repaso timer shortens when plan stale 5d+", async ({ page }) => {
+  await boot(page);
+  const secs = await page.evaluate(() => {
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 6 * 86400000));
+    return {
+      deep: repasoTimerSecs(),
+      mild: (() => {
+        localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
+        return repasoTimerSecs();
+      })(),
+      fresh: (() => {
+        localStorage.removeItem("enlab-coach-stale-since");
+        return repasoTimerSecs();
+      })(),
+    };
+  });
+  expect(secs.deep).toBe(360);
+  expect(secs.mild).toBe(480);
+  expect(secs.fresh).toBe(600);
+});
+
+test("hydrateCoachPlanStale copies pendingSince from mirror", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    localStorage.removeItem("enlab-coach-stale-since");
+    localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+      pendingSince: Date.now() - 5 * 86400000,
+    }));
+    hydrateCoachPlanStale();
+    return {
+      sticky: coachPlanStickySince() > 0,
+      stale: coachPlanIsStale(),
+    };
+  });
+  expect(out.sticky).toBe(true);
+  expect(out.stale).toBe(true);
+});
+
+test("Podcast quiz fail logs ear plan step once", async ({ page }) => {
+  await boot(page);
+  const n = await page.evaluate(() => {
+    const pods = (window.ENLAB.podcasts || []).filter((p) => (p.qs || []).length >= 1);
+    const pod = pods[0];
+    if (!pod) return -1;
+    localStorage.removeItem("enlab-kids");
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.setItem("enlab-error-log", "[]");
+    sessionStorage.removeItem(`enlab-pod-fail-log:${todayKey()}:${pod.id}`);
+    quiz = {
+      i: 1,
+      score: 0,
+      fromPodcast: pod.id,
+      items: [{ type: "listen", q: "x", a: "y", opts: ["y"], inf: "podcast:t:y" }],
+      fails: ["podcast:t:y"],
+      mode: "listen",
+      host: "#quiz-box",
+    };
+    renderQuiz();
+    renderQuiz();
+    const log = JSON.parse(localStorage.getItem("enlab-error-log") || "[]");
+    return log.filter((r) => r.planStep === "fail" && String(r.mode || "").includes("ear")).length;
+  });
+  expect(n).toBe(1);
+});

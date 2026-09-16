@@ -78,7 +78,7 @@ Flujo diario opcional tras el camino de Hoy: **familia oído → familia uso →
 | Día marcado | Chip en `#hoy-done-mid` (sin tarjeta duplicada en extras) |
 | Repaso + plan | Filtro por familia pendiente, timer corto, un hint en Guía |
 
-**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix, plan stale ≥3d (`pendingSince` + sticky). Espejo: `enlab-coach-plan-mirror`. Aula: atención print/QR `#coach-plan` (filtro o hi/stale). Deep-link: `#coach-plan`. Diario: writing &lt;60% → `planStep:fail`. Guía lazy al abrir. Podcast mid → CTA oído del plan. Stats `days.plan` → racha 90d.
+**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix, plan stale ≥3d (`pendingSince` + sticky + hydrate IDB). Espejo: `enlab-coach-plan-mirror`. Aula: atención print/CSV/QR. Podcast quiz fail → oído del plan. Repaso timer acorta con stale. Guía map/lab memo por lang+tab. Deep-link: `#coach-plan`.
 
 ## Extensión a propósito (y su coste)
 

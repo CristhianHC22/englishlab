@@ -698,6 +698,7 @@
     quiz = {
       i: 0,
       score: 0,
+      fromPodcast: pod.id,
       items: pod.qs.map((q, i) => ({
         type: "listen",
         q: q.q,

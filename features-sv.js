@@ -851,6 +851,7 @@
         <button type="button" class="btn ghost sm" id="class-friction-print">${esc(t("classFrictionPrint"))}</button>
         <button type="button" class="btn ghost sm" id="class-student-qr">${esc(t("classStudentQr"))}</button>
         <button type="button" class="btn ghost sm" id="class-attention-print">${esc(t("classAttentionPrint"))}</button>
+        <button type="button" class="btn ghost sm" id="class-attention-csv">${esc(t("classAttentionCsv"))}</button>
         <button type="button" class="btn ghost sm" id="student-pdf">${esc(t("studentPdf"))}</button>
       </div>
       <div id="class-student-qr-box" class="student-qr-box" hidden></div>
@@ -1004,6 +1005,33 @@
     }
     window.print();
     area.hidden = true;
+  }
+
+  function exportClassAttentionCsv() {
+    if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
+    const rows = [["student", "plan_status", "plan_cell", "friction_mode", "friction_drop", "why", "filter"]];
+    const filt = _classFrictionHeatFilter || _classPlanHeatFilter || "attention";
+    classAttentionStudents().forEach((s) => {
+      const why = [
+        rosterCoachPlanStale(s) ? "stale_3d" : "",
+        frictionDropLevel(s.frictionDrop) === "hi" ? "friction_hi" : "",
+      ].filter(Boolean).join("|") || "";
+      rows.push([
+        s.name,
+        rosterCoachPlanStatus(s) || "",
+        rosterCoachPlanCell(s),
+        s.frictionMode || "",
+        s.frictionDrop != null ? String(s.frictionDrop) : "",
+        why,
+        filt,
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filt && filt !== "attention" ? `englishlab-attention-${filt}.csv` : "englishlab-attention.csv";
+    a.click();
   }
 
   function countHotDays(statsRaw, windowDays) {
@@ -1509,7 +1537,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v95";
+  const SW_CACHE = "enlab-v96";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1720,6 +1748,7 @@
         document.querySelector("#class-student-qr-box")?.scrollIntoView({ behavior: "smooth" });
       }
       if (e.target.closest("#class-attention-print")) printClassAttentionSheet();
+      if (e.target.closest("#class-attention-csv")) exportClassAttentionCsv();
       if (e.target.closest("#class-import-code")) {
         if (typeof classroomAllowsChange === "function" && !classroomAllowsChange("classPinExport")) return;
         const code = window.prompt(typeof t === "function" ? t("classImportPrompt") : "Pega código transfer del alumno:");
