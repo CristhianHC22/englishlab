@@ -592,3 +592,14 @@ Avance v114:
 - **Push**: plural `paso{s}` / `step{s}` alineado SW↔app.
 - **CI**: job funcional en Playwright jammy (mismo container que visual).
 - Cache SW: `enlab-v93`.
+
+Avance v115:
+
+- **Guía**: hint al abrir diario desde 90d / foco plan.
+- **Aula**: CSV/print fricción respetan filtro hi/mid/lo.
+- **Repaso/diario**: `plan-abandon` pesa ×3 al elegir paso coach.
+- **Writing**: rúbrica &lt;60% sugiere CTA Plan 8 min por familia.
+- **Transfer**: `pendingSince` en espejo coach (IDB/transfer).
+- **Perf**: memo gráfica 90d por firma plan/fricción/SRS.
+- **Kids**: onboarding salta meta viaje/trabajo/examen.
+- Cache SW: `enlab-v94`.

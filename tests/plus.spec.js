@@ -522,3 +522,76 @@ test("90d plan day chip opens journal plan filter", async ({ page }) => {
   await page.locator("[data-chart90-plan]").click();
   await expect(page.locator("#error-journal .journal-plan-chart")).toBeVisible();
 });
+
+test("90d→diario sets Guía hint and from-90d flag", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "error-journal", "ia");
+  const hint = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-journal-from-90d", "1");
+    sessionStorage.setItem("enlab-journal-focus", "plan");
+    if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
+    const entry = guideFillEntry();
+    return entry?.w || "";
+  });
+  expect(hint).toMatch(/90d|90-day|racha|streak|plan/i);
+});
+
+test("Journal coach mode weights plan-abandon ×3", async ({ page }) => {
+  await boot(page);
+  const mode = await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.setItem("enlab-error-log", JSON.stringify([
+      { at: Date.now(), mode: "plan:uso", expected: "a", prompt: "p", said: "x", why: "z", planStep: "abandon" },
+      { at: Date.now() - 1, mode: "ear", expected: "b", prompt: "p", said: "x", why: "z" },
+      { at: Date.now() - 2, mode: "ear", expected: "c", prompt: "p", said: "x", why: "z" },
+    ]));
+    return window.PLUS.journalCoachPlanMode();
+  });
+  expect(mode).toBe("uso");
+});
+
+test("Coach plan mirror stores pendingSince until first step", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(() => {
+    sessionStorage.removeItem("enlab-coach-plan");
+    localStorage.removeItem("enlab-coach-plan-mirror");
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    sessionStorage.setItem("enlab-coach-plan-flow", "1");
+    persistCoachPlanMirror();
+    const first = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    const since = first?.pendingSince;
+    persistCoachPlanMirror();
+    const second = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 1, steps: ["ear", "uso", "choice"],
+    }));
+    persistCoachPlanMirror();
+    const progressed = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+    return {
+      hasSince: typeof since === "number" && since > 0,
+      stable: second?.pendingSince === since,
+      cleared: !progressed?.pendingSince,
+    };
+  });
+  expect(out.hasSince).toBe(true);
+  expect(out.stable).toBe(true);
+  expect(out.cleared).toBe(true);
+});
+
+test("90d streak chart memo skips identical rebuild", async ({ page }) => {
+  await boot(page);
+  const same = await page.evaluate(() => {
+    window._streakChartKey = "";
+    renderStreakChart();
+    const key1 = window._streakChartKey;
+    const html1 = document.querySelector("#hoy-streak-chart")?.innerHTML || "";
+    renderStreakChart();
+    return key1 && key1 === window._streakChartKey
+      && html1 === (document.querySelector("#hoy-streak-chart")?.innerHTML || "");
+  });
+  expect(same).toBe(true);
+});

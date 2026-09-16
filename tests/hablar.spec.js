@@ -22,6 +22,50 @@ test("Hablar: writing rubric panel", async ({ page }) => {
   await expect(page.locator("#writing-result")).not.toHaveText("");
 });
 
+test("Hablar: writing low score offers Plan 8 min CTA", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "writing-panel", "hablar");
+  await page.evaluate(() => {
+    sessionStorage.setItem("enlab-coach-plan", JSON.stringify({
+      day: todayKey(), done: 0, steps: ["ear", "uso", "choice"],
+    }));
+    localStorage.removeItem("enlab-kids");
+    if (typeof applyKidsMode === "function") applyKidsMode();
+  });
+  await page.locator("#writing-draft").fill("x");
+  await page.locator("#writing-score").click();
+  await expect(page.locator("#writing-result [data-writing-coach-plan]")).toBeVisible();
+  await expect(page.locator("#writing-result")).toContainText(/plan|8/i);
+});
+
+test("Hablar: kids onboard skips goals step", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.removeItem("enlab-onboard-v3");
+    localStorage.removeItem("enlab-welcome-v2");
+    localStorage.setItem("enlab-kids", "1");
+    const el = document.querySelector("#welcome");
+    if (!el) return;
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="card welcome-card onboard-steps">
+        <div class="onboard-step" data-step="1">
+          <button type="button" class="chip onboard-level" data-level="A1">A1</button>
+          <button type="button" class="chip on" id="onboard-kids" aria-pressed="true">Kids</button>
+        </div>
+        <div class="onboard-step" data-step="2" hidden>
+          <button type="button" class="chip onboard-goal" data-goal="travel">Viaje</button>
+        </div>
+        <div class="onboard-step" data-step="3" hidden>
+          <p id="onboard-session-hint"></p>
+        </div>
+      </div>`;
+  });
+  await page.locator(".onboard-level").click();
+  await expect(page.locator('[data-step="2"]')).toBeHidden();
+  await expect(page.locator('[data-step="3"]')).toBeVisible();
+});
+
 test("Hablar: chat and duo cards", async ({ page }) => {
   await boot(page);
   await openLabRoom(page, "chat-work-card", "hablar");
@@ -402,6 +446,77 @@ test("Hablar: friction heatmap filter chips hide rows", async ({ page }) => {
   await page.locator('.class-friction-heat-filters [data-friction-heat-filter="hi"]').click();
   await expect(page.locator('.class-friction-heat-row[data-friction-lvl="hi"]')).toBeVisible();
   await expect(page.locator('.class-friction-heat-row[data-friction-lvl="lo"]')).toBeHidden();
+});
+
+test("Hablar: friction CSV respects hi filter", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await page.evaluate(() => {
+    const week = typeof weekStartKey === "function" ? weekStartKey() : todayKey().slice(0, 7);
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      { name: "Hi", frictionMode: "uso", frictionDrop: 60, synced: Date.now() },
+      { name: "Lo", frictionMode: "ear", frictionDrop: 20, synced: Date.now() },
+    ]));
+    localStorage.setItem("enlab-class-friction-week", JSON.stringify({
+      [week]: { Hi: { uso: 60 }, Lo: { ear: 20 } },
+    }));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+  });
+  await page.locator('.class-friction-heat-filters [data-friction-heat-filter="hi"]').click();
+  const csv = await page.evaluate(() => {
+    const blobs = [];
+    const Orig = window.Blob;
+    window.Blob = function (parts, opts) {
+      blobs.push(String(parts?.[0] || ""));
+      return new Orig(parts, opts);
+    };
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {};
+    try {
+      document.querySelector("#class-friction-csv")?.click();
+    } finally {
+      window.Blob = Orig;
+      HTMLAnchorElement.prototype.click = click;
+    }
+    return blobs[0] || "";
+  });
+  expect(csv).toMatch(/Hi/);
+  expect(csv).toMatch(/,"hi"/);
+  expect(csv).not.toMatch(/Lo/);
+});
+
+test("Hablar: friction print respects lo filter", async ({ page }) => {
+  await boot(page);
+  await openLabRoom(page, "class-pro-panel", "ia");
+  await page.evaluate(() => {
+    const week = typeof weekStartKey === "function" ? weekStartKey() : todayKey().slice(0, 7);
+    localStorage.setItem("enlab-class-roster", JSON.stringify([
+      { name: "Hi", frictionMode: "uso", frictionDrop: 60, synced: Date.now() },
+      { name: "Lo", frictionMode: "ear", frictionDrop: 20, synced: Date.now() },
+    ]));
+    localStorage.setItem("enlab-class-friction-week", JSON.stringify({
+      [week]: { Hi: { uso: 60 }, Lo: { ear: 20 } },
+    }));
+    if (window.SV?.renderClassPro) window.SV.renderClassPro();
+  });
+  await page.locator('.class-friction-heat-filters [data-friction-heat-filter="lo"]').click();
+  const html = await page.evaluate(() => {
+    const print = window.print;
+    window.print = () => {};
+    let out = "";
+    try {
+      document.querySelector("#class-friction-print")?.click();
+      out = document.querySelector("#weak-print-area")?.innerHTML || "";
+    } finally {
+      window.print = print;
+      const area = document.querySelector("#weak-print-area");
+      if (area) area.hidden = true;
+    }
+    return out;
+  });
+  expect(html).toMatch(/Lo/);
+  expect(html).not.toMatch(/>Hi</);
+  expect(html).toMatch(/&lt;35%|<35%/);
 });
 
 test("Hablar: stale coach plan alert after 3 days pending", async ({ page }) => {

@@ -189,7 +189,7 @@
   }
 
   function journalCoachPlanMode() {
-    const errors = loadErrors().slice(0, 30);
+    const errors = loadErrors().slice(0, 40);
     const famScores = { ear: 0, uso: 0, verbs: 0 };
     const famOf = (mode) => {
       if (typeof coachPlanFamily === "function") return coachPlanFamily(journalPlayMode(mode)) || "";
@@ -201,7 +201,11 @@
     };
     errors.forEach((r) => {
       const fam = famOf(r.mode);
-      if (fam && famScores[fam] != null) famScores[fam] += 1;
+      if (!fam || famScores[fam] == null) return;
+      let w = 1;
+      if (r.planStep === "abandon") w = 3;
+      else if (r.planStep === "fail") w = 2;
+      famScores[fam] += w;
     });
     try {
       const wf = typeof loadWeeklyFailsForCoach === "function"
@@ -952,13 +956,21 @@
       if (e.target.closest("#week-sheet-print")) printWeekSheet();
       if (e.target.closest("#journal-print-now")) printJournalNow();
       if (e.target.closest(".journal-search-row [data-journal-clear]")) {
-        try { sessionStorage.removeItem("enlab-journal-focus"); } catch { /* ignore */ }
+        try {
+          sessionStorage.removeItem("enlab-journal-focus");
+          sessionStorage.removeItem("enlab-journal-from-90d");
+        } catch { /* ignore */ }
+        if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
         renderErrorJournal();
       }
       const modeChip = e.target.closest("[data-journal-mode]");
       if (modeChip) {
         const m = modeChip.dataset.journalMode;
-        try { sessionStorage.setItem("enlab-journal-focus", m || ""); } catch { /* ignore */ }
+        try {
+          sessionStorage.setItem("enlab-journal-focus", m || "");
+          sessionStorage.removeItem("enlab-journal-from-90d");
+        } catch { /* ignore */ }
+        if (typeof invalidateYouAreChipsCache === "function") invalidateYouAreChipsCache();
         renderErrorJournal();
       }
       if (e.target.closest("#student-pdf")) printStudentPdf();
@@ -1028,6 +1040,7 @@
     logError,
     logPlanStepEvent,
     journalPlayMode,
+    journalCoachPlanMode,
     startPlacement,
     makePlacementItems,
     loadPlaceNow,

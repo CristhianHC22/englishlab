@@ -541,6 +541,7 @@
     const words = draft.split(/\s+/).filter(Boolean).length;
     let total = 0;
     let max = 0;
+    const failed = [];
     const list = Array.isArray(pick.checklist) ? pick.checklist : [];
     list.forEach((c) => {
       max += c.weight;
@@ -553,11 +554,39 @@
       else if (c.id === "cover") ok = /@|\bcover\b|backup|urgent/i.test(draft);
       else ok = (pick.hints || []).some((h) => lower.includes(h.toLowerCase()));
       total += ok ? c.weight : 0;
+      if (!ok) failed.push(c.id);
       const li = document.querySelector(`[data-rubric="${c.id}"] .rubric-ok`);
       if (li) li.textContent = ok ? "✓" : "○";
     });
     const pct = max ? Math.round((total / max) * 100) : 0;
-    if (result) result.textContent = `Rúbrica: ${pct}% · ${words} palabras`;
+    let planCta = "";
+    if (pct < 60 && typeof coachPlanLeft === "function" && coachPlanLeft() > 0
+      && !(typeof kidsOn === "function" && kidsOn())) {
+      const famScores = { ear: 0, uso: 0, verbs: 0 };
+      failed.forEach((id) => {
+        if (id === "tone" || id === "connectors" || id === "cover") famScores.uso += 2;
+        else if (id === "length" || id === "action" || id === "ask" || id === "cta") famScores.verbs += 1;
+        else famScores.uso += 1;
+      });
+      const pending = typeof coachPlanPendingModes === "function"
+        ? coachPlanPendingModes()
+        : (typeof quizCoachPlan8 === "function" ? quizCoachPlan8() : ["ear", "uso", "choice"]);
+      let best = pending[0] || "uso";
+      let bestN = -1;
+      pending.forEach((step) => {
+        const fam = typeof coachPlanFamily === "function" ? coachPlanFamily(step) : step;
+        const n = famScores[fam] || 0;
+        if (n > bestN) { bestN = n; best = step; }
+      });
+      const label = typeof t === "function" ? (t(`quizModes.${best}.t`) || best) : best;
+      planCta = ` <button type="button" class="btn ghost sm" data-writing-coach-plan="${esc(best)}">${esc(typeof t === "function" ? t("writeCoachPlanCta", { mode: label }) : `Plan 8 min · ${label}`)}</button>`;
+    }
+    if (result) {
+      const base = typeof t === "function"
+        ? t("writeScoreResult", { pct, words })
+        : `Rúbrica: ${pct}% · ${words} palabras`;
+      result.innerHTML = `${esc(base)}${planCta}`;
+    }
     if (pct >= 60) {
       const done = new Set(JSON.parse(localStorage.getItem("enlab-writing-done") || "[]"));
       done.add(pick.id);
@@ -719,24 +748,34 @@
     const week = typeof weekStartKey === "function" ? weekStartKey() : "";
     const prevWeek = typeof prevWeekStartKey === "function" ? prevWeekStartKey() : "";
     const modes = ["ear", "uso", "choice", "quickmix"];
-    const rows = [["student", "week", "mode", "drop_pct", "prev_drop_pct", "delta_pct"]];
+    const filt = _classFrictionHeatFilter;
+    const rows = [["student", "week", "mode", "drop_pct", "prev_drop_pct", "delta_pct", "filter"]];
     loadRoster().forEach((s) => {
-      const cur = (raw[week] || {})[s.name] || {};
+      const cur = { ...((raw[week] || {})[s.name] || {}) };
       const prev = prevWeek ? ((raw[prevWeek] || {})[s.name] || {}) : {};
       if (localStorage.getItem("enlab-student-name") === s.name && s.frictionMode) {
         cur[s.frictionMode] = s.frictionDrop;
       }
+      const maxDrop = Math.max(0, ...Object.values(cur).map((n) => Number(n) || 0));
+      const lvl = frictionDropLevel(maxDrop || null);
+      if (filt && lvl !== filt) return;
       modes.forEach((m) => {
         if (cur[m] == null && prev[m] == null) return;
         const delta = cur[m] != null && prev[m] != null ? cur[m] - prev[m] : "";
-        rows.push([s.name, week, m, cur[m] != null ? String(cur[m]) : "", prev[m] != null ? String(prev[m]) : "", delta !== "" ? String(delta) : ""]);
+        rows.push([
+          s.name, week, m,
+          cur[m] != null ? String(cur[m]) : "",
+          prev[m] != null ? String(prev[m]) : "",
+          delta !== "" ? String(delta) : "",
+          filt || "all",
+        ]);
       });
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "englishlab-friction-heatmap.csv";
+    a.download = filt ? `englishlab-friction-${filt}.csv` : "englishlab-friction-heatmap.csv";
     a.click();
   }
 
@@ -1090,11 +1129,14 @@
         coachDay: raw.day,
         coachSteps: steps,
       };
-      if (raw.day === today && done === 0) out.coachPendingSince = Date.now();
-      else if (raw.day === today && done > 0) out.coachPendingSince = null;
-      else if (raw.day !== today && done < steps.length) {
+      if (raw.pendingSince) out.coachPendingSince = Number(raw.pendingSince) || raw.pendingSince;
+      if (raw.day === today && done === 0) {
+        out.coachPendingSince = out.coachPendingSince || Date.now();
+      } else if (raw.day === today && done > 0) {
+        out.coachPendingSince = null;
+      } else if (raw.day !== today && done < steps.length) {
         out.coachDone = 0;
-        out.coachPendingSince = Date.now() - 3 * 86400000;
+        out.coachPendingSince = out.coachPendingSince || (Date.now() - 3 * 86400000);
       }
       return out;
     } catch { return null; }
@@ -1200,6 +1242,7 @@
     const area = document.querySelector("#weak-print-area");
     if (!area) return;
     const roster = loadRoster();
+    const filt = _classFrictionHeatFilter;
     const rows = roster
       .map((s) => {
         let mode = s.frictionMode;
@@ -1208,15 +1251,19 @@
           const top = topQuizFriction(1)[0];
           if (top) { mode = top.mode; drop = top.drop; }
         }
-        return { name: s.name, mode, drop, srsDue: s.srsDue, weeklyDone: s.weeklyDone };
+        return { name: s.name, mode, drop, srsDue: s.srsDue, weeklyDone: s.weeklyDone, lvl: frictionDropLevel(drop) };
       })
       .filter((r) => r.mode && r.drop != null)
+      .filter((r) => !filt || r.lvl === filt)
       .sort((a, b) => (b.drop - a.drop) || String(a.name).localeCompare(String(b.name)));
     const weekCmp = typeof perfFrictionWeekHtml === "function" ? perfFrictionWeekHtml() : "";
+    const filtLabel = filt
+      ? (filt === "hi" ? t("classFrictionFilterHi") : filt === "mid" ? t("classFrictionFilterMid") : t("classFrictionFilterLo"))
+      : t("classFrictionFilterAll");
     area.hidden = false;
     area.innerHTML = `
       <h1>${esc(t("classFrictionPrintTitle"))}</h1>
-      <p>${typeof todayKey === "function" ? todayKey() : ""} · ${esc(t("classFrictionPrintHint"))}</p>
+      <p>${typeof todayKey === "function" ? todayKey() : ""} · ${esc(t("classFrictionPrintHint"))} · ${esc(filtLabel)}</p>
       ${weekCmp ? `<div class="print-friction-week">${weekCmp}</div>` : ""}
       ${rows.length ? `<table class="mini-table"><thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColFriction"))}</th><th>SRS</th><th>${esc(t("classColWeekly"))}</th></tr></thead>
         <tbody>${rows.map((r) => `<tr>
@@ -1327,6 +1374,9 @@
           <p class="kicker">${esc(t("onboard"))}</p>
           <h2 data-i18n="onboardLevel">¿Tu nivel?</h2>
           <div class="row">${["A1", "A2", "B1", "B2"].map((l) => `<button type="button" class="chip onboard-level" data-level="${l}">${l}</button>`).join("")}</div>
+          <div class="row" style="margin-top:10px">
+            <button type="button" class="chip" id="onboard-kids" aria-pressed="false" data-i18n="kids">Modo niño</button>
+          </div>
         </div>
         <div class="onboard-step" data-step="2" hidden>
           <h2 data-i18n="onboardGoal">¿Tu meta?</h2>
@@ -1339,9 +1389,6 @@
         <div class="onboard-step" data-step="3" hidden>
           <h2 data-i18n="onboardSession">Primera sesión</h2>
           <p class="muted" id="onboard-session-hint" data-i18n="onboardSessionHint">15 min: oír → hablar → 3 preguntas. Todo local.</p>
-          <div class="row" style="margin:8px 0">
-            <button type="button" class="chip" id="onboard-kids" aria-pressed="false" data-i18n="kids">Modo niño</button>
-          </div>
           <button type="button" class="btn" id="onboard-start-path" data-i18n="onboardStart">Empezar el camino</button>
           <button type="button" class="btn ghost" id="onboard-skip" data-i18n="onboardSkip">Saltar</button>
         </div>
@@ -1392,7 +1439,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v93";
+  const SW_CACHE = "enlab-v94";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1580,6 +1627,11 @@
         renderWritingPanel();
       }
       if (e.target.closest("#writing-score")) scoreWriting();
+      if (e.target.closest("[data-writing-coach-plan]")) {
+        const mode = e.target.closest("[data-writing-coach-plan]").dataset.writingCoachPlan;
+        if (typeof startCoachPlanQuiz === "function") startCoachPlanQuiz(mode || undefined);
+        return;
+      }
       if (e.target.closest("#class-add-student")) {
         const name = document.querySelector("#class-student-name")?.value?.trim();
         if (name) {
@@ -1633,7 +1685,19 @@
         const l = btn.dataset.level;
         if (typeof setCefr === "function") setCefr(l);
         document.querySelector('[data-step="1"]')?.setAttribute("hidden", "");
-        document.querySelector('[data-step="2"]')?.removeAttribute("hidden");
+        const kids = localStorage.getItem("enlab-kids") === "1";
+        if (kids) {
+          localStorage.removeItem("enlab-onboard-goal");
+          document.querySelector('[data-step="2"]')?.setAttribute("hidden", "");
+          document.querySelector('[data-step="3"]')?.removeAttribute("hidden");
+          const hint = document.querySelector("#onboard-session-hint");
+          if (hint) {
+            hint.removeAttribute("data-i18n");
+            hint.textContent = t("onboardSessionHintKids");
+          }
+        } else {
+          document.querySelector('[data-step="2"]')?.removeAttribute("hidden");
+        }
       }
       if (e.target.closest(".onboard-goal")) {
         const btn = e.target.closest(".onboard-goal");
@@ -1648,6 +1712,7 @@
         btn.setAttribute("aria-pressed", on ? "true" : "false");
         btn.classList.toggle("on", on);
         localStorage.setItem("enlab-kids", on ? "1" : "0");
+        if (on) localStorage.removeItem("enlab-onboard-goal");
         const hint = document.querySelector("#onboard-session-hint");
         if (hint) {
           hint.removeAttribute("data-i18n");

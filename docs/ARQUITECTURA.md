@@ -78,7 +78,7 @@ Flujo diario opcional tras el camino de Hoy: **familia oído → familia uso →
 | Día marcado | Chip en `#hoy-done-mid` (sin tarjeta duplicada en extras) |
 | Repaso + plan | Filtro por familia pendiente, timer corto, un hint en Guía |
 
-**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix. Espejo: `enlab-coach-plan-mirror` (transfer restaura steps mid-flow). Aula pro: columna Plan + mapa + CSV (familia siguiente / stale 3d) + print con heatmap + filtro fricción. Deep-link: `#coach-plan`. Diario: `planStep` + gráfica + Anki `#plan-step`. Stats `days.plan` alimenta la racha 90d (clic → diario).
+**Triggers:** placement bajo, cert warm-up ×2, fallos semanal, fricción 3 días → quickmix. Espejo: `enlab-coach-plan-mirror` (+ `pendingSince`, transfer restaura steps mid-flow). Aula pro: columna Plan + mapa + CSV (familia/stale) + print/CSV fricción filtrados. Deep-link: `#coach-plan`. Diario: `planStep` + gráfica + Anki `#plan-step`; abandonos ×3 en coach mode. Stats `days.plan` → racha 90d (clic → diario + hint Guía). Writing &lt;60% → CTA plan.
 
 ## Extensión a propósito (y su coste)
 

@@ -93,7 +93,9 @@ test("index has no remote fonts; SW v86 + offline fallback", async ({ request })
   expect(html).not.toMatch(/fonts\.googleapis/);
   expect(html).not.toMatch(/fonts\.gstatic/);
   const sw = await (await request.get("/sw.js")).text();
-  expect(sw).toMatch(/enlab-v93/);
+  expect(sw).toMatch(/enlab-v94/);
+  const sv = await (await request.get("/features-sv.js")).text();
+  expect(sv).toMatch(/SW_CACHE\s*=\s*["']enlab-v94["']/);
   expect(sw).toMatch(/offline\.html/);
   expect(sw).toMatch(/mode === ["']navigate["']/);
   const off = await request.get("/offline.html");

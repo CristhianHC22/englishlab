@@ -883,12 +883,20 @@ function persistCoachPlanMirror() {
       localStorage.removeItem("enlab-coach-plan-mirror");
       return;
     }
-    localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify({
+    const done = Number(plan?.done) || 0;
+    let pendingSince;
+    try {
+      const prev = JSON.parse(localStorage.getItem("enlab-coach-plan-mirror") || "null");
+      if (prev?.day === today && prev.pendingSince) pendingSince = prev.pendingSince;
+    } catch { /* ignore */ }
+    const payload = {
       day: today,
-      done: Number(plan?.done) || 0,
+      done,
       steps: plan?.steps || quizCoachPlan8(),
       flow: flow ? 1 : 0,
-    }));
+    };
+    if (done === 0) payload.pendingSince = pendingSince || Date.now();
+    localStorage.setItem("enlab-coach-plan-mirror", JSON.stringify(payload));
   } catch { /* ignore */ }
 }
 
@@ -5524,7 +5532,11 @@ document.addEventListener("click", (e) => {
       return;
     }
     if (srsDay.dataset.planDay === "1") {
-      try { sessionStorage.setItem("enlab-journal-focus", "plan"); } catch { /* ignore */ }
+      try {
+        sessionStorage.setItem("enlab-journal-focus", "plan");
+        sessionStorage.setItem("enlab-journal-from-90d", "1");
+      } catch { /* ignore */ }
+      invalidateYouAreChipsCache();
       showTab("ia");
       if (typeof openLabRoom === "function") openLabRoom("error-journal");
       else {
@@ -5535,6 +5547,7 @@ document.addEventListener("click", (e) => {
         }
       }
       if (typeof window.PLUS?.renderErrorJournal === "function") window.PLUS.renderErrorJournal();
+      if (typeof fillGuide === "function" && $("#guide-panel") && !$("#guide-panel").hidden) fillGuide();
       return;
     }
     if (srsDay.dataset.srsDue === "1") {
@@ -5547,10 +5560,15 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("[data-chart90-plan]")) {
-    try { sessionStorage.setItem("enlab-journal-focus", "plan"); } catch { /* ignore */ }
+    try {
+      sessionStorage.setItem("enlab-journal-focus", "plan");
+      sessionStorage.setItem("enlab-journal-from-90d", "1");
+    } catch { /* ignore */ }
+    invalidateYouAreChipsCache();
     showTab("ia");
     if (typeof openLabRoom === "function") openLabRoom("error-journal");
     if (typeof window.PLUS?.renderErrorJournal === "function") window.PLUS.renderErrorJournal();
+    if (typeof fillGuide === "function" && $("#guide-panel") && !$("#guide-panel").hidden) fillGuide();
     return;
   }
 
@@ -7157,6 +7175,20 @@ function guideFillEntry() {
       s: [hint, ...(entry.s || [])].slice(0, 4),
     };
   }
+  if (!kids && (place === "error-journal" || currentTab === "ia")) {
+    let focus = "";
+    try { focus = sessionStorage.getItem("enlab-journal-focus") || ""; } catch { focus = ""; }
+    const from90 = sessionStorage.getItem("enlab-journal-from-90d") === "1";
+    const planFocus = focus === "plan" || focus === "plan 8 min" || focus === "8-min plan";
+    if (planFocus || from90) {
+      const hint = from90 ? t("guideJournalPlanFrom90") : t("guideJournalPlanFocus");
+      entry = {
+        ...entry,
+        w: entry.w ? `${hint} ${entry.w}` : hint,
+        s: [hint, ...(entry.s || [])].slice(0, 4),
+      };
+    }
+  }
   if (!kids && currentTab === "hoy" && !coachPlanStarted() && coachPlanLeft() > 0 && !placeNudgeDismissed()) {
     const pr = loadPlaceResult();
     if (pr) {
@@ -7346,6 +7378,7 @@ function invalidateCoachUiCache() {
   _quizNowKey = "";
   _lastHoyDoneMidKey = "";
   window._perfHintKey = "";
+  window._streakChartKey = "";
 }
 
 function invalidateYouAreChipsCache() {
@@ -7409,6 +7442,10 @@ function guideFillEntryCached() {
     coachPlanStarted(),
     certWarmupStreak(),
     document.querySelector("#class-task-banner")?.classList.contains("class-task-must") ? "1" : "0",
+    (() => {
+      try { return sessionStorage.getItem("enlab-journal-focus") || ""; } catch { return ""; }
+    })(),
+    sessionStorage.getItem("enlab-journal-from-90d") === "1" ? "1" : "0",
   ].join("|");
   if (key === _guideFillEntryKey && _guideFillEntryCache) return _guideFillEntryCache;
   _guideFillEntryKey = key;
@@ -8206,6 +8243,15 @@ function renderStreakChart() {
   const srsDays = days.filter((d) => d.srsDue).length;
   const frictionDays = days.filter((d) => d.frictionHigh).length;
   const planDays = days.filter((d) => d.planDone).length;
+  const lang = typeof uiLang === "function" ? uiLang() : "es";
+  let roll = 0;
+  for (let i = 0; i < days.length; i += 1) {
+    const d = days[i];
+    roll = ((roll * 33) + (d.score & 255) + (d.srsDue ? 256 : 0) + (d.frictionHigh ? 512 : 0) + (d.planDone ? 1024 : 0)) >>> 0;
+  }
+  const chartKey = `${lang}|${hotN}|${srsDays}|${frictionDays}|${planDays}|${roll}|${days[0]?.key}|${days[89]?.key}`;
+  if (chartKey === window._streakChartKey && el.innerHTML && !el.hidden) return;
+  window._streakChartKey = chartKey;
   const max = Math.max(1, ...days.map((d) => d.score));
   el.hidden = false;
   el.innerHTML = `
