@@ -251,7 +251,7 @@
             <td class="muted">${esc(rosterCoachPlanCell(s))}</td>
             <td class="muted">${esc(rosterFrictionCell(s))}</td>
             <td class="muted">${s.synced ? new Date(s.synced).toLocaleDateString() : "—"}</td>
-            <td><button type="button" class="chip sm" data-roster-rm="${realI}">×</button></td>
+            <td><button type="button" class="chip sm" data-roster-rm="${realI}" aria-label="${esc(t("classRosterRemove"))}">×</button></td>
           </tr>`;
     }).join("");
   }
@@ -391,7 +391,7 @@
       pathDone ? document.querySelector("#hoy-done-story") : null,
     ].filter(Boolean);
     if (!hit) {
-      hosts.forEach((host) => { host.hidden = true; host.innerHTML = ""; });
+      hosts.forEach((host) => { host.hidden = true; host.replaceChildren(); });
       return;
     }
     hosts.forEach((host) => {
@@ -401,7 +401,7 @@
     const above = document.querySelector("#hoy-story-chip");
     if (above && pathDone) {
       above.hidden = true;
-      above.innerHTML = "";
+      above.replaceChildren();
     }
   }
   function renderStoriesPanel() {
@@ -486,7 +486,7 @@
     if (!host) return;
     const all = (ENLAB.writingPrompts || []).filter((p) => p && p.prompt);
     if (!all.length) {
-      host.innerHTML = "";
+      host.replaceChildren();
       return;
     }
     const lvl = typeof lvlNum === "function" ? lvlNum() : 3;
@@ -497,7 +497,7 @@
     }
     const pick = prompts.find((p) => p.id && p.id === window._writingPick?.id) || prompts[0];
     if (!pick) {
-      host.innerHTML = "";
+      host.replaceChildren();
       return;
     }
     window._writingPick = pick;
@@ -858,14 +858,19 @@
         <button type="button" class="btn ghost sm" id="student-pdf">${esc(t("studentPdf"))}</button>
       </div>
       <div id="class-student-qr-box" class="student-qr-box" hidden></div>
-      <table class="class-roster-table" style="margin-top:12px;width:100%">
-        <thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColWeekly"))}</th><th>${esc(t("classColCert"))}</th><th>${esc(t("classColDue"))}</th><th>${esc(t("classColPlacement"))}</th><th>${esc(t("classColCoachPlan"))}</th><th>${esc(t("classColFriction"))}</th><th>${esc(t("classColSync"))}</th><th></th></tr></thead>
-        <tbody>${roster.length ? rosterRowsHtml(roster, taskCoach) : `<tr><td colspan="9" class="muted">${esc(t("classRosterEmpty"))}</td></tr>`}
+      <div class="table-scroll" tabindex="0" role="region" aria-label="${esc(t("classPro"))}">
+      <table class="class-roster-table">
+        <thead><tr><th scope="col">${esc(t("classColName"))}</th><th scope="col">${esc(t("classColWeekly"))}</th><th scope="col">${esc(t("classColCert"))}</th><th scope="col">${esc(t("classColDue"))}</th><th scope="col">${esc(t("classColPlacement"))}</th><th scope="col">${esc(t("classColCoachPlan"))}</th><th scope="col">${esc(t("classColFriction"))}</th><th scope="col">${esc(t("classColSync"))}</th><th scope="col"></th></tr></thead>
+        <tbody>${roster.length ? rosterRowsHtml(roster, taskCoach) : `<tr><td colspan="9"><div class="empty-state">${esc(t("classRosterEmpty"))}</div></td></tr>`}
         </tbody>
       </table>
+      </div>
       ${classCoachPlanSummaryHtml()}
       ${classCoachPlanAlertHtml()}
-      <div id="class-heat-lazy" class="class-heat-lazy" aria-busy="true"><p class="muted">${esc(t("classHeatLazy"))}</p></div>`;
+      <div id="class-heat-lazy" class="class-heat-lazy empty-state" aria-busy="true">
+        <progress class="loading-spinner" aria-label="${esc(t("classHeatLazy"))}"></progress>
+        <p class="muted">${esc(t("classHeatLazy"))}</p>
+      </div>`;
     scheduleClassHeatLazy();
     maybeNotifyClassAttention();
   }
@@ -877,6 +882,7 @@
       if (!slot.isConnected || slot.dataset.ready === "1") return;
       slot.dataset.ready = "1";
       slot.removeAttribute("aria-busy");
+      slot.classList.remove("empty-state");
       slot.innerHTML = `${classCoachPlanHeatHtml()}${classFrictionHeatmapHtml()}`;
       updateClassRosterBody();
     };
@@ -891,7 +897,7 @@
     const taskCoach = localStorage.getItem("enlab-class-task") === "coach";
     tbody.innerHTML = roster.length
       ? rosterRowsHtml(roster, taskCoach)
-      : `<tr><td colspan="9" class="muted">${esc(t("classRosterEmpty"))}</td></tr>`;
+      : `<tr><td colspan="9"><div class="empty-state">${esc(t("classRosterEmpty"))}</div></td></tr>`;
     document.querySelectorAll(".class-plan-heat-filters .chip").forEach((btn) => {
       btn.classList.toggle("active", (btn.dataset.planHeatFilter || "") === _classPlanHeatFilter);
     });
@@ -1018,7 +1024,8 @@
       ${rows.length ? `<table class="mini-table"><thead><tr><th>${esc(t("classColName"))}</th><th>${esc(t("classColCoachPlan"))}</th><th>${esc(t("classColFriction"))}</th><th>${esc(t("classAttentionWhy"))}</th></tr></thead>
         <tbody>${rows.map((s) => {
           const why = [
-            rosterCoachPlanStale(s) ? t("classAttentionWhyStale") : "",
+            rosterCoachPlanStale(s, 7) ? t("classAttentionWhyStale7")
+              : (rosterCoachPlanStale(s) ? t("classAttentionWhyStale") : ""),
             frictionDropLevel(s.frictionDrop) === "hi" ? t("classAttentionWhyFriction") : "",
           ].filter(Boolean).join(" · ") || "—";
           return `<tr>
@@ -1042,7 +1049,7 @@
     const filt = _classFrictionHeatFilter || _classPlanHeatFilter || "attention";
     classAttentionStudents().forEach((s) => {
       const why = [
-        rosterCoachPlanStale(s) ? "stale_3d" : "",
+        rosterCoachPlanStale(s, 7) ? "stale_7d" : (rosterCoachPlanStale(s) ? "stale_3d" : ""),
         frictionDropLevel(s.frictionDrop) === "hi" ? "friction_hi" : "",
       ].filter(Boolean).join("|") || "";
       rows.push([
@@ -1287,6 +1294,8 @@
 
   function parsePodcastEarFromPayload(payload) {
     try {
+      const pe = Number(payload?.pe);
+      if (Number.isFinite(pe) && pe > 0) return pe;
       const errs = JSON.parse(payload["enlab-error-log"] || "[]");
       if (!Array.isArray(errs)) return 0;
       return errs.filter((r) => r && r.podcastEar).length;
@@ -1579,7 +1588,7 @@
     }).catch(() => {});
   }
 
-  const SW_CACHE = "enlab-v98";
+  const SW_CACHE = "enlab-v105";
 
   async function precacheTab(tab) {
     if (!("caches" in window)) return;
@@ -1816,6 +1825,7 @@
       if (e.target.closest("#class-coach-plan-print")) printClassCoachPlanSheet();
       if (e.target.closest("#class-coach-plan-csv")) exportClassCoachPlanCsv();
       if (e.target.closest("[data-roster-rm]")) {
+        if (!window.confirm(t("classRosterRemoveConfirm"))) return;
         const roster = loadRoster();
         roster.splice(Number(e.target.closest("[data-roster-rm]").dataset.rosterRm), 1);
         saveRoster(roster);

@@ -76,9 +76,9 @@ async function stabilizeForSnapshot(page) {
       ).join("")}</div>`;
     }
     const journal = document.getElementById("error-journal");
-    if (journal) { journal.hidden = true; journal.innerHTML = ""; }
+    if (journal) { journal.hidden = true; journal.replaceChildren(); }
     const perf = document.getElementById("perf-panel");
-    if (perf) { perf.hidden = true; perf.innerHTML = ""; }
+    if (perf) { perf.hidden = true; perf.replaceChildren(); }
     document.querySelectorAll("[data-pwa-install]").forEach((el) => { el.hidden = true; });
     document.getElementById("level-nudge")?.setAttribute("hidden", "");
     document.getElementById("welcome")?.setAttribute("hidden", "");

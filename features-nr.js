@@ -425,7 +425,8 @@
     const pods = (ENLAB.podcasts || []).filter((p) => (p.min || 1) <= n);
     const series = (ENLAB.podcastSeries || []).filter((s) => (s.min || 1) <= n);
     const resumeBanner = renderPodcastResumeBanner();
-    const seriesMid = loadSeriesQuizNow();
+    const kids = typeof kidsOn === "function" && kidsOn();
+    const seriesMid = !kids ? loadSeriesQuizNow() : null;
     const seriesResumeBanner = seriesMid ? (() => {
       const s = (ENLAB.podcastSeries || []).find((x) => x.id === seriesMid.id);
       if (!s) return "";
@@ -728,13 +729,13 @@
     if (!el) return;
     if (typeof currentTab !== "undefined" && currentTab !== "hablar") {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     const now = loadDuoNow();
     if (!now || duoState.active || (typeof kidsOn === "function" && kidsOn())) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     el.hidden = false;
@@ -750,13 +751,13 @@
     if (!el) return;
     if (typeof kidsOn === "function" && kidsOn()) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     const now = loadDuoNow();
     if (!now) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       renderDuoResumeHablar();
       return;
     }
@@ -982,7 +983,7 @@
     if (!el) return;
     if (typeof kidsOn === "function" && kidsOn()) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     const now = loadCertNow();
@@ -997,7 +998,7 @@
         return;
       }
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     el.hidden = false;
@@ -1429,14 +1430,43 @@
     bindEvents();
     renderCertToday();
     renderDuoToday();
+    renderSeriesToday();
     if (typeof onHomePaint === "function" && !window._renderHomePatched) {
       window._renderHomePatched = true;
       onHomePaint(() => {
         renderTravelPanel();
         renderCertToday();
         renderDuoToday();
+        renderSeriesToday();
       });
     }
+  }
+
+  function renderSeriesToday() {
+    const el = document.querySelector("#series-today");
+    if (!el) return;
+    if (typeof kidsOn === "function" && kidsOn()) {
+      el.hidden = true;
+      el.replaceChildren();
+      return;
+    }
+    const mid = loadSeriesQuizNow();
+    if (!mid) {
+      el.hidden = true;
+      el.replaceChildren();
+      return;
+    }
+    const s = (ENLAB.podcastSeries || []).find((x) => x.id === mid.id);
+    const total = s?.seriesQs?.length || 0;
+    if (!s || !total) {
+      el.hidden = true;
+      el.replaceChildren();
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `<p class="kicker">${esc(t("seriesQuizResumeKicker"))}</p>
+      <p class="muted">${esc(s.title)}</p>
+      <button type="button" class="btn sm" data-series-resume="${esc(s.id)}">${esc(t("seriesQuizResume", { n: mid.i + 1, total }))}</button>`;
   }
 
   function travelYouAreHint() {
@@ -1473,6 +1503,7 @@
     loadSeriesQuizNow,
     resumeSeriesQuiz,
     seriesYouAreChipsHtml,
+    renderSeriesToday,
   };
 
   if (!window.ENLAB_LOADER) NR.bootstrap();

@@ -146,7 +146,7 @@
     const now = loadPlaceNow();
     if (!now || (typeof kidsOn === "function" && kidsOn())) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     el.hidden = false;
@@ -161,13 +161,13 @@
     if (!el) return;
     if (typeof kidsOn === "function" && kidsOn()) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       return;
     }
     const now = loadPlaceNow();
     if (!now) {
       el.hidden = true;
-      el.innerHTML = "";
+      el.replaceChildren();
       renderPlaceQuizResume();
       return;
     }
@@ -325,9 +325,9 @@
     let sortBy = "date";
     try { sortBy = sessionStorage.getItem("enlab-journal-sort") || "date"; } catch { /* ignore */ }
     if (sortBy === "mode") {
-      sortedRows = [...sortedRows].sort((a, b) => journalPlayMode(a.mode).localeCompare(journalPlayMode(b.mode)));
+      sortedRows = sortedRows.toSorted((a, b) => journalPlayMode(a.mode).localeCompare(journalPlayMode(b.mode)));
     } else if (sortBy === "word") {
-      sortedRows = [...sortedRows].sort((a, b) => String(a.expected || "").localeCompare(String(b.expected || "")));
+      sortedRows = sortedRows.toSorted((a, b) => String(a.expected || "").localeCompare(String(b.expected || "")));
     }
     /* date = default order (most recent first, already stored that way) */
     const rows = sortedRows.slice(0, 12);
@@ -575,7 +575,7 @@
         </tr>`).join("")}</tbody>
       </table>`;
     window.print();
-    requestAnimationFrame(() => { area.hidden = true; area.innerHTML = ""; });
+    requestAnimationFrame(() => { area.hidden = true; area.replaceChildren(); });
   }
 
   function printWeekSheet() {
@@ -943,6 +943,7 @@
     } else {
       lines.push(`<p class="muted perf-lh-row">${esc(tt("perfLhHint"))}</p>`);
     }
+    lines.push(`<p><button type="button" class="btn ghost sm" id="perf-lh-copy" data-copy="npm run perf:lh">${esc(tt("perfLhCopy"))}</button></p>`);
     host.innerHTML = lines.join("");
     schedulePerfHeatLazy();
     fetch("./enlab-lh-last.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((data) => {
@@ -993,6 +994,25 @@
       }
       if (e.target.closest("#journal-csv")) exportWeakCsv();
       if (e.target.closest("#perf-friction-csv")) exportFrictionCsv();
+      const lhCopy = e.target.closest("#perf-lh-copy");
+      if (lhCopy) {
+        const cmd = lhCopy.dataset.copy || "npm run perf:lh";
+        const done = () => {
+          if (typeof flashToast === "function") flashToast(tt("perfLhCopied"), "ok");
+          else lhCopy.textContent = tt("perfLhCopied");
+        };
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(cmd).then(done).catch(() => {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = cmd;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+            done();
+          } catch { /* ignore */ }
+        });
+      }
       if (e.target.closest("#week-sheet-print")) printWeekSheet();
       if (e.target.closest("#journal-print-now")) printJournalNow();
       if (e.target.closest(".journal-search-row [data-journal-clear]")) {

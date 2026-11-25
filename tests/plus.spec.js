@@ -694,9 +694,13 @@ test("Repaso timer shortens when plan stale 5d+", async ({ page }) => {
   const secs = await page.evaluate(() => {
     localStorage.removeItem("enlab-kids");
     sessionStorage.removeItem("enlab-coach-plan");
-    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 6 * 86400000));
+    localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 8 * 86400000));
     return {
-      deep: repasoTimerSecs(),
+      deep7: repasoTimerSecs(),
+      deep5: (() => {
+        localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 6 * 86400000));
+        return repasoTimerSecs();
+      })(),
       mild: (() => {
         localStorage.setItem("enlab-coach-stale-since", String(Date.now() - 4 * 86400000));
         return repasoTimerSecs();
@@ -707,7 +711,8 @@ test("Repaso timer shortens when plan stale 5d+", async ({ page }) => {
       })(),
     };
   });
-  expect(secs.deep).toBe(360);
+  expect(secs.deep7).toBe(300);
+  expect(secs.deep5).toBe(360);
   expect(secs.mild).toBe(480);
   expect(secs.fresh).toBe(600);
 });
@@ -938,4 +943,19 @@ test("Perf panel shows stored Lighthouse score", async ({ page }) => {
     window.PLUS?.renderPerfHint?.();
   });
   await expect(page.locator("#perf-panel .perf-lh-row")).toContainText(/82|Lighthouse|LCP/i);
+  await expect(page.locator("#perf-lh-copy")).toHaveCount(1);
+});
+
+test("Hoy series-today shows mid series quiz resume", async ({ page }) => {
+  await boot(page);
+  const ok = await page.evaluate(() => {
+    const s = (ENLAB.podcastSeries || [])[0];
+    if (!s) return false;
+    localStorage.removeItem("enlab-kids");
+    localStorage.setItem("enlab-series-now", JSON.stringify({ id: s.id, i: 1, at: Date.now() }));
+    window.NR?.renderSeriesToday?.();
+    const el = document.querySelector("#series-today");
+    return !!(el && !el.hidden && el.querySelector("[data-series-resume]"));
+  });
+  expect(ok).toBe(true);
 });

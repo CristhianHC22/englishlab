@@ -2,14 +2,29 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>English Lab</title>
   <meta name="description" content="English Lab: oído y verbos irregulares. A1 a B2. Pulsa para oír." />
+  <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" id="theme-color" content="#0b7a72" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="English Lab" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("enlab-theme");
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = (saved === "dark" || saved === "light") ? saved : (dark ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        if (meta) meta.content = (saved === "dark" || saved === "light") ? saved : "light dark";
+        var tc = document.getElementById("theme-color");
+        if (tc) tc.content = theme === "dark" ? "#12201e" : "#0b7a72";
+      } catch (e) { /* FOUC guard */ }
+    })();
+  </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-180.png" />
@@ -17,6 +32,7 @@
 </head>
 <body>
   <a class="skip" href="#hoy" data-i18n="skip">Saltar al contenido</a>
+  <div id="enlab-toast" class="enlab-toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <div id="welcome" class="welcome" hidden>
     <div class="card welcome-card">
       <p class="kicker" data-i18n="welcomeKicker">Cómo funciona</p>
@@ -33,9 +49,9 @@
   <div class="wrap">
     <header class="hero">
       <div class="hero-top">
-        <div>
-          <div class="kicker" data-i18n="heroKicker">English Lab · de A1 a B2</div>
+        <div class="hero-brand">
           <h1>English Lab</h1>
+          <p class="hero-tag" data-i18n="heroKicker">English Lab · de A1 a B2</p>
         </div>
         <div class="hero-tools">
           <button type="button" class="chip" id="guide-toggle" aria-expanded="false" aria-controls="guide-panel" data-i18n="guideBtn" data-i18n-aria="guideBtnAria" aria-label="Guía: cómo funciona esta pantalla">Guía</button>
@@ -84,13 +100,13 @@
       <p id="kids-banner" class="kids-banner" hidden data-i18n="kidsBanner">Modo niño: letra grande, voz lenta.</p>
     </header>
 
-    <nav class="tabs" aria-label="Secciones" data-i18n-aria="navAria">
-      <button data-tab="hoy" aria-current="page" data-i18n-title="tabHintHoy" title="Sesión de 15 min. Un botón te lleva.">Hoy</button>
-      <button data-tab="vocales" data-i18n-title="tabHintVocales" title="Temas para oír. Cada tarjeta es una sala.">Oír</button>
-      <button data-tab="verbos" data-i18n-title="tabHintVerbos" title="Tu lista: busca, oye, marca débil o fuerte.">Verbos</button>
-      <button data-tab="quiz" data-i18n-title="tabHintQuiz" title="Juega ahora usa el del día. O elige un grupo.">Juego</button>
-      <button data-tab="hablar" data-i18n-title="tabHintHablar" title="Oír modelo, luego Grabarme. Extra abajo.">Hablar</button>
-      <button data-tab="ia" data-i18n-title="tabHintIa" title="Herramientas (prompts, aula). No explica el lab: eso es Guía.">Ayuda</button>
+    <nav class="tabs" role="tablist" aria-label="Secciones" data-i18n-aria="navAria">
+      <button type="button" role="tab" id="tab-hoy" data-tab="hoy" aria-controls="hoy" aria-selected="true" aria-current="page" tabindex="0" data-i18n-title="tabHintHoy" title="Sesión de 15 min. Un botón te lleva.">Hoy</button>
+      <button type="button" role="tab" id="tab-vocales" data-tab="vocales" aria-controls="vocales" aria-selected="false" tabindex="-1" data-i18n-title="tabHintVocales" title="Temas para oír. Cada tarjeta es una sala.">Oír</button>
+      <button type="button" role="tab" id="tab-verbos" data-tab="verbos" aria-controls="verbos" aria-selected="false" tabindex="-1" data-i18n-title="tabHintVerbos" title="Tu lista: busca, oye, marca débil o fuerte.">Verbos</button>
+      <button type="button" role="tab" id="tab-quiz" data-tab="quiz" aria-controls="quiz" aria-selected="false" tabindex="-1" data-i18n-title="tabHintQuiz" title="Juega ahora usa el del día. O elige un grupo.">Juego</button>
+      <button type="button" role="tab" id="tab-hablar" data-tab="hablar" aria-controls="hablar" aria-selected="false" tabindex="-1" data-i18n-title="tabHintHablar" title="Oír modelo, luego Grabarme. Extra abajo.">Hablar</button>
+      <button type="button" role="tab" id="tab-ia" data-tab="ia" aria-controls="ia" aria-selected="false" tabindex="-1" data-i18n-title="tabHintIa" title="Herramientas (prompts, aula). No explica el lab: eso es Guía.">Ayuda</button>
     </nav>
 
     <button type="button" id="you-are" class="you-are" aria-controls="guide-panel" data-i18n-title="youAreHint" title="Pulsa para abrir Guía">
@@ -119,7 +135,7 @@
       <nav id="guide-lab" class="guide-lab" hidden></nav>
     </aside>
 
-    <section id="hoy" class="panel active">
+    <section id="hoy" class="panel active" role="tabpanel" aria-labelledby="tab-hoy">
       <div class="card hoy-mission">
         <div class="hoy-mission-head">
           <div>
@@ -178,6 +194,7 @@
         <p class="muted" data-i18n="hoySessionNote">Se marca solo, en el orden del camino: oír pares, oír verbos, grabar el diálogo, 3 preguntas.</p>
         <div id="situations-panel" class="card situations-panel" hidden></div>
         <div id="podcast-today" class="card" hidden></div>
+        <div id="series-today" class="card" hidden></div>
         <div id="cierre-today" class="card" hidden></div>
         <div id="cert-today" class="card" hidden></div>
         <div id="weekly-today" class="card" hidden></div>
@@ -342,7 +359,7 @@
       </p>
     </section>
 
-    <section id="vocales" class="panel">
+    <section id="vocales" class="panel" role="tabpanel" aria-labelledby="tab-vocales" hidden>
       <div class="card lab-keep">
         <h2 data-i18n="oidoTitle">Oír: por qué cambia cada vocal</h2>
         <p data-i18n="oidoIntro">Cada tarjeta es una sala para oír. Los botones Jugar te llevan a Juego (otra pestaña).</p>
@@ -448,12 +465,13 @@
       </article>
     </section>
 
-    <section id="verbos" class="panel">
+    <section id="verbos" class="panel" role="tabpanel" aria-labelledby="tab-verbos" hidden>
       <div id="verb-today" class="card verb-today" hidden></div>
       <div class="card">
         <h2 data-i18n="verbosTitle">Verbos</h2>
         <p class="muted" data-i18n="verbosHint">Busca. Débil = se te traba. I + pasado = ayer; I have… = experiencia.</p>
-        <input id="verb-search" type="search" data-i18n-placeholder="verbSearchPh" placeholder="Busca: go, ir, thought, escribir, I have…" />
+        <label class="sr-only" for="verb-search" data-i18n="verbSearchPh">Busca: go, ir, thought, escribir, I have…</label>
+        <input id="verb-search" type="search" name="verb-search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="verbSearchPh" placeholder="Busca: go, ir, thought, escribir, I have…" />
         <div id="verb-filters" class="verb-filters"></div>
         <p class="muted" id="verb-count"></p>
         <p class="muted" data-i18n="verbWeakNote">Débil = se te traba. Fuerte = ya te sale. Son tu lista personal.</p>
@@ -461,7 +479,7 @@
       <div id="verb-list" class="card" style="margin-top:12px"></div>
     </section>
 
-    <section id="quiz" class="panel">
+    <section id="quiz" class="panel" role="tabpanel" aria-labelledby="tab-quiz" hidden>
       <div class="card lab-hub-head">
         <h2 data-i18n="quizTitle">Elige un juego</h2>
         <p class="muted" data-i18n="quizHint">Juega ahora usa el del día. Un grupo es si quieres otro. Un round cuenta en Hoy.</p>
@@ -606,7 +624,7 @@
       <div id="cert-print-area" class="print-only" hidden></div>
     </section>
 
-    <section id="hablar" class="panel">
+    <section id="hablar" class="panel" role="tabpanel" aria-labelledby="tab-hablar" hidden>
       <div class="card lab-keep">
         <h2 data-i18n="hablarTitle">Di esto</h2>
         <p class="muted" data-i18n="hablarHint">Primero Oír modelo (Grabarme se marca). Luego graba: comprueba sola.</p>
@@ -706,7 +724,7 @@
       </article>
     </section>
 
-    <section id="ia" class="panel">
+    <section id="ia" class="panel" role="tabpanel" aria-labelledby="tab-ia" hidden>
       <div class="card lab-hub-head">
         <h2 data-i18n="iaTitle">Ayuda de una IA (gratis)</h2>
         <p data-i18n="iaHint">Guía (arriba) explica cada pantalla. Aquí son herramientas. Los prompts se copian; el lab no envía nada.</p>

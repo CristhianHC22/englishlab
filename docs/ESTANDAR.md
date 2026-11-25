@@ -644,6 +644,67 @@ Avance v119:
 - **Perf**: panel lee `enlab-lh-last.json` / localStorage tras `npm run perf:lh`.
 - Cache SW: `enlab-v98`.
 
+Avance v120 (modernización frontend):
+
+- **Tokens**: spacing / radius / sombra / `--accent-ink` en `:root`; identidad Lab calm tactile (teal + coral).
+- **Tema**: `<meta name="color-scheme">` + FOUC script; `applyTheme` sincroniza meta; CSS `:has(meta)`.
+- **Pestañas**: `role="tablist/tab/tabpanel"`, flechas Home/End, subrayado de selección, `hidden` en paneles.
+- **IME**: Enter en quiz tipado/dictado ignora composición (`isComposing` / `keyCode === 229`).
+- **Transfer**: `TextEncoder` / `TextDecoder` (mismo wire UTF-8 + base64).
+- **Aula**: `.table-scroll` con cabeceras sticky; empty-state del roster.
+- **Hub**: container queries en `.lab-hub-grid`.
+- Cache SW: `enlab-v99`.
+
+Avance v121 (módulos + móvil):
+
+- **Hoy/móvil**: densifica hero; safe-area + `viewport-fit=cover`; `scroll-padding-bottom` para tabs fijas; gap táctil ≥8px.
+- **Verbos**: empty-state; label `sr-only` en búsqueda.
+- **Quiz tipado/dictado**: label + `aria-live` en veredicto; `enterkeyhint`.
+- **Aula**: spinner nativo (`<progress>`) en heat lazy; aria-label en quitar alumno.
+- **Forms**: `accent-color`, `:user-invalid`, focus-visible unificado.
+- Cache SW: `enlab-v100`.
+
+Avance v122 (perf + a11y):
+
+- **Clears**: `replaceChildren()` en lugar de `innerHTML = ""` (app + features + visual helper).
+- **Defer paint**: `content-visibility` + `contain-intrinsic-size` en `.lab-card`, journal y heat tables.
+- **Focus**: `scroll-padding-top` (tabs sticky escritorio) + ajuste móvil.
+- **A11y**: `aria-label` en dismiss del nudge de placement.
+- Cache SW: `enlab-v101`.
+
+Avance v123 (cierre residual):
+
+- **JS**: `toSorted()` en coach-plan pick y orden del diario (sin mutar arrays).
+- **Aula**: confirm nativo antes de quitar alumno del roster.
+- Cache SW: `enlab-v102`.
+
+Avance v124 (UX):
+
+- **Feedback**: toast `#enlab-toast` (aria-live) para copiar/importar progreso; status ok/bad en transfer.
+- **Salas**: foco a `.lab-back` al entrar y a la primera `.lab-card` al salir.
+- **Lab-back** más claro (← + borde accent); you-are más calmado; room-bar móvil con safe-area.
+- Cache SW: `enlab-v103`.
+
+Avance v125 (Lab calm tactile v2):
+
+- **Marca**: hero brand-first (`h1` + `.hero-tag`); tipografía display serif local (Palatino/Georgia), sin Google Fonts.
+- **Atmósfera**: fondos con gradients teal/coral; misión Hoy con rail accent; tabs glass sticky; cards/mode-picks táctiles.
+- **Oscuro**: mismos gradients; tabs transparentes; tokens `--bg-deep` / papel cálido.
+- Cache SW: `enlab-v104`.
+
+Avance v126 (cierre plan + Ideas v120):
+
+- **Repaso**: stale ≥7d → timer 5 min; Guía se ofrece 1× tras auto-plan.
+- **Aula**: CSV/print `stale_7d`; transfer compacto `pe` (podcastEar).
+- **Hoy**: `#series-today` resume quiz de serie; kids ocultan mid-series.
+- **URL**: hash de sala (`#lab-id`) al entrar; al salir vuelve a la pestaña.
+- **Perf**: botón copia `npm run perf:lh`; chart 90d más contraste en oscuro.
+- Cache SW: `enlab-v105`.
+
+### Design tokens (CSS)
+
+Variables en `:root` / `html[data-theme="dark"]`: color (`--bg`, `--bg-deep`, `--ink`, `--accent`, `--accent-2`…), `--space-1…5`, `--radius-sm|md|lg|pill`, `--shadow` / `--shadow-sm`, `--tap`, `--font` / `--font-display`. No Google Fonts. Preferir tokens al hardcodear px en UI nueva.
+
 ### Perf baseline (Lighthouse)
 
 Servidor local estático + Chrome headless (no CI — soft):

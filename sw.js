@@ -1,4 +1,4 @@
-const CACHE = "enlab-v98";
+const CACHE = "enlab-v105";
 const ASSETS = [
   "./",
   "./index.html",

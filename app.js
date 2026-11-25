@@ -111,8 +111,13 @@ function themePref() {
 }
 
 function applyTheme() {
+  const saved = localStorage.getItem("enlab-theme");
   const t = themePref();
   document.documentElement.dataset.theme = t;
+  const schemeMeta = document.querySelector('meta[name="color-scheme"]');
+  if (schemeMeta) {
+    schemeMeta.content = (saved === "dark" || saved === "light") ? saved : "light dark";
+  }
   const meta = $("#theme-color");
   if (meta) meta.content = t === "dark" ? "#12201e" : "#0b7a72";
   $$("[data-theme-set]").forEach((b) => setPressed(b, b.dataset.themeSet === t));
@@ -862,7 +867,7 @@ function quizCoachPlan8() {
   if (window._coachPlanStepsDay === day && window._coachPlanSteps) return window._coachPlanSteps;
   const ux = loadQuizUx();
   const dropOf = (m) => (ux[m]?.abandoned || 0) / Math.max(1, ux[m]?.sessions || 0);
-  const pick = (...modes) => [...modes].sort((a, b) => dropOf(b) - dropOf(a))[0];
+  const pick = (...modes) => modes.toSorted((a, b) => dropOf(b) - dropOf(a))[0];
   window._coachPlanStepsDay = day;
   window._coachPlanSteps = [
     pick("ear", "listen", "dict") || "ear",
@@ -1124,16 +1129,30 @@ function maybeScrollCoachPlanChip(force) {
 
 function handleAppHash(hash) {
   const h = String(hash || "").replace("#", "").trim();
-  if (h !== "coach-plan") return false;
-  if (currentTab !== "hoy") showTab("hoy");
-  const run = () => {
-    if (typeof coachPlanLeft !== "function" || coachPlanLeft() === 0) return;
-    if (!coachPlanStarted() && typeof startCoachPlanQuiz === "function") startCoachPlanQuiz();
-    else maybeScrollCoachPlanChip(true);
-  };
-  if (window._enlabBootstrapped) run();
-  else window.addEventListener("enlab-packs-ready", run, { once: true });
-  return true;
+  if (!h) return false;
+  if (h === "coach-plan") {
+    if (currentTab !== "hoy") showTab("hoy");
+    const run = () => {
+      if (typeof coachPlanLeft !== "function" || coachPlanLeft() === 0) return;
+      if (!coachPlanStarted() && typeof startCoachPlanQuiz === "function") startCoachPlanQuiz();
+      else maybeScrollCoachPlanChip(true);
+    };
+    if (window._enlabBootstrapped) run();
+    else window.addEventListener("enlab-packs-ready", run, { once: true });
+    return true;
+  }
+  const tabs = ["hoy", "vocales", "verbos", "quiz", "hablar", "ia"];
+  if (tabs.includes(h)) {
+    showTab(h);
+    return true;
+  }
+  if (typeof openLabRoom === "function") {
+    const run = () => openLabRoom(h);
+    if (window._enlabBootstrapped) return !!run();
+    window.addEventListener("enlab-packs-ready", run, { once: true });
+    return true;
+  }
+  return false;
 }
 
 function startCoachPlanQuiz(mode) {
@@ -1393,11 +1412,24 @@ function showTab(id) {
   _lastYouAreChipsKey = ""; /* invalidate chips cache on tab change */
   _lastHoyReviewKey = ""; /* invalidate review cache on tab change */
   clearEarTimers();
-  $$(".panel").forEach((p) => p.classList.toggle("active", p.id === id));
-  $$("nav.tabs button").forEach((b) => {
-    b.setAttribute("aria-current", b.dataset.tab === id ? "page" : "false");
+  $$(".panel").forEach((p) => {
+    const on = p.id === id;
+    p.classList.toggle("active", on);
+    p.hidden = !on;
   });
-  location.hash = id;
+  $$("nav.tabs button").forEach((b) => {
+    const on = b.dataset.tab === id;
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.setAttribute("aria-current", on ? "page" : "false");
+    b.tabIndex = on ? 0 : -1;
+  });
+  if (!window._enlabHashLock) {
+    try {
+      if (location.hash.replace(/^#/, "") !== id) history.replaceState(null, "", `#${id}`);
+    } catch {
+      try { location.hash = id; } catch { /* ignore */ }
+    }
+  }
   localStorage.setItem("enlab-tab", id);
   paintTab(id);
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
@@ -1742,7 +1774,7 @@ function renderLevelNudge() {
   if (!el) return;
   if (nudgeHidden()) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const days = daysBetweenKeys(ensureCefrSince(), todayKey());
@@ -1768,7 +1800,7 @@ function renderLevelNudge() {
   }
   if (!mode) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const action = mode === "up"
@@ -2065,7 +2097,7 @@ function renderHoyGame() {
   const g = todayGame();
   if (!g.game) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const n = g.game === "ed" ? edWeakSet().size : usoWeakSet().size;
@@ -2083,7 +2115,7 @@ function renderDailyVerbs(daily) {
   const deck = daily || (typeof todaysDeck === "function" ? todaysDeck() : []);
   const v = typeof verbOfDay === "function" ? verbOfDay() : deck[0];
   if (!v) {
-    box.innerHTML = "";
+    box.replaceChildren();
     return;
   }
   const rest = deck.filter((x) => x.inf !== v.inf).slice(0, 9);
@@ -2238,7 +2270,7 @@ function renderHoyPath() {
       if (pulse) localStorage.setItem("enlab-plan-pulse-day", todayKey());
     } else {
       planEl.hidden = true;
-      planEl.innerHTML = "";
+      planEl.replaceChildren();
     }
   }
   $$(".hoy-next").forEach((b) => { b.textContent = label; });
@@ -2302,6 +2334,30 @@ function cueHoyNext() {
   const foot = document.querySelector(".hoy-path-foot .hoy-next");
   if (!foot || foot.hidden) return;
   foot.classList.add("next-act");
+}
+
+let _toastTimer = null;
+function flashToast(msg, kind = "") {
+  const el = $("#enlab-toast");
+  if (!el || !msg) return;
+  el.hidden = false;
+  el.textContent = msg;
+  el.className = `enlab-toast${kind === "ok" ? " ok" : kind === "bad" ? " bad" : ""}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    if (el.contains(document.activeElement)) return;
+    el.hidden = true;
+    el.textContent = "";
+    el.className = "enlab-toast";
+  }, 4200);
+}
+
+function setStatusLine(st, msg, kind = "") {
+  if (!st) return;
+  st.hidden = false;
+  st.textContent = msg;
+  st.className = kind === "ok" ? "status ok" : kind === "bad" ? "status bad" : "muted";
+  if (!st.hasAttribute("aria-live")) st.setAttribute("aria-live", "polite");
 }
 
 function cueFirstPairHear() {
@@ -2384,13 +2440,13 @@ function renderCierreToday() {
   if (!el) return;
   if (typeof kidsOn === "function" && kidsOn()) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const now = loadCierreNow();
   if (!now) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   el.hidden = false;
@@ -2581,7 +2637,7 @@ function renderDailyStress() {
   if (!el) return;
   if (lvlNum() < 3) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const bank = ENLAB.stress || [];
@@ -2868,7 +2924,7 @@ function resetOidoLazy() {
   oidoSections().forEach((s) => {
     const el = $(s.host);
     if (!el) return;
-    el.innerHTML = "";
+    el.replaceChildren();
     el.classList.remove("is-ready");
   });
 }
@@ -3092,7 +3148,7 @@ function renderVerbs() {
   const slice = list.slice(0, verbLimit);
   box.classList.toggle("compact", verbCompactOn());
   box.innerHTML = slice.map((v) => verbCard(v)).join("")
-    || `<p class="muted">${esc(FILTERS.only === "weak" ? t("verbWeakEmpty") : t("verbNone"))}</p>`;
+    || `<div class="empty-state"><strong>${esc(FILTERS.only === "weak" ? t("verbWeakEmpty") : t("verbNone"))}</strong></div>`;
   if (slice.length && slice.length < list.length) {
     box.insertAdjacentHTML("beforeend",
       `<p style="margin:14px 0 0"><button type="button" class="btn" data-verb-more>Ver más (${list.length - slice.length})</button></p>`);
@@ -3350,7 +3406,7 @@ function renderHoyReview() {
     : "";
   if (!total && !preview.length && !coachRepaso) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const chip = (text, say, quizMode) => {
@@ -3774,7 +3830,7 @@ function renderWeeklyQuizResume() {
   if (!el) return;
   if (typeof kidsOn === "function" && kidsOn()) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   pruneWeeklyNow();
@@ -3789,7 +3845,7 @@ function renderWeeklyQuizResume() {
   }
   if (!now) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   el.hidden = false;
@@ -3805,7 +3861,7 @@ function renderWeeklyHistory() {
   try { hist = JSON.parse(localStorage.getItem("enlab-weekly-history") || "[]"); } catch { /* ignore */ }
   if (!hist.length) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   el.hidden = false;
@@ -3902,7 +3958,7 @@ function renderWeeklyToday() {
   if (!el) return;
   if (typeof kidsOn === "function" && kidsOn()) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     renderWeeklyQuizResume();
     return;
   }
@@ -3918,7 +3974,7 @@ function renderWeeklyToday() {
   }
   if (!now) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     if (typeof renderWeekReport === "function") renderWeekReport();
     renderWeeklyQuizResume();
     return;
@@ -4536,9 +4592,10 @@ function renderQuiz() {
       ${quizHeadHtml(it)}
       <div class="quiz-q">${quizQ(it)}</div>
       <div class="row"><button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizListen"))}</button></div>
-      <input id="quiz-input" type="text" autocomplete="off" placeholder="${esc(t("quizTypePh"))}" />
+      <label class="sr-only" for="quiz-input">${esc(t("quizTypePh"))}</label>
+      <input id="quiz-input" type="text" name="quiz-answer" autocomplete="off" enterkeyhint="done" aria-describedby="quiz-typed" placeholder="${esc(t("quizTypePh"))}" />
       <button type="button" class="btn" id="quiz-submit" style="margin-top:8px">${esc(t("quizCheck"))}</button>
-      <p class="status" id="quiz-typed"></p>
+      <p class="status" id="quiz-typed" aria-live="polite"></p>
     </div>`;
     $("#quiz-input").focus();
     const submit = () => {
@@ -4556,7 +4613,11 @@ function renderQuiz() {
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 900);
     };
     $("#quiz-submit").addEventListener("click", submit);
-    $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    $("#quiz-input").addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      submit();
+    });
     return;
   }
   if (it.type === "email") {
@@ -4584,9 +4645,10 @@ function renderQuiz() {
         <button type="button" class="btn" data-say="${esc(it.say)}" data-slow="1">${esc(t("quizHearOnce"))}</button>
         <button type="button" class="btn ghost" data-say="${esc(it.say)}">${esc(t("quizHearAgain"))}</button>
       </div>
-      <input id="quiz-input" type="text" autocomplete="off" placeholder="${esc(t("quizDictPh"))}" />
+      <label class="sr-only" for="quiz-input">${esc(t("quizDictPh"))}</label>
+      <input id="quiz-input" type="text" name="quiz-dict" autocomplete="off" enterkeyhint="done" aria-describedby="quiz-typed" placeholder="${esc(t("quizDictPh"))}" />
       <button type="button" class="btn" id="quiz-submit" style="margin-top:8px">${esc(t("quizCheck"))}</button>
-      <p class="status" id="quiz-typed"></p>
+      <p class="status" id="quiz-typed" aria-live="polite"></p>
     </div>`;
     speak(it.say, true);
     $("#quiz-input").focus();
@@ -4605,7 +4667,11 @@ function renderQuiz() {
       setTimeout(() => { quiz.i += 1; renderQuiz(); }, 1100);
     };
     $("#quiz-submit").addEventListener("click", submit);
-    $("#quiz-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    $("#quiz-input").addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      submit();
+    });
     return;
   }
   if (it.type === "uso" || it.type === "ed" || it.type === "art" || it.type === "prep" || it.type === "phrasal" || it.type === "cond" || it.type === "listen" || it.type === "email" || it.type === "story" || it.type === "emailtone") {
@@ -5284,6 +5350,23 @@ function playEarSequence(it, warmup) {
     later(() => { speak(it.say, true).then(resolve); }, 280);
   });
 }
+
+document.querySelector("nav.tabs")?.addEventListener("keydown", (e) => {
+  const tabs = [...document.querySelectorAll("nav.tabs [role='tab'], nav.tabs [data-tab]")];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  let next = -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (i + 1) % tabs.length;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (i - 1 + tabs.length) % tabs.length;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = tabs.length - 1;
+  else return;
+  e.preventDefault();
+  const btn = tabs[next];
+  btn.focus();
+  if (currentTab === btn.dataset.tab) closeLabRoom(document.getElementById(btn.dataset.tab));
+  showTab(btn.dataset.tab);
+});
 
 document.addEventListener("click", (e) => {
   const tab = e.target.closest("nav.tabs [data-tab]");
@@ -6160,7 +6243,7 @@ function renderOidoResume() {
   const here = panel?.classList.contains("lab-in") && panel.querySelector(".lab-topic.on")?.dataset.lab;
   if (!last?.id || here === last.id) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const topic = document.querySelector(`[data-lab="${CSS.escape(last.id)}"]`);
@@ -6398,7 +6481,7 @@ function placementPlanChipHtml(cls = "btn sm") {
   if (pct >= 0.65) return "";
   const step = placementCoachStep(pct);
   const btn = `<button type="button" class="${cls}" data-coach-plan-go data-coach-plan-mode="${esc(step)}">${esc(t("placeCoachPlanChip", { pct: Math.round(pct * 100) }))}</button>`;
-  return `<span class="you-are-chip-row">${btn}<button type="button" class="chip sm" data-place-nudge-dismiss title="${esc(t("placeNudgeDismiss"))}">×</button></span>`;
+  return `<span class="you-are-chip-row">${btn}<button type="button" class="chip sm" data-place-nudge-dismiss title="${esc(t("placeNudgeDismiss"))}" aria-label="${esc(t("placeNudgeDismiss"))}">×</button></span>`;
 }
 
 function placementCoachPlanHtml() {
@@ -6484,6 +6567,7 @@ function saveWeeklyFailsForCoach() {
 function repasoTimerSecs() {
   try {
     const staleFlag = sessionStorage.getItem("enlab-repaso-stale");
+    if (staleFlag === "7" && coachPlanLeft() > 0) return 300;
     if (staleFlag === "5" && coachPlanLeft() > 0) return 360;
     if (staleFlag === "3" && coachPlanLeft() > 0) return 480;
   } catch { /* ignore */ }
@@ -6491,6 +6575,7 @@ function repasoTimerSecs() {
     const left = coachPlanLeft();
     return Math.min(600, Math.max(360, left * 240));
   }
+  if (coachPlanLeft() > 0 && coachPlanIsStale(7)) return 300;
   if (coachPlanLeft() > 0 && coachPlanIsStale(5)) return 360;
   if (coachPlanLeft() > 0 && coachPlanIsStale(3)) return 480;
   return 600;
@@ -6519,7 +6604,7 @@ function renderCoachPlanToday() {
   /* Día marcado ya lleva el chip en #hoy-done-mid; kids: menos ruido */
   if (kids || pathDone || done >= steps.length) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   const qm = quickmixFrictionHigh()
@@ -6611,6 +6696,20 @@ function closeLabRoom(panel) {
   panel.querySelectorAll(".lab-topic").forEach((el) => el.classList.remove("on"));
   syncGuide();
   if (panel.id === "vocales") renderOidoResume();
+  try {
+    if (panel.id && location.hash.replace(/^#/, "") !== panel.id) {
+      history.replaceState(null, "", `#${panel.id}`);
+    }
+  } catch { /* ignore */ }
+  requestAnimationFrame(() => {
+    const hub = panel.querySelector(".lab-hub");
+    const card = hub?.querySelector(".lab-card");
+    if (card) card.focus({ preventScroll: true });
+    else if (hub) {
+      if (!hub.hasAttribute("tabindex")) hub.tabIndex = -1;
+      hub.focus({ preventScroll: true });
+    }
+  });
 }
 
 function closeOidoTopic() {
@@ -6656,6 +6755,15 @@ function openLabRoom(jumpId) {
     renderWeeklyHistory();
   }
   if (topic.dataset.lab === "duo-card") window.NR?.renderDuoResumeHablar?.();
+  const roomHash = topic.dataset.lab || raw;
+  try {
+    window._enlabHashLock = true;
+    if (roomHash) history.replaceState(null, "", `#${roomHash}`);
+  } catch { /* ignore */ }
+  finally { window._enlabHashLock = false; }
+  requestAnimationFrame(() => {
+    panel.querySelector(".lab-back")?.focus({ preventScroll: true });
+  });
   return true;
 }
 
@@ -7855,7 +7963,7 @@ function fillGuideMap() {
   _lastGuideMapKey = mapKey;
   if (pathDone) {
     box.hidden = true;
-    box.innerHTML = "";
+    box.replaceChildren();
     return;
   }
   const panel = document.getElementById(currentTab);
@@ -7869,7 +7977,7 @@ function fillGuideMap() {
       .filter((c) => (c.dataset.labJump || c.dataset.jump) !== here);
     if (!sibs.length) {
       box.hidden = true;
-      box.innerHTML = "";
+      box.replaceChildren();
       return;
     }
     const hereTitle = hereCard?.querySelector("strong")?.textContent?.trim() || "";
@@ -7886,7 +7994,7 @@ function fillGuideMap() {
   const groups = [...(panel?.querySelectorAll(".lab-hub-group") || [])];
   if (cards.length < 2) {
     box.hidden = true;
-    box.innerHTML = "";
+    box.replaceChildren();
     return;
   }
   box.hidden = false;
@@ -7967,6 +8075,14 @@ function maybeOfferGuide() {
   if (localStorage.getItem("enlab-guide-quiet") === "1") return;
   const welcome = $("#welcome");
   if (welcome && !welcome.hidden) return;
+  try {
+    if (sessionStorage.getItem("enlab-repaso-auto-plan") === "1"
+      && sessionStorage.getItem("enlab-repaso-auto-guide-seen") !== "1") {
+      sessionStorage.setItem("enlab-repaso-auto-guide-seen", "1");
+      setGuideOpen(true);
+      return;
+    }
+  } catch { /* ignore */ }
   if (guideSeen().includes(currentTab)) return;
   setGuideOpen(true);
 }
@@ -8133,7 +8249,7 @@ function applyUiLangBody() {
     if (hoyPathI < 0) b.textContent = t("startPath");
   });
   $$("[data-pwa-install]").forEach((b) => { b.textContent = t("installApp"); });
-  const heroKicker = document.querySelector(".hero .kicker");
+  const heroKicker = document.querySelector(".hero .hero-tag, .hero .kicker");
   if (heroKicker && !heroKicker.dataset.i18n) heroKicker.textContent = t("heroKicker");
   const lede = $("#level-lede");
   if (lede) lede.textContent = t("heroLede");
@@ -8235,7 +8351,7 @@ function startRepasoMode() {
     const kids = typeof kidsOn === "function" && kidsOn();
     const pathDone = $("#hoy")?.classList.contains("path-done");
     if (!kids && coachPlanIsStale() && coachPlanProgress() === 0 && coachPlanLeft() >= 3) {
-      sessionStorage.setItem("enlab-repaso-stale", coachPlanIsStale(5) ? "5" : "3");
+      sessionStorage.setItem("enlab-repaso-stale", coachPlanIsStale(7) ? "7" : (coachPlanIsStale(5) ? "5" : "3"));
       /* Auto-arranque solo con día marcado — no secuestra el camino */
       if (pathDone) staleAuto = true;
     }
@@ -8465,6 +8581,13 @@ function renderStreakChart() {
 function buildTransferPayload() {
   const payload = { v: 2, savedAt: new Date().toISOString() };
   PROG_KEYS.forEach((k) => { payload[k] = localStorage.getItem(k); });
+  try {
+    const errs = JSON.parse(localStorage.getItem("enlab-error-log") || "[]");
+    if (Array.isArray(errs)) {
+      const pe = errs.filter((r) => r && r.podcastEar).length;
+      if (pe > 0) payload.pe = pe;
+    }
+  } catch { /* ignore */ }
   payload.cs = transferPayloadChecksum(payload);
   return payload;
 }
@@ -8481,7 +8604,10 @@ function transferPayloadChecksum(payload) {
 }
 
 function transferEncode(payload) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
 
 let prefsTransferEcho = "";
@@ -8493,7 +8619,9 @@ function transferTail(code) {
 }
 
 function transferDecode(str) {
-  return JSON.parse(decodeURIComponent(escape(atob(String(str || "").trim()))));
+  const bin = atob(String(str || "").trim());
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 function transferDecodeLooksCut(err) {
@@ -8580,37 +8708,33 @@ function renderTransferCode() {
 }
 
 function importTransferCode(raw, quiet) {
-  const st = $("#prefs-transfer-status");
-  const say = (msg) => {
-    if (quiet && st) {
-      st.hidden = false;
-      st.textContent = msg;
-      return;
-    }
-    alert(msg);
+  const st = $("#prefs-transfer-status") || $("#hoy-transfer-status");
+  const say = (msg, kind = "bad") => {
+    setStatusLine(st, msg, kind);
+    if (!quiet) flashToast(msg, kind);
   };
   const trimmed = String(raw || "").replace(/\s/g, "");
   if (!trimmed) {
-    say(t("prefsTransferEmpty"));
+    say(t("prefsTransferEmpty"), "bad");
     return;
   }
   if (trimmed.length < 16) {
-    say(t("transferTooShort"));
+    say(t("transferTooShort"), "bad");
     return;
   }
   let payload;
   try {
     payload = transferDecode(trimmed);
   } catch (err) {
-    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"));
+    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"), "bad");
     return;
   }
   if (typeof payload?.cs === "number" && payload.cs !== transferPayloadChecksum(payload)) {
-    say(t("transferChecksumFail"));
+    say(t("transferChecksumFail"), "bad");
     return;
   }
   if (transferTailMismatch(trimmed)) {
-    say(t("prefsTransferTailBlocked"));
+    say(t("prefsTransferTailBlocked"), "bad");
     return;
   }
   try {
@@ -8625,10 +8749,10 @@ function importTransferCode(raw, quiet) {
     if (typeof renderCoachPlanToday === "function") renderCoachPlanToday();
     if (typeof renderQuizNow === "function") renderQuizNow();
     if (typeof syncRemindToSw === "function") syncRemindToSw();
-    say(t("progressImported"));
+    say(t("progressImported"), "ok");
     prefsTransferEcho = trimmed;
   } catch (err) {
-    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"));
+    say(t(transferDecodeLooksCut(err) ? "transferCut" : "progressInvalid"), "bad");
   }
 }
 
@@ -8824,7 +8948,7 @@ function renderDueToday() {
   const due = srsDueList(10);
   if (!due.length) {
     el.hidden = true;
-    el.innerHTML = "";
+    el.replaceChildren();
     return;
   }
   el.hidden = false;
@@ -8893,20 +9017,19 @@ function renderWeekReport() {
 function importFromPrefs() {
   const raw = $("#prefs-transfer-paste")?.value || "";
   const st = $("#prefs-transfer-status");
-  const say = (msg) => {
-    if (!st) return;
-    st.hidden = false;
-    st.textContent = msg;
-  };
   if (!raw.trim()) {
-    say(t("prefsTransferEmpty"));
+    setStatusLine(st, t("prefsTransferEmpty"), "bad");
+    flashToast(t("prefsTransferEmpty"), "bad");
     return;
   }
   if (classroomLocked()) {
-    say(t("classPinImport"));
+    setStatusLine(st, t("classPinImport"), "bad");
+    flashToast(t("classPinImport"), "bad");
     return;
   }
   importTransferCode(raw, true);
+  const msg = st?.textContent || "";
+  if (msg) flashToast(msg, st.classList.contains("ok") ? "ok" : "bad");
 }
 
 function transferTailMismatch(code) {
@@ -8949,8 +9072,9 @@ function sayTransferCopied(st, code) {
   prefsTransferTail = transferTail(code);
   prefsTransferEcho = "";
   if (transferStatusReady(st)) return;
-  st.hidden = false;
-  st.textContent = t("prefsTransferCopied", { tail: prefsTransferTail });
+  const msg = t("prefsTransferCopied", { tail: prefsTransferTail });
+  setStatusLine(st, msg, "ok");
+  flashToast(msg, "ok");
 }
 
 function copyTransferFromPrefs() {
@@ -8958,17 +9082,17 @@ function copyTransferFromPrefs() {
   if (typeof renderTransferCode === "function") renderTransferCode();
   const code = $("#transfer-code")?.value || "";
   const st = $("#prefs-transfer-status");
-  const done = (msg) => {
-    if (!st) return;
-    st.hidden = false;
-    st.textContent = msg;
-  };
   if (!code) {
-    done(t("prefsTransferEmpty"));
+    setStatusLine(st, t("prefsTransferEmpty"), "bad");
+    flashToast(t("prefsTransferEmpty"), "bad");
     return;
   }
   sayTransferCopied(st, code);
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).catch(() => {});
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(code).catch(() => {
+      flashToast(t("prefsTransferEmpty"), "bad");
+    });
+  }
 }
 
 function classroomPin() {
@@ -9217,9 +9341,9 @@ function importProgress(file) {
       });
       applyLevel();
       renderRemind();
-      alert(t("progressImported"));
+      flashToast(t("progressImported"), "ok");
     } catch {
-      alert(t("progressFileInvalid"));
+      flashToast(t("progressFileInvalid"), "bad");
     }
   };
   reader.readAsText(file);
@@ -9278,6 +9402,11 @@ function prepareWelcome() {
 
 function init() {
   applyTheme();
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (!localStorage.getItem("enlab-theme")) applyTheme();
+    });
+  } catch { /* ignore */ }
   applyHideEs();
   applyKidsMode();
   applyUiLang();
