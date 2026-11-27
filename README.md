@@ -2,20 +2,47 @@
 
 PWA **gratis**, sin servidor: oído, verbos y habla para hispanohablantes. A1 → B2. Meta: B1. 15 minutos al día. Chrome o Edge.
 
+> Para agentes / orquestador de `Projects`: leer primero **[`AGENTS.md`](AGENTS.md)**.  
+> Arquitectura: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) · Estándar de pantallas: [`docs/ESTANDAR.md`](docs/ESTANDAR.md).
+
+**Path canónico (portfolio):** `C:\Users\ASUS ROG\Projects\englishlab`  
 Sitio: [https://cristhianhc22.github.io/englishlab/](https://cristhianhc22.github.io/englishlab/) (GitHub Pages, raíz del repo).
 
-Progreso: `localStorage` en este aparato. Nada se sube a un backend. Puedes exportar un código de transfer / QR para otro dispositivo o el aula.
+Progreso: `localStorage` (+ espejo IDB) en este aparato. Nada se sube a un backend. Transfer / QR para otro dispositivo o el aula.
 
-## Cómo se usa
+---
+
+## Contexto para el orquestador / agentes
+
+| Clave | Valor |
+|-------|--------|
+| **Dominio** | Aprendizaje de inglés (local-first PWA) |
+| **Caja Docker** | **Ninguna** — sitio estático; no usa `postgres_db` ni redes Docker del portfolio |
+| **Stack** | Vanilla JS + CSS + HTML (sin bundler, sin React/Vite/TS) |
+| **Runtime** | Chrome / Edge · Service Worker · Web Speech / mic |
+| **Deploy** | GitHub Pages (`push` a `main`) |
+| **Git remote** | `https://github.com/CristhianHC22/englishlab.git` |
+| **Cache SW** | `enlab-vNN` en `sw.js` **y** `features-sv.js` (hoy ver `AGENTS.md`) |
+| **Hermanos** | Independiente del resto del portfolio (no factura / SRI / Nest) |
+
+**No es** Nest/Angular/Next ni producto con DB. No inventar backend ni cuentas de usuario.
+
+Handoff al orquestador: `Projects/.orchestrator/inbox/YYYY-MM-DD-<slug>.md`.
+
+---
+
+## Cómo se usa (humano)
 
 1. Elige nivel (A1 fácil … B2 reto).
 2. **Hoy**: camino del día (pares → verbos → diálogo → 3 preguntas).
-3. **Oír / Verbos / Juego / Hablar** para profundizar.
+3. **Oír / Verbos / Juego / Hablar** para profundizar; **Ayuda** = herramientas (no explica la UI: eso es Guía).
 4. Instala la app si quieres avisos más fiables (HTTPS).
 
 ## Desarrollo
 
-```bash
+```powershell
+cd C:\Users\ASUS ROG\Projects\englishlab
+npm ci   # si hace falta
 npx --yes serve -l 4173
 # o: npm test  (levanta serve solo)
 ```
@@ -28,10 +55,11 @@ npx --yes serve -l 4173
 | `npm run test:visual:update` | Reescribe snapshots de **esta** plataforma |
 | `npm run icons` | Regenera PNG de iconos |
 | `npm run vapid` | Genera claves Web Push (privado **no** se commitea) |
+| `npm run perf:lh` | Lighthouse soft → `enlab-lh-last.json` |
 
 Snapshots visuales van por SO (`*-win32.png`, `*-linux.png`). Desde Windows, Linux:
 
-```bash
+```powershell
 docker run --rm -v ${PWD}:/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.62.1-jammy bash -c "npm ci && npm run test:visual:update"
 ```
 
@@ -41,14 +69,25 @@ docker run --rm -v ${PWD}:/work -v /work/node_modules -w /work mcr.microsoft.com
 2. Cada `push` a `main` publica (`/.github/workflows/pages.yml`).
 3. CI: `/.github/workflows/ci.yml` (syntax + tests + visual en Ubuntu).
 
-Al cambiar JS/CSS/HTML cacheados, hay que subir la versión de cache del service worker (`enlab-vNN` en `sw.js` y `features-sv.js`) o los alumnos instalados se quedan con el bundle viejo.
+Al cambiar JS/CSS/HTML cacheados, subir la versión de cache del service worker (`enlab-vNN` en `sw.js` y `features-sv.js`) o los alumnos instalados se quedan con el bundle viejo.
 
 ## Documentación para quien toca el código
 
 - [AGENTS.md](./AGENTS.md) — reglas cortas (agentes y humanos).
-- [docs/ARQUITECTURA.md](./docs/ARQUITECTURA.md) — qué hay, de dónde salió, por qué está así, qué falta.
+- [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) — qué hay, de dónde salió, por qué está así.
+- [docs/ESTANDAR.md](docs/ESTANDAR.md) — hub → sala, 6 pestañas, Guía vs Ayuda.
 
 ## Privacidad / secretos
 
 - `vapid-private.json` y `push-sub.json` están en `.gitignore`.
 - La clave **pública** sí va en `vapid-public.js` (necesario para suscribir Push en el cliente).
+- No commitear `node_modules/`, `test-results/`.
+
+## Relación con el portfolio `Projects`
+
+| | |
+|--|--|
+| Path canónico | `Projects\englishlab` |
+| Orquestador | `Projects\AGENTS.md` + `.orchestrator\inbox\` |
+| Infra compartida | **No usa** Postgres / redes Docker de demos |
+| Residual a evitar | `C:\Users\ASUS ROG\englishlab` tras el traslado |

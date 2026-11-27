@@ -2,7 +2,10 @@
 
 PWA **vanilla JS** (sin bundler, sin framework). Sitio estático en GitHub Pages. Todo el progreso vive en `localStorage` (+ espejo IDB de un subconjunto). Chrome/Edge. Hispano A1→B2, meta B1.
 
-Lee esto **antes** de tocar código. El mapa largo está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). El marco de pantallas (hub, sala, Guía) está en [docs/ESTANDAR.md](docs/ESTANDAR.md) — **léelo antes de añadir un panel o un menú**.
+**Path canónico (portfolio):** `C:\Users\ASUS ROG\Projects\englishlab`  
+Handoff humano / orquestador: [README.md](README.md). Mapa largo: [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Pantallas (hub, sala, Guía): [docs/ESTANDAR.md](docs/ESTANDAR.md) — **léelo antes de añadir un panel o un menú**.
+
+No depende de Postgres ni Docker del portfolio. Remote: `origin` → `https://github.com/CristhianHC22/englishlab.git`.
 
 ## No romper
 
